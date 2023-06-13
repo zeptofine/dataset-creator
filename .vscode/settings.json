@@ -1,0 +1,16 @@
+{
+  "editor.formatOnSave": true,
+  "python.analysis.typeCheckingMode": "basic",
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.formatOnType": true,
+    "editor.rulers": [
+      120
+    ]
+  },
+  "pylint.args": [
+    "--max-line-length=120",
+    "--extension-pkg-whitelist=cv2",
+    "--good-names=i,j,k,p,s,t,ex,Run,df"
+  ]
+}

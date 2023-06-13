@@ -1,0 +1,12 @@
+numpy
+opencv-python
+tqdm
+rich
+cfg_param_wrapper
+typer[all]
+python-dateutil
+polars
+imagehash
+pillow
+imagesize
+pyarrow
