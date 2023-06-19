@@ -8,7 +8,7 @@ from typing import Callable
 import polars as pl
 from polars import DataFrame, Expr
 
-from util.file_list import get_file_list, to_recursive
+from util.file_list import get_file_list
 
 from .base_filters import DataFilter, FastComparable
 

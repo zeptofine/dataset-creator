@@ -73,7 +73,7 @@ IMHASH_TYPES: dict[str, Callable] = {
 class HashFilter(DataFilter, Comparable):
     def __init__(self, hash_choice: str = "average", resolver: str = "newest") -> None:
         super().__init__()
-        self.column_schema = {"hash": str, "modifiedtime": pl.Datetime}  # type: ignore
+        self.column_schema = {"hash": str}  # type: ignore
         self.build_schema: dict[str, Expr] = {"hash": pl.col("path").apply(self._hash_img)}
 
         imhash_resolvers: dict[str, Callable] = {

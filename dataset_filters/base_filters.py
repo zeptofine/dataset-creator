@@ -31,6 +31,7 @@ class DataFilter:
 
         column_schema: dict[str, PolarsDataType | type]
             This is used to add a column using names and types to the file database.
+             These *must* be filled by the build_schema.
 
         build_schema: dict[str, Expr]
             This is used to build the data given in the column_schema.

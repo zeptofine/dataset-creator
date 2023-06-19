@@ -207,7 +207,7 @@ def main(
     s: RichStepper = RichStepper(loglevel=1, step=-1)
     s.next("Settings: ")
 
-    db = DatasetBuilder(origin=str(input_folder), processes=threads)
+    db = DatasetBuilder(origin=str(input_folder))
 
     def check_for_images(image_list: list[Path]) -> bool:
         if not image_list:
@@ -298,21 +298,14 @@ def main(
     if minsize or maxsize:
         s.print(f"Filtering by size ({minsize} <= x <= {maxsize})")
 
-    stat_filter = StatFilter(dtbefore, dtafter)
-    res_filter = ResFilter(minsize, maxsize, crop_mod, scale)
-    hash_filter = HashFilter(hash_mode, hash_choice)
-    channel_filter = ChannelFilter(channel_num)
-    db.add_optional_from_filter(stat_filter)
-    db.add_optional_from_filter(res_filter)  # they may not be filtered but may be necessary for populating
-    db.add_optional_from_filter(channel_filter)
     if dtbefore or dtafter:
-        db.add_filters(stat_filter)
+        db.add_filters(StatFilter(dtbefore, dtafter))
     if scale != 1 or minsize or maxsize:
-        db.add_filters(res_filter)
+        db.add_filters(ResFilter(minsize, maxsize, crop_mod, scale))
     if hash_images:
-        db.add_filters(hash_filter)
+        db.add_filters(HashFilter(hash_mode, hash_choice))
     if channel_num:
-        db.add_filters(channel_filter)
+        db.add_filters(ChannelFilter(channel_num))
 
     # * Gather images
     s.next("Gathering images...")
@@ -378,7 +371,6 @@ def main(
             for path in image_list
         ]
         print(len(pargs))
-        # return 0
         with Pool(threads) as p, tqdm(p.imap(fileparse, pargs, chunksize=chunksize), total=len(image_list)) as t:
             for file in t:
                 if verbose:

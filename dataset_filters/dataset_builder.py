@@ -1,7 +1,8 @@
 import os
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import polars as pl
 from cfg_param_wrapper import CfgDict
@@ -23,10 +24,9 @@ def _time(_=None) -> datetime:
 
 
 class DatasetBuilder:
-    def __init__(self, origin: str, processes=1) -> None:
+    def __init__(self, origin: str) -> None:
         super().__init__()
         self.filters: list[DataFilter] = []
-        self.power: int = processes
         self.origin: str = origin
 
         self.config = CfgDict(
@@ -35,7 +35,7 @@ class DatasetBuilder:
                 "trim": True,
                 "trim_age_limit_secs": 60 * 60 * 24 * 7,
                 "trim_check_exists": True,
-                "save_interval": 500,
+                "save_interval_secs": 60,
                 "chunksize": 100,
                 "filepath": "filedb.feather",
             },
@@ -50,11 +50,12 @@ class DatasetBuilder:
         self.basic_schema = {"path": str, "checkedtime": pl.Datetime}
         self.build_schema: dict[str, Expr] = {"checkedtime": pl.col("path").apply(_time)}
         if os.path.exists(self.filepath):
+            before = datetime.now()
             print("Reading database...")
-            self.df = pl.read_ipc(self.config["filepath"], use_pyarrow=True)
-            print("Finished.")
+            self.df: DataFrame = pl.read_ipc(self.config["filepath"], use_pyarrow=True)
+            print(f"Finished reading in {datetime.now() - before}")
         else:
-            self.df = DataFrame(schema=self.basic_schema)
+            self.df: DataFrame = DataFrame(schema=self.basic_schema)
 
     def add_filters(self, *filters: DataFilter) -> None:
         """Adds filters to the filter list."""
@@ -72,13 +73,9 @@ class DatasetBuilder:
             ), f"Schema is already in build_schema: {self.build_schema}"
         self.build_schema.update(filter_.build_schema)
 
-    def add_optional_from_filter(self, filter_: DataFilter):
-        assert filter_.build_schema, f"{filter_} has no build_schema"
-        self.build_schema.update(filter_.build_schema)
-
     def populate_df(self, lst: Iterable[Path]):
+        assert self.filters, "No filters specified"
         if self.trim and len(self.df):
-            print("Attempting to trim db...")
             now: datetime = current_time()
             original_size: int = len(self.df)
 
@@ -86,7 +83,7 @@ class DatasetBuilder:
             if self.check_exists:
                 cond &= pl.col("path").apply(os.path.exists)
 
-            self.df = self.df.filter(cond).rechunk()
+            self.df = self.df.filter(cond)
             if diff := original_size - len(self.df):
                 print(f"Removed {diff} images")
 
@@ -101,62 +98,59 @@ class DatasetBuilder:
                 [self.df, DataFrame({"path": new_paths})],
                 how="diagonal",
             )
-
-        modified_schema: dict[str, PolarsDataType | type] = dict(self.df.schema).copy()
+        column_schema: dict[str, PolarsDataType | type] = self.basic_schema.copy()
+        build_schema: dict[str, Expr] = {"checkedtime": pl.col("path").apply(_time)}
         for filter_ in self.filters:
             filter_.filedict = from_full_to_relative
-            modified_schema.update(
-                {
-                    schema: value for schema, value in filter_.column_schema.items() if schema not in self.df.schema
-                }  # type: ignore
-            )
+            if filter_.column_schema:
+                column_schema.update(filter_.column_schema)
+            if filter_.build_schema:
+                build_schema.update(filter_.build_schema)
 
-        full_build_expr: dict[str, Expr] = {
-            col: pl.when(pl.col(col).is_null()).then(expr).otherwise(pl.col(col))
-            for col, expr in self.build_schema.items()
-            if col in self.df.columns or col in modified_schema
-        }
-
-        # get paths with missing data
-        self.df: DataFrame = DatasetBuilder._make_schema_compliant(self.df, modified_schema)
-
-        unfinished: DataFrame = self.df.filter(pl.any(pl.col(col).is_null() for col in self.df.columns))
-
+        self.df = self._make_schema_compliant(self.df, column_schema)
+        updated_df: DataFrame = self.df.with_columns(column_schema)
+        unfinished: DataFrame = updated_df.filter(pl.any(pl.col(col).is_null() for col in updated_df.columns))
         if len(unfinished):
-            try:
-                # gather new data and add it to the dataframe
-                old_db_size: str = byte_format(self.get_db_disk_size())
-                with tqdm(desc="Gathering file info...", total=len(unfinished)) as t:
-                    chunksize: int = self.config["chunksize"]
-                    save_timer = 0
-                    collected_data = DataFrame(schema=modified_schema)  # type: ignore
-                    for group in (
-                        unfinished.with_row_count("idx").with_columns(pl.col("idx") // chunksize).partition_by("idx")
-                    ):
-                        group.drop_in_place("idx")
-                        new_data: DataFrame = group.with_columns(**full_build_expr)
-                        collected_data.vstack(new_data, in_place=True)
-                        t.update(len(group))
+            old_db_size: str = byte_format(self.get_db_disk_size())
+            with tqdm(desc="Gathering file info...", total=len(unfinished)) as t:
+                chunksize: int = self.config["chunksize"]
+                save_timer = datetime.now()
+                collected_data: DataFrame = DataFrame(schema=column_schema)
+                for group in (
+                    unfinished.with_row_count("idx").with_columns(pl.col("idx") // chunksize).partition_by("idx")
+                ):
+                    new_data: DataFrame = self.fill_nulls(group, build_schema).drop("idx").select(column_schema)
+                    collected_data.vstack(new_data, in_place=True)
+                    t.update(len(group))
+                    if ((new_time := datetime.now()) - save_timer).total_seconds() > self.config["save_interval_secs"]:
+                        self.df = self.df.update(collected_data, on="path")
+                        self.save_df()
+                        t.set_postfix_str(f"Autosaved at {current_time()}")
+                        collected_data = collected_data.clear()
+                        save_timer = new_time
 
-                        save_timer += len(group)
-                        if save_timer > self.config["save_interval"]:
-                            self.df = self.df.update(collected_data, on="path")
-                            self.save_df()
-                            t.set_postfix_str(f"Autosaved at {current_time()}")
-                            collected_data: DataFrame = collected_data.clear()
-                            save_timer = 0
-
-                    self.df = self.df.update(collected_data, on="path").rechunk()
-                    self.save_df()
-                    rprint(f"old DB size: [bold red]{old_db_size}[/bold red]")
-                    rprint(f"new DB size: [bold yellow]{byte_format(self.get_db_disk_size())}[/bold yellow]")
-            except KeyboardInterrupt as exc:
-                print("KeyboardInterrupt detected! attempting to save dataframe...")
-                self.save_df()
-                print("Saved.")
-                raise exc
-
+            self.df = self.df.update(collected_data, on="path").rechunk()
+            self.save_df()
+            rprint(f"old DB size: [bold red]{old_db_size}[/bold red]")
+            rprint(f"new DB size: [bold yellow]{byte_format(self.get_db_disk_size())}[/bold yellow]")
         return
+
+    @staticmethod
+    def fill_nulls(data_frame: DataFrame, build_expr: dict[str, Expr]) -> DataFrame:
+        return (
+            data_frame.with_row_count("i")
+            .groupby("i")
+            .apply(lambda item: DatasetBuilder.apply_only_on_null(item, build_expr))
+            .drop("i")
+        )
+
+    @staticmethod
+    def apply_only_on_null(item: DataFrame, build_expr: dict[str, Expr]):
+        # only use expressions that are valid
+        dct_: dict[str, Any] = item.row(0, named=True)
+        if all(value is None for value in dct_.values()):
+            return item.with_columns(**build_expr)
+        return item.with_columns(**{col: expr for col, expr in build_expr.items() if dct_[col] is None})
 
     def filter(self, lst, sort_col="path") -> list[Path]:
         assert (
@@ -201,6 +195,9 @@ class DatasetBuilder:
 
     def absolute_dict(self, lst: Iterable[Path]) -> dict[str, Path]:
         return {(str((self.origin / pth).resolve())): pth for pth in lst}  # type: ignore
+
+    def get_path_data(self, pths: Collection[str]):
+        return self.df.filter(pl.col("path").is_in(pths))
 
     @staticmethod
     def _make_schema_compliant(data_frame: DataFrame, schema) -> DataFrame:
