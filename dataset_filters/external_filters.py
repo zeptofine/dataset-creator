@@ -3,7 +3,7 @@ from collections.abc import Callable, Collection, Iterable
 
 import imagehash
 import imagesize
-import polars as pl
+from polars import List, col
 from PIL import Image
 from polars import DataFrame, Expr
 
@@ -15,8 +15,8 @@ class ResFilter(DataFilter, FastComparable):
 
     def __init__(self, minsize: int | None, maxsize: int | None, crop_mod: bool, scale: int) -> None:
         super().__init__()
-        self.column_schema = {"resolution": pl.List(int)}
-        self.build_schema = {"resolution": pl.col("path").apply(imagesize.get)}
+        self.column_schema = {"resolution": List(int)}
+        self.build_schema = {"resolution": col("path").apply(imagesize.get)}
         self.min: int | None = minsize
         self.max: int | None = maxsize
         self.crop: bool = crop_mod
@@ -24,8 +24,8 @@ class ResFilter(DataFilter, FastComparable):
 
     def fast_comp(self) -> Expr | bool:
         if self.crop:
-            return pl.col("resolution").apply(lambda lst: self.is_valid(map(self.resize, lst)))
-        return pl.col("resolution").apply(lambda lst: all(dim % self.scale == 0 for dim in lst) and self.is_valid(lst))
+            return col("resolution").apply(lambda lst: self.is_valid(map(self.resize, lst)))
+        return col("resolution").apply(lambda lst: all(dim % self.scale == 0 for dim in lst) and self.is_valid(lst))
 
     def is_valid(self, lst: Iterable[int]) -> bool:
         lst = set(lst)
@@ -41,7 +41,7 @@ class ChannelFilter(DataFilter, FastComparable):
     def __init__(self, channel_num: int | None, strict: bool = False) -> None:
         super().__init__()
         self.column_schema = {"channels": int}
-        self.build_schema = {"channels": pl.col("path").apply(self.get_channels)}
+        self.build_schema = {"channels": col("path").apply(self.get_channels)}
 
         self.channel_num: int | None = channel_num
         self.strict: bool = strict
@@ -53,8 +53,8 @@ class ChannelFilter(DataFilter, FastComparable):
         if not self.channel_num:
             return True
         if self.strict:
-            return pl.col("channels") == self.channel_num
-        return pl.col("channels") <= self.channel_num
+            return col("channels") == self.channel_num
+        return col("channels") <= self.channel_num
 
 
 IMHASH_TYPES: dict[str, Callable] = {
@@ -74,7 +74,7 @@ class HashFilter(DataFilter, Comparable):
     def __init__(self, hash_choice: str = "average", resolver: str = "newest") -> None:
         super().__init__()
         self.column_schema = {"hash": str}  # type: ignore
-        self.build_schema: dict[str, Expr] = {"hash": pl.col("path").apply(self._hash_img)}
+        self.build_schema: dict[str, Expr] = {"hash": col("path").apply(self._hash_img)}
 
         imhash_resolvers: dict[str, Callable] = {
             "ignore_all": HashFilter._ignore_all,
@@ -93,14 +93,12 @@ class HashFilter(DataFilter, Comparable):
 
     def compare(self, lst: Collection, cols: DataFrame) -> set:
         applied: DataFrame = (
-            cols.filter(
-                pl.col("hash").is_in(cols.filter(pl.col("path").is_in(lst)).select(pl.col("hash")).unique().to_series())
-            )
+            cols.filter(col("hash").is_in(cols.filter(col("path").is_in(lst)).select(col("hash")).unique().to_series()))
             .groupby("hash")
             .apply(lambda df: df.filter(self.resolver()) if len(df) > 1 else df)
         )
 
-        resolved_paths = set(applied.select(pl.col("path")).to_series())
+        resolved_paths = set(applied.select(col("path")).to_series())
         return resolved_paths
 
     def _hash_img(self, pth) -> str:
@@ -112,13 +110,13 @@ class HashFilter(DataFilter, Comparable):
 
     @staticmethod
     def _accept_newest() -> Expr:
-        return pl.col("modifiedtime") == pl.col("modifiedtime").max()
+        return col("modifiedtime") == col("modifiedtime").max()
 
     @staticmethod
     def _accept_oldest() -> Expr:
-        return pl.col("modifiedtime") == pl.col("modifiedtime").min()
+        return col("modifiedtime") == col("modifiedtime").min()
 
     @staticmethod
     def _accept_biggest() -> Expr:
-        sizes: Expr = pl.col("path").apply(lambda p: os.stat(str(p)).st_size)
+        sizes: Expr = col("path").apply(lambda p: os.stat(str(p)).st_size)
         return sizes == sizes.max()

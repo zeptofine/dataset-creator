@@ -1,20 +1,18 @@
 import os
-from collections.abc import Generator
 from dataclasses import dataclass
-from datetime import datetime
 from enum import Enum
 from multiprocessing import Pool, cpu_count, freeze_support
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import cv2
 import dateutil.parser as timeparser
-import numpy as np
 import typer
 from cfg_param_wrapper import CfgDict, wrap_config
 from polars import col
 from rich import print as rprint
 from tqdm import tqdm
+from typer import Option
 from typing_extensions import Annotated
 
 from dataset_filters.data_filters import BlacknWhitelistFilter, ExistingFilter, StatFilter
@@ -22,6 +20,13 @@ from dataset_filters.dataset_builder import DatasetBuilder
 from dataset_filters.external_filters import ChannelFilter, HashFilter, ResFilter
 from util.file_list import get_file_list, to_recursive
 from util.print_funcs import RichStepper, ipbar
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+    from datetime import datetime
+
+    import numpy as np
+
 
 CPU_COUNT = int(cpu_count())
 app = typer.Typer()
@@ -107,100 +112,90 @@ config = CfgDict("config.toml", save_mode="toml")
 @app.command()
 @wrap_config(config)
 def main(
-    input_folder: Annotated[Path, typer.Option(help="the folder to scan.")] = Path(),
-    scale: Annotated[int, typer.Option(help="the scale to downscale.")] = 4,
-    extension: Annotated[Optional[str], typer.Option(help="export extension.")] = None,
-    extensions: Annotated[str, typer.Option(help="extensions to search for. (split with commas)")] = "webp,png,jpg",
-    recursive: Annotated[bool, typer.Option(help="preserves the tree hierarchy.", rich_help_panel="modifiers")] = False,
+    input_folder: Annotated[Path, Option(help="the folder to scan.")] = Path(),
+    scale: Annotated[int, Option(help="the scale to downscale.")] = 4,
+    extension: Annotated[Optional[str], Option(help="export extension.")] = None,
+    extensions: Annotated[str, Option(help="extensions to search for. (split with commas)")] = "webp,png,jpg",
+    recursive: Annotated[bool, Option(help="preserves the tree hierarchy.", rich_help_panel="modifiers")] = False,
     convert_spaces: Annotated[
         bool,
-        typer.Option(
+        Option(
             help="Whether to replace spaces with underscores when creating the output.", rich_help_panel="modifiers"
         ),
     ] = False,
-    threads: Annotated[
-        int, typer.Option(help="number of threads for multiprocessing.", rich_help_panel="modifiers")
-    ] = int(CPU_COUNT * (3 / 4)),
+    threads: Annotated[int, Option(help="number of threads for multiprocessing.", rich_help_panel="modifiers")] = int(
+        CPU_COUNT * (3 / 4)
+    ),
     chunksize: Annotated[
-        int, typer.Option(help="number of images to run with one thread per pool chunk", rich_help_panel="modifiers")
+        int, Option(help="number of images to run with one thread per pool chunk", rich_help_panel="modifiers")
     ] = 5,
     limit: Annotated[
-        Optional[int], typer.Option(help="only gathers a given number of images.", rich_help_panel="modifiers")
+        Optional[int], Option(help="only gathers a given number of images.", rich_help_panel="modifiers")
     ] = None,
     limit_mode: Annotated[
-        LimitModes, typer.Option(help="which order the limiter is activated.", rich_help_panel="modifiers")
+        LimitModes, Option(help="which order the limiter is activated.", rich_help_panel="modifiers")
     ] = LimitModes.BEFORE,
     simulate: Annotated[
-        bool, typer.Option(help="skips the conversion step. Used for debugging.", rich_help_panel="modifiers")
+        bool, Option(help="skips the conversion step. Used for debugging.", rich_help_panel="modifiers")
     ] = False,
     purge: Annotated[
-        bool, typer.Option(help="deletes output corresponding to input files.", rich_help_panel="modifiers")
+        bool, Option(help="deletes output corresponding to input files.", rich_help_panel="modifiers")
     ] = False,
     purge_all: Annotated[
-        bool, typer.Option(help="Same as above, but deletes *everything*.", rich_help_panel="modifiers")
+        bool, Option(help="Same as above, but deletes *everything*.", rich_help_panel="modifiers")
     ] = False,
-    make_lr: Annotated[bool, typer.Option(help="whether to make an LR folder.", rich_help_panel="modifiers")] = True,
+    make_lr: Annotated[bool, Option(help="whether to make an LR folder.", rich_help_panel="modifiers")] = True,
     overwrite: Annotated[
         bool,
-        typer.Option(help="Skips checking existing files, overwrites existing files.", rich_help_panel="modifiers"),
+        Option(help="Skips checking existing files, overwrites existing files.", rich_help_panel="modifiers"),
     ] = False,
     verbose: Annotated[
-        bool, typer.Option(help="Prints the files when they are fully converted.", rich_help_panel="modifiers")
+        bool, Option(help="Prints the files when they are fully converted.", rich_help_panel="modifiers")
     ] = False,
     sort_by: Annotated[
         str,
-        typer.Option(
+        Option(
             help="Which column in the database to sort by. It must be in the database.", rich_help_panel="modifiers"
         ),
     ] = "path",
     # BlacknWhitelistFilter
     whitelist: Annotated[
-        Optional[str], typer.Option(help="only allows paths with the given strings.", rich_help_panel="filters")
+        Optional[str], Option(help="only allows paths with the given strings.", rich_help_panel="filters")
     ] = None,
     blacklist: Annotated[
-        Optional[str], typer.Option(help="Excludes paths with the given strings.", rich_help_panel="filters")
+        Optional[str], Option(help="Excludes paths with the given strings.", rich_help_panel="filters")
     ] = None,
-    list_separator: Annotated[
-        str, typer.Option(help="separator for the white/blacklists.", rich_help_panel="filters")
-    ] = ",",
+    list_separator: Annotated[str, Option(help="separator for the white/blacklists.", rich_help_panel="filters")] = ",",
     # ResFilter
-    minsize: Annotated[
-        Optional[int], typer.Option(help="minimum size an image must be.", rich_help_panel="filters")
-    ] = None,
-    maxsize: Annotated[
-        Optional[int], typer.Option(help="maximum size an image can be.", rich_help_panel="filters")
-    ] = None,
+    minsize: Annotated[Optional[int], Option(help="minimum size an image must be.", rich_help_panel="filters")] = None,
+    maxsize: Annotated[Optional[int], Option(help="maximum size an image can be.", rich_help_panel="filters")] = None,
     crop_mod: Annotated[
         bool,
-        typer.Option(
-            help="changes the res filter to crop the image to be divisible by scale", rich_help_panel="filters"
-        ),
+        Option(help="changes the res filter to crop the image to be divisible by scale", rich_help_panel="filters"),
     ] = False,
     # StatFilter
     before: Annotated[
-        Optional[str], typer.Option(help="only uses files before a given date", rich_help_panel="filters")
+        Optional[str], Option(help="only uses files before a given date", rich_help_panel="filters")
     ] = None,
-    after: Annotated[
-        Optional[str], typer.Option(help="only uses after a given date.", rich_help_panel="filters")
-    ] = None,
+    after: Annotated[Optional[str], Option(help="only uses after a given date.", rich_help_panel="filters")] = None,
     # ^^ these will be parsed with dateutil.parser ^^
     # ChannelFilter
     channel_num: Annotated[
-        Optional[int], typer.Option(help="number of channels an image must have.", rich_help_panel="filters")
+        Optional[int], Option(help="number of channels an image must have.", rich_help_panel="filters")
     ] = None,
     # HashFilter
     hash_images: Annotated[
-        bool, typer.Option(help="Removes perceptually similar images.", rich_help_panel="filters")
+        bool, Option(help="Removes perceptually similar images.", rich_help_panel="filters")
     ] = False,
     hash_mode: Annotated[
         HashModes,
-        typer.Option(
+        Option(
             help="How to hash the images. read https://github.com/JohannesBuchner/imagehash for more info",
             rich_help_panel="filters",
         ),
     ] = HashModes.AVERAGE,
     hash_choice: Annotated[
-        HashChoices, typer.Option(help="What to do in the occurance of a hash conflict.", rich_help_panel="filters")
+        HashChoices, Option(help="What to do in the occurance of a hash conflict.", rich_help_panel="filters")
     ] = HashChoices.IGNORE_ALL,
 ) -> int:
     """Does all the heavy lifting"""
@@ -285,13 +280,12 @@ def main(
 
     # * {White,Black}list option
     if whitelist or blacklist:
-        whiteed_items: list[str] = []
-        blacked_items: list[str] = []
+        lists: list[list[str] | None] = [None, None]
         if whitelist:
-            whiteed_items = whitelist.split(list_separator)
+            lists[0] = whitelist.split(list_separator)
         if blacklist:
-            blacked_items = blacklist.split(list_separator)
-        db.add_filters(BlacknWhitelistFilter(whiteed_items, blacked_items))
+            lists[1] = blacklist.split(list_separator)
+        db.add_filters(BlacknWhitelistFilter(*lists))
 
     if (minsize and minsize <= 0) or (maxsize and maxsize <= 0):
         print("selected minsize and/or maxsize is invalid")
@@ -341,7 +335,7 @@ def main(
                 lr_path.unlink(missing_ok=True)
 
     if not overwrite:
-        folders = [hr_folder]
+        folders: list[Path] = [hr_folder]
         if make_lr:
             folders.append(lr_folder)
         db.add_filters(ExistingFilter(*folders, recurse_func=recurse))

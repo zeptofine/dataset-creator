@@ -41,7 +41,7 @@ class DataFilter:
         self.column_schema: dict[str, PolarsDataType | type] = {}
         self.build_schema: dict[str, Expr] | None = None
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         attrlist: list[str] = [
             f"{key}=..." if hasattr(val, "__iter__") and not isinstance(val, str) else f"{key}={val}"
             for key, val in self.__dict__.items()

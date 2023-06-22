@@ -71,10 +71,10 @@ PRINT_MODES: dict[str, tuple[str, str]] = {"newline": ("", "\n"), "sameline": ("
 
 
 class Stepper:
-    def __init__(self, step=0, print_mode="newline", print_method: Callable = print):  # type: ignore
-        self.step = step
+    def __init__(self, step=0, print_mode="newline", print_method: Callable[..., None] = print):  # type: ignore
+        self.step: int = step
         self.print_mode: tuple[str, str] = PRINT_MODES[print_mode]
-        self.printer = print_method
+        self.printer: Callable[..., None] = print_method
 
     def next(self, s=None, **kwargs):
         self.step += 1

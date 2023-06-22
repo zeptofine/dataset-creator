@@ -1,23 +1,27 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Collection
 from datetime import datetime
-from pathlib import Path
-from typing import Callable
-import polars as pl
-from polars import DataFrame, Expr
+from typing import TYPE_CHECKING
+
+from polars import Datetime, col
 
 from util.file_list import get_file_list
 
 from .base_filters import DataFilter, FastComparable
 
+if TYPE_CHECKING:
+    from collections.abc import Callable, Collection
+    from pathlib import Path
+
+    from polars import DataFrame, Expr
+
 
 class StatFilter(DataFilter, FastComparable):
     def __init__(self, beforetime: datetime | None, aftertime: datetime | None) -> None:
         super().__init__()
-        self.column_schema = {"modifiedtime": pl.Datetime}
-        self.build_schema: dict[str, Expr] = {"modifiedtime": pl.col("path").apply(StatFilter.get_modified_time)}
+        self.column_schema = {"modifiedtime": Datetime}
+        self.build_schema: dict[str, Expr] = {"modifiedtime": col("path").apply(StatFilter.get_modified_time)}
         self.before: datetime | None = beforetime
         self.after: datetime | None = aftertime
 
@@ -28,9 +32,9 @@ class StatFilter(DataFilter, FastComparable):
     def fast_comp(self) -> Expr | bool:
         param: Expr | bool = True
         if self.after:
-            param = param & (self.after < pl.col("modifiedtime)"))
+            param &= self.after < col("modifiedtime)")
         if self.before:
-            param = param & (self.before > pl.col("modifiedtime"))
+            param &= self.before > col("modifiedtime")
         return param
 
 
@@ -52,11 +56,11 @@ class BlacknWhitelistFilter(DataFilter, FastComparable):
         args: Expr | bool = True
         if self.whitelist:
             for item in self.whitelist:
-                args = args & pl.col("path").str.contains(item)
+                args &= col("path").str.contains(item)
 
         if self.blacklist:
             for item in self.blacklist:
-                args = args & pl.col("path").str.contains(item).is_not()
+                args &= col("path").str.contains(item).is_not()
         return args
 
     def _whitelist(self, imglist, whitelist) -> filter:
@@ -74,7 +78,7 @@ class ExistingFilter(DataFilter, FastComparable):
         self.recurse_func: Callable[[Path], Path] = recurse_func
 
     def fast_comp(self) -> Expr | bool:
-        return pl.col("path").apply(
+        return col("path").apply(
             lambda x: self.recurse_func(self.filedict[str(x)]).with_suffix("") not in self.existing_list
         )
 
