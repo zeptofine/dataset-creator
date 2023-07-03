@@ -68,5 +68,3 @@ env.bak/
 venv.bak/
 
 filedb.feather
-config.toml
-database_config.toml

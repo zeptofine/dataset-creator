@@ -1,6 +1,34 @@
 trim = true
 trim_age_limit_secs = 604800
 trim_check_exists = true
-save_interval_secs = 30
-chunksize = 25
+save_interval_secs = 60
+chunksize = 100
 filepath = "filedb.feather"
+
+[stats]
+enabled = false
+before = "2040" # only get items before this threshold
+after = "2010"  # only get items after this threshold
+
+[resolution]
+enabled = true
+min = 128
+max = 2048
+crop = false   #if true, then it will check if it is valid after cropping a little to be divisible by scale
+scale = 4
+
+[hashing]
+enabled = true
+hasher = "average"      # average | crop_resistant | color | dhash | dhash_vertical | phash | phash_simple | whash | whash-db4
+resolver = "ignore_all" # ignore_all | newest | oldest | size
+
+[channels]
+enabled = false
+channel_num = 3
+strict = false  # if true, only images with {channel_num} channels are available
+
+[blackwhitelists]
+enabled = false
+whitelist = ["safe"]           # files with these strings are filtered in
+all_whitelists_are_true = true # allow files that are valid to __every__ whitelist string
+blacklist = ["explicit"]       # items with these strings are filtered out

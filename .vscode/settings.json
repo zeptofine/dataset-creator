@@ -9,8 +9,11 @@
     ]
   },
   "pylint.args": [
-    "--max-line-length=120",
     "--extension-pkg-whitelist=cv2",
-    "--good-names=i,j,k,p,s,t,ex,Run,df"
+    "--good-names=i,j,k,p,s,t,ex,Run,df",
+    "--max-line-length=120"
+  ],
+  "black-formatter.args": [
+    "--line-length=120"
   ]
 }

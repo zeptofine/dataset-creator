@@ -13,6 +13,7 @@ from tqdm import tqdm
 from util.print_funcs import byte_format
 
 from .base_filters import Comparable, DataFilter, FastComparable
+from .custom_toml import TomlCustomCommentDecoder, TomlCustomCommentEncoder
 
 
 def current_time() -> datetime:
@@ -41,6 +42,8 @@ class DatasetBuilder:
             },
             autofill=True,
             save_mode="toml",
+            encoder=TomlCustomCommentEncoder(),
+            decoder=TomlCustomCommentDecoder(),
         )
         self.filepath: str = self.config["filepath"]
         self.trim: bool = self.config["trim"]
@@ -59,11 +62,25 @@ class DatasetBuilder:
 
     def add_filters(self, *filters: DataFilter) -> None:
         """Adds filters to the filter list."""
+        new_confs = False
         for filter_ in filters:
-            self.filters.append(filter_)
-            if filter_.build_schema:
-                if any(col not in self.build_schema for col in filter_.build_schema):
-                    self.add_schema_from_filter(filter_)
+            filter_conf: tuple[str | None, dict[str, Any]] = filter_.get_config()
+            if filter_conf[0] not in (*self.config, None):
+                self.config.update({filter_conf[0]: filter_conf[1]})
+                print(f"New filter added to config: {filter_conf[0]}. check database_config.toml to edit.")
+                new_confs = True
+            if filter_conf[0] is not None:
+                filter_.populate_from_cfg(self.config[filter_conf[0]])
+
+                if "enabled" in self.config[filter_conf[0]] and self.config[filter_conf[0]]["enabled"]:
+                    self.filters.append(filter_)
+                    filter_.enable()
+                    if filter_.build_schema:
+                        if any(col not in self.build_schema for col in filter_.build_schema):
+                            self.add_schema_from_filter(filter_)
+
+        if new_confs:
+            self.config.save()
 
     def add_schema_from_filter(self, filter_: DataFilter, overwrite=False):
         assert filter_.build_schema, f"{filter_} has no build_schema"

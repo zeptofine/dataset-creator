@@ -17,16 +17,3 @@ make_lr = false       # whether or not to make a folder for lowres output
 overwrite = false     # disables checking if the files already exist in the output
 verbose = false       # prints data the database picked up during population while it converts files
 sort_by = "path"      # sorts the files after filtering, based on the gathered data
-
-# filters
-# whitelist = ""       # strings that need to be in the input files
-# blacklist = ""       # strings that CANNOT be in the input files
-list_separator = "," # the separator that splits the whitelist and blacklist and extensions
-minsize = 128        # the minimum size an image must be
-# maxsize = 4096       # the maximum size an image can be
-crop_mod = true
-before = "2016" # will only use images where the modified time is before 2016
-# after = "2010" # will only use images where the modifiedtime is after 2010
-hash_images = true         # hash the images using imagehash, then eliminate visually similar images
-hash_choice = "ignore_all" # ignore_all|newest|oldest|size
-hash_mode = "average"      # average|crop_resistant|color|dhash|dhash_vertical|phash|phash_simple|whash|whash-db4

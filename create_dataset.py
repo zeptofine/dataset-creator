@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 import cv2
-import dateutil.parser as timeparser
 import typer
 from cfg_param_wrapper import CfgDict, wrap_config
 from polars import col
@@ -23,7 +22,6 @@ from util.print_funcs import RichStepper, ipbar
 
 if TYPE_CHECKING:
     from collections.abc import Generator
-    from datetime import datetime
 
     import numpy as np
 
@@ -83,29 +81,6 @@ class LimitModes(str, Enum):
     AFTER = "after"
 
 
-class HashModes(str, Enum):
-    """Modes to hash the images to compare."""
-
-    AVERAGE = "average"
-    CROP_RESISTANT = "crop_resistant"
-    COLOR = "color"
-    DHASH = "dhash"
-    DHASH_VERTICAL = "dhash_vertical"
-    PHASH = "phash"
-    PHASH_SIMPLE = "phash_simple"
-    WHASH = "whash"
-    WHASH_DB4 = "whash-db4"
-
-
-class HashChoices(str, Enum):
-    """How to decide which image to keep / remove."""
-
-    IGNORE_ALL = "ignore_all"
-    NEWEST = "newest"
-    OLDEST = "oldest"
-    SIZE = "size"
-
-
 config = CfgDict("config.toml", save_mode="toml")
 
 
@@ -158,45 +133,6 @@ def main(
             help="Which column in the database to sort by. It must be in the database.", rich_help_panel="modifiers"
         ),
     ] = "path",
-    # BlacknWhitelistFilter
-    whitelist: Annotated[
-        Optional[str], Option(help="only allows paths with the given strings.", rich_help_panel="filters")
-    ] = None,
-    blacklist: Annotated[
-        Optional[str], Option(help="Excludes paths with the given strings.", rich_help_panel="filters")
-    ] = None,
-    list_separator: Annotated[str, Option(help="separator for the white/blacklists.", rich_help_panel="filters")] = ",",
-    # ResFilter
-    minsize: Annotated[Optional[int], Option(help="minimum size an image must be.", rich_help_panel="filters")] = None,
-    maxsize: Annotated[Optional[int], Option(help="maximum size an image can be.", rich_help_panel="filters")] = None,
-    crop_mod: Annotated[
-        bool,
-        Option(help="changes the res filter to crop the image to be divisible by scale", rich_help_panel="filters"),
-    ] = False,
-    # StatFilter
-    before: Annotated[
-        Optional[str], Option(help="only uses files before a given date", rich_help_panel="filters")
-    ] = None,
-    after: Annotated[Optional[str], Option(help="only uses after a given date.", rich_help_panel="filters")] = None,
-    # ^^ these will be parsed with dateutil.parser ^^
-    # ChannelFilter
-    channel_num: Annotated[
-        Optional[int], Option(help="number of channels an image must have.", rich_help_panel="filters")
-    ] = None,
-    # HashFilter
-    hash_images: Annotated[
-        bool, Option(help="Removes perceptually similar images.", rich_help_panel="filters")
-    ] = False,
-    hash_mode: Annotated[
-        HashModes,
-        Option(
-            help="How to hash the images. read https://github.com/JohannesBuchner/imagehash for more info",
-            rich_help_panel="filters",
-        ),
-    ] = HashModes.AVERAGE,
-    hash_choice: Annotated[
-        HashChoices, Option(help="What to do in the occurance of a hash conflict.", rich_help_panel="filters")
-    ] = HashChoices.IGNORE_ALL,
 ) -> int:
     """Does all the heavy lifting"""
     s: RichStepper = RichStepper(loglevel=1, step=-1)
@@ -260,46 +196,17 @@ def main(
 
         return hr_path, lr_path
 
-    dtafter: datetime | None = None
-    dtbefore: datetime | None = None
-    if before or after:
-        try:
-            if after:
-                dtafter = timeparser.parse(str(after))
-            if before:
-                dtbefore = timeparser.parse(str(before))
-            if dtafter is not None and dtafter is not None:
-                if dtafter > dtbefore:  # type: ignore
-                    raise timeparser.ParserError(f"{dtbefore} (--before) is older than {dtafter} (--after)!")
+    stat = StatFilter()
+    res = ResFilter()
+    hsh = HashFilter()
+    chn = ChannelFilter()
+    blw = BlacknWhitelistFilter()
+    db.add_filters(stat, res, hsh, chn, blw)
 
-            s.print(f"Filtering by time ({dtbefore} <= x <= {dtafter})")
-
-        except timeparser.ParserError as err:
-            s.set(-9).print(str(err))
-            return 1
-
-    # * {White,Black}list option
-    if whitelist or blacklist:
-        lists: list[list[str] | None] = [None, None]
-        if whitelist:
-            lists[0] = whitelist.split(list_separator)
-        if blacklist:
-            lists[1] = blacklist.split(list_separator)
-        db.add_filters(BlacknWhitelistFilter(*lists))
-
-    if (minsize and minsize <= 0) or (maxsize and maxsize <= 0):
-        print("selected minsize and/or maxsize is invalid")
-    if minsize or maxsize:
-        s.print(f"Filtering by size ({minsize} <= x <= {maxsize})")
-
-    if dtbefore or dtafter:
-        db.add_filters(StatFilter(dtbefore, dtafter))
-    if scale != 1 or minsize or maxsize:
-        db.add_filters(ResFilter(minsize, maxsize, crop_mod, scale))
-    if hash_images:
-        db.add_filters(HashFilter(hash_mode, hash_choice))
-    if channel_num:
-        db.add_filters(ChannelFilter(channel_num))
+    if res:
+        s.print(f"Filtering by size ({res.min} <= x <= {res.max})")
+    if blw:
+        s.print(f"Whitelist: {blw.whitelist}", f"Blacklist: {blw.blacklist}")
 
     # * Gather images
     s.next("Gathering images...")
@@ -341,11 +248,13 @@ def main(
         db.add_filters(ExistingFilter(*folders, recurse_func=recurse))
 
     # * Run filters
-    s.next("Populating df...")
+    s.next("Using: ")
+    s.print(*[f" - {str(filter_)}" for filter_ in db.filters])
+
+    s.print("Populating df...")
     db.populate_df(image_list)
 
-    s.next("Filtering using:")
-    s.print(*[f" - {str(filter_)}" for filter_ in db.filters])
+    s.print("Filtering...")
     image_list = db.filter(image_list, sort_col=sort_by)
 
     if limit and limit_mode == LimitModes.AFTER:

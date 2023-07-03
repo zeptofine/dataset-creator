@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from dateutil import parser as timeparser
 from polars import Datetime, col
 
 from util.file_list import get_file_list
@@ -11,19 +12,35 @@ from util.file_list import get_file_list
 from .base_filters import DataFilter, FastComparable
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Collection
+    from collections.abc import Callable, Collection, Iterable
     from pathlib import Path
 
     from polars import DataFrame, Expr
 
 
 class StatFilter(DataFilter, FastComparable):
-    def __init__(self, beforetime: datetime | None, aftertime: datetime | None) -> None:
+    def __init__(self) -> None:
         super().__init__()
         self.column_schema = {"modifiedtime": Datetime}
         self.build_schema: dict[str, Expr] = {"modifiedtime": col("path").apply(StatFilter.get_modified_time)}
-        self.before: datetime | None = beforetime
-        self.after: datetime | None = aftertime
+        self.config = (
+            "stats",
+            {
+                "enabled": False,
+                "before": "2040",
+                "!#before": " only get items before this threshold",
+                "after": "2010",
+                "!#after": " only get items after this threshold",
+            },
+        )
+        self.before: datetime | None = None
+        self.after: datetime | None = None
+
+    def populate_from_cfg(self, dct: dict[str, Any]):
+        self.before = timeparser.parse(dct["before"])
+        self.after = timeparser.parse(dct["after"])
+        if self.after > self.before:
+            raise timeparser.ParserError(f"{self.after} is older than {self.before}")
 
     @staticmethod
     def get_modified_time(path: str) -> datetime:
@@ -39,13 +56,31 @@ class StatFilter(DataFilter, FastComparable):
 
 
 class BlacknWhitelistFilter(DataFilter, FastComparable):
-    def __init__(self, whitelist: list[str] | None = None, blacklist: list[str] | None = None) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self.whitelist: list[str] = whitelist or []
-        self.blacklist: list[str] = blacklist or []
+        self.config = (
+            "blackwhitelists",
+            {
+                "enabled": False,
+                "whitelist": ["safe"],
+                "!#whitelist": " files with these strings are filtered in",
+                "all_whitelists_are_true": True,
+                "!#all_whitelists_are_true": " allow files that are valid to __every__ whitelist string",
+                "blacklist": ["explicit"],
+                "!#blacklist": " items with these strings are filtered out",
+            },
+        )
+
+        self.whitelist: list[str] | None = None
+        self.blacklist: list[str] | None = None
+        self.exclusive: bool = False
+
+    def populate_from_cfg(self, dct: dict[str, Any]):
+        self.exclusive = dct["all_whitelists_are_true"]
+        return super().populate_from_cfg(dct)
 
     def compare(self, lst: Collection[Path], _: DataFrame) -> set:
-        out = lst
+        out: Iterable[Path] = lst
         if self.whitelist:
             out = self._whitelist(out, self.whitelist)
         if self.blacklist:
@@ -74,7 +109,6 @@ class ExistingFilter(DataFilter, FastComparable):
     def __init__(self, *folders, recurse_func: Callable) -> None:
         super().__init__()
         self.existing_list = ExistingFilter._get_existing(*folders)
-        # print(self.existing_list)
         self.recurse_func: Callable[[Path], Path] = recurse_func
 
     def fast_comp(self) -> Expr | bool:

@@ -2,7 +2,7 @@ numpy
 opencv-python
 tqdm
 rich
-cfg_param_wrapper
+cfg_param_wrapper>=1.0.1
 typer[all]
 python-dateutil
 polars
