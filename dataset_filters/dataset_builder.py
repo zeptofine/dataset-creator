@@ -7,10 +7,8 @@ from typing import Any
 import polars as pl
 from cfg_param_wrapper import CfgDict
 from polars import DataFrame, Expr, PolarsDataType
-from rich import print as rprint
 from tqdm import tqdm
 
-from util.print_funcs import byte_format
 
 from .base_filters import Comparable, DataFilter, FastComparable
 from .custom_toml import TomlCustomCommentDecoder, TomlCustomCommentEncoder
@@ -53,10 +51,7 @@ class DatasetBuilder:
         self.basic_schema = {"path": str, "checkedtime": pl.Datetime}
         self.build_schema: dict[str, Expr] = {"checkedtime": pl.col("path").apply(_time)}
         if os.path.exists(self.filepath):
-            before = datetime.now()
-            print("Reading database...")
             self.df: DataFrame = pl.read_ipc(self.config["filepath"], use_pyarrow=True)
-            print(f"Finished reading in {datetime.now() - before}")
         else:
             self.df: DataFrame = DataFrame(schema=self.basic_schema)
 
@@ -94,15 +89,11 @@ class DatasetBuilder:
         assert self.filters, "No filters specified"
         if self.trim and len(self.df):
             now: datetime = current_time()
-            original_size: int = len(self.df)
-
             cond: Expr = now - pl.col("checkedtime") < self.time_threshold
             if self.check_exists:
                 cond &= pl.col("path").apply(os.path.exists)
 
             self.df = self.df.filter(cond)
-            if diff := original_size - len(self.df):
-                print(f"Removed {diff} images")
 
         from_full_to_relative: dict[str, Path] = self.absolute_dict(lst)
         abs_paths: set[str] = set(from_full_to_relative.keys())
@@ -117,22 +108,18 @@ class DatasetBuilder:
             )
 
         column_schema: dict[str, PolarsDataType | type] = self.basic_schema.copy()
-        build_schema: dict[str, Expr] = {"checkedtime": pl.col("path").apply(_time)}
         for filter_ in self.filters:
             filter_.filedict = from_full_to_relative
             if filter_.column_schema:
                 column_schema.update(filter_.column_schema)
-            if filter_.build_schema:
-                build_schema.update(filter_.build_schema)
 
         self.df = self._make_schema_compliant(self.df, column_schema)
         updated_df: DataFrame = self.df.with_columns(column_schema)
-        search_cols = {*build_schema, *self.basic_schema}
+        search_cols = {*self.build_schema, *self.basic_schema}
         unfinished: DataFrame = updated_df.filter(
             pl.any(pl.col(col).is_null() for col in updated_df.columns if col in search_cols)
         )
         if len(unfinished):
-            old_db_size: str = byte_format(self.get_db_disk_size())
             with tqdm(desc="Gathering file info...", total=len(unfinished)) as t:
                 chunksize: int = self.config["chunksize"]
                 save_timer = datetime.now()
@@ -140,7 +127,7 @@ class DatasetBuilder:
                 for group in (
                     unfinished.with_row_count("idx").with_columns(pl.col("idx") // chunksize).partition_by("idx")
                 ):
-                    new_data: DataFrame = self.fill_nulls(group, build_schema).drop("idx").select(column_schema)
+                    new_data: DataFrame = self.fill_nulls(group, self.build_schema).drop("idx").select(column_schema)
                     collected_data.vstack(new_data, in_place=True)
                     t.update(len(group))
                     if ((new_time := datetime.now()) - save_timer).total_seconds() > self.config["save_interval_secs"]:
@@ -152,8 +139,6 @@ class DatasetBuilder:
 
             self.df = self.df.update(collected_data, on="path").rechunk()
             self.save_df()
-            rprint(f"old DB size: [bold red]{old_db_size}[/bold red]")
-            rprint(f"new DB size: [bold yellow]{byte_format(self.get_db_disk_size())}[/bold yellow]")
         return
 
     @staticmethod
@@ -183,7 +168,6 @@ class DatasetBuilder:
         with tqdm(self.filters, "Running full filters...") as t:
             vdf: DataFrame = self.df.filter(pl.col("path").is_in(paths)).rechunk()
             count = 0
-            print(f"Original size: {len(vdf)}")
             for dfilter in self.filters:
                 if len(vdf) == 0:
                     break
@@ -198,17 +182,10 @@ class DatasetBuilder:
                             )
                         )
                     )
-                print(f"{dfilter}: {len(vdf)}")
                 t.update(count + 1)
                 count = 0
             t.update(count)
         return [from_full_to_relative[p] for p in vdf.sort(sort_col).select(pl.col("path")).to_series()]
-
-    def get_db_disk_size(self) -> int:
-        """gets the database size on disk."""
-        if not os.path.exists(self.config["filepath"]):
-            return 0
-        return os.stat(self.config["filepath"]).st_size
 
     def save_df(self) -> None:
         """saves the dataframe to self.filepath"""
