@@ -28,7 +28,6 @@ def get_parser():
 
 if __name__ == "__main__":
     args = get_parser().parse_args()
-    hasher = IMHASH_TYPES[args.type]
 
     folder = Path(args.input)
     new_folder = folder.parent / "linked"
