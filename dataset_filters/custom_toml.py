@@ -33,13 +33,13 @@ class TomlCustomCommentEncoder(
 
 class TomlCustomCommentDecoder(toml.TomlPreserveCommentDecoder):
     def preserve_comment(self, line_no, key, comment, beginline):
-        self.saved_comments[line_no] = (key, comment)
+        self.saved_comments[line_no] = (key, comment)  # type: ignore
 
     def embed_comments(self, idx, currentlevel) -> None:
         if idx not in self.saved_comments:
             return
 
-        key, comment = self.saved_comments[idx]
+        key, comment = self.saved_comments[idx]  # type: ignore
         if key:
             if comment.strip().startswith("#"):
                 comment = comment.strip()[1:]

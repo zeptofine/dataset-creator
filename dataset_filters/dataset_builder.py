@@ -115,6 +115,7 @@ class DatasetBuilder:
                 [self.df, DataFrame({"path": new_paths})],
                 how="diagonal",
             )
+
         column_schema: dict[str, PolarsDataType | type] = self.basic_schema.copy()
         build_schema: dict[str, Expr] = {"checkedtime": pl.col("path").apply(_time)}
         for filter_ in self.filters:
@@ -126,7 +127,10 @@ class DatasetBuilder:
 
         self.df = self._make_schema_compliant(self.df, column_schema)
         updated_df: DataFrame = self.df.with_columns(column_schema)
-        unfinished: DataFrame = updated_df.filter(pl.any(pl.col(col).is_null() for col in updated_df.columns))
+        search_cols = {*build_schema, *self.basic_schema}
+        unfinished: DataFrame = updated_df.filter(
+            pl.any(pl.col(col).is_null() for col in updated_df.columns if col in search_cols)
+        )
         if len(unfinished):
             old_db_size: str = byte_format(self.get_db_disk_size())
             with tqdm(desc="Gathering file info...", total=len(unfinished)) as t:
