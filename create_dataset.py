@@ -25,7 +25,6 @@ if TYPE_CHECKING:
 
     import numpy as np
 
-
 CPU_COUNT = int(cpu_count())
 app = typer.Typer()
 
@@ -91,6 +90,7 @@ def main(
     scale: Annotated[int, Option(help="the scale to downscale.")] = 4,
     extension: Annotated[Optional[str], Option(help="export extension.")] = None,
     extensions: Annotated[str, Option(help="extensions to search for. (split with commas)")] = "webp,png,jpg",
+    config_path: Annotated[Path, Option(help="Where the filter config is placed.")] = Path("database_config.toml"),
     recursive: Annotated[bool, Option(help="preserves the tree hierarchy.", rich_help_panel="modifiers")] = False,
     convert_spaces: Annotated[
         bool,
@@ -138,7 +138,7 @@ def main(
     s: RichStepper = RichStepper(loglevel=1, step=-1)
     s.next("Settings: ")
 
-    db = DatasetBuilder(origin=str(input_folder))
+    db = DatasetBuilder(origin=str(input_folder), config_path=config_path)
 
     def check_for_images(image_list: list[Path]) -> bool:
         if not image_list:

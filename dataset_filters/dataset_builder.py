@@ -23,13 +23,13 @@ def _time(_=None) -> datetime:
 
 
 class DatasetBuilder:
-    def __init__(self, origin: str) -> None:
+    def __init__(self, origin: str, config_path: Path) -> None:
         super().__init__()
         self.filters: list[DataFilter] = []
         self.origin: str = origin
 
         self.config = CfgDict(
-            "database_config.toml",
+            config_path,
             {
                 "trim": True,
                 "trim_age_limit_secs": 60 * 60 * 24 * 7,
