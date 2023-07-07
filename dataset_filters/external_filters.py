@@ -1,15 +1,15 @@
 from __future__ import annotations
+
 import os
 from collections.abc import Callable, Collection, Iterable
 from typing import Any
 
 import imagehash
 import imagesize
-from polars import List, col
 from PIL import Image
-from polars import DataFrame, Expr
+from polars import DataFrame, Expr, List, col
 
-from .base_filters import Comparable, DataFilter, FastComparable
+from .base_filters import Column, Comparable, DataFilter, FastComparable
 
 
 class ResFilter(DataFilter, FastComparable):
@@ -17,8 +17,7 @@ class ResFilter(DataFilter, FastComparable):
 
     def __init__(self) -> None:
         super().__init__()
-        self.column_schema = {"resolution": List(int)}
-        self.build_schema = {"resolution": col("path").apply(imagesize.get)}
+        self.schema = [Column("resolution", List(int), col("path").apply(imagesize.get))]
         self.config = (
             "resolution",
             {
@@ -58,8 +57,7 @@ class ChannelFilter(DataFilter, FastComparable):
 
     def __init__(self) -> None:
         super().__init__()
-        self.column_schema = {"channels": int}
-        self.build_schema = {"channels": col("path").apply(self.get_channels)}
+        self.schema = [Column("channels", int, col("path").apply(self.get_channels))]
         self.config = (
             "channels",
             {
@@ -87,8 +85,7 @@ class ChannelFilter(DataFilter, FastComparable):
 class HashFilter(DataFilter, Comparable):
     def __init__(self) -> None:
         super().__init__()
-        self.column_schema = {"hash": str}  # type: ignore
-        self.build_schema: dict[str, Expr] = {"hash": col("path").apply(self._hash_img)}
+        self.schema = [Column("hash", str, col("path").apply(self._hash_img))]
         self.config = (
             "hashing",
             {

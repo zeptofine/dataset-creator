@@ -1,5 +1,6 @@
 from abc import abstractmethod
 from collections.abc import Collection
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,15 @@ class FastComparable:
         raise NotImplementedError
 
 
+@dataclass
+class Column:
+    """A class defining what is in a column which a filter may use to apply a"""
+
+    name: str
+    dtype: PolarsDataType | type
+    build_method: Expr | None = None
+
+
 class DataFilter:
     """An abstract DataFilter format, for use in DatasetBuilder."""
 
@@ -29,6 +39,8 @@ class DataFilter:
         filedict: dict[str, Path]
             This is filled from the dataset builder, and contains a dictionary going from the resolved versions of
             the files to the ones given from the user.
+
+
 
         column_schema: dict[str, PolarsDataType | type]
             This is used to add a column using names and types to the file database.
@@ -45,8 +57,7 @@ class DataFilter:
 
         """
         self.filedict: dict[str, Path] = {}  # used for certain filters, like Existing
-        self.column_schema: dict[str, PolarsDataType | type] = {}
-        self.build_schema: dict[str, Expr] | None = None
+        self.schema: list[Column] = []
         self.config: tuple[str | None, dict[str, Any]] = (None, {"enabled": False})
         self.__enabled = False
 

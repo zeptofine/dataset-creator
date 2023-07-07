@@ -9,7 +9,7 @@ from polars import Datetime, col
 
 from util.file_list import get_file_list
 
-from .base_filters import DataFilter, FastComparable
+from .base_filters import DataFilter, FastComparable, Column
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Collection, Iterable
@@ -21,8 +21,7 @@ if TYPE_CHECKING:
 class StatFilter(DataFilter, FastComparable):
     def __init__(self) -> None:
         super().__init__()
-        self.column_schema = {"modifiedtime": Datetime}
-        self.build_schema: dict[str, Expr] = {"modifiedtime": col("path").apply(StatFilter.get_modified_time)}
+        self.schema = [Column("modifiedtime", Datetime, col("path").apply(StatFilter.get_modified_time))]
         self.config = (
             "stats",
             {
@@ -98,10 +97,12 @@ class BlacknWhitelistFilter(DataFilter, FastComparable):
                 args &= col("path").str.contains(item).is_not()
         return args
 
-    def _whitelist(self, imglist, whitelist) -> filter:
+    @staticmethod
+    def _whitelist(imglist, whitelist) -> filter:
         return filter(lambda x: any(x in white for white in whitelist), imglist)
 
-    def _blacklist(self, imglist, blacklist) -> filter:
+    @staticmethod
+    def _blacklist(imglist, blacklist) -> filter:
         return filter(lambda x: all(x not in black for black in blacklist), imglist)
 
 

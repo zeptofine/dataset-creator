@@ -6,11 +6,11 @@ from typing import Any
 
 import polars as pl
 from cfg_param_wrapper import CfgDict
-from polars import DataFrame, Expr, PolarsDataType
+from polars import DataFrame, Expr
 from tqdm import tqdm
 
 
-from .base_filters import Comparable, DataFilter, FastComparable
+from .base_filters import Comparable, DataFilter, FastComparable, Column
 from .custom_toml import TomlCustomCommentDecoder, TomlCustomCommentEncoder
 
 
@@ -49,6 +49,7 @@ class DatasetBuilder:
         self.check_exists: bool = self.config["trim_check_exists"]
 
         self.basic_schema = {"path": str, "checkedtime": pl.Datetime}
+        self.column_schema = self.basic_schema.copy()
         self.build_schema: dict[str, Expr] = {"checkedtime": pl.col("path").apply(_time)}
         if os.path.exists(self.filepath):
             self.df: DataFrame = pl.read_ipc(self.config["filepath"], use_pyarrow=True)
@@ -67,23 +68,24 @@ class DatasetBuilder:
             if filter_conf[0] is not None:
                 filter_.populate_from_cfg(self.config[filter_conf[0]])
 
-                if "enabled" in self.config[filter_conf[0]] and self.config[filter_conf[0]]["enabled"]:
+                if self.config[filter_conf[0]].get("enabled", False):
                     self.filters.append(filter_)
                     filter_.enable()
-                    if filter_.build_schema:
-                        if any(col not in self.build_schema for col in filter_.build_schema):
-                            self.add_schema_from_filter(filter_)
+                    for column in filter_.schema:
+                        if column.build_method is not None:
+                            if column.name not in self.build_schema:
+                                self.add_schema(column)
 
         if new_confs:
             self.config.save()
 
-    def add_schema_from_filter(self, filter_: DataFilter, overwrite=False):
-        assert filter_.build_schema, f"{filter_} has no build_schema"
+    def add_schema(self, col: Column, overwrite=False):
         if not overwrite:
-            assert all(
-                key not in self.build_schema for key in filter_.build_schema.keys()
-            ), f"Schema is already in build_schema: {self.build_schema}"
-        self.build_schema.update(filter_.build_schema)
+            assert col.name not in self.build_schema, f"Column is already in build_schema ({self.build_schema})"
+        if col.build_method is not None:
+            self.build_schema[col.name] = col.build_method
+        if col.name not in self.column_schema:
+            self.column_schema[col.name] = col.dtype
 
     def populate_df(self, lst: Iterable[Path]):
         assert self.filters, "No filters specified"
@@ -107,14 +109,11 @@ class DatasetBuilder:
                 how="diagonal",
             )
 
-        column_schema: dict[str, PolarsDataType | type] = self.basic_schema.copy()
         for filter_ in self.filters:
             filter_.filedict = from_full_to_relative
-            if filter_.column_schema:
-                column_schema.update(filter_.column_schema)
 
-        self.df = self._make_schema_compliant(self.df, column_schema)
-        updated_df: DataFrame = self.df.with_columns(column_schema)
+        self.df = self._make_schema_compliant(self.df, self.column_schema)
+        updated_df: DataFrame = self.df.with_columns(self.column_schema)
         search_cols = {*self.build_schema, *self.basic_schema}
         unfinished: DataFrame = updated_df.filter(
             pl.any(pl.col(col).is_null() for col in updated_df.columns if col in search_cols)
@@ -123,11 +122,13 @@ class DatasetBuilder:
             with tqdm(desc="Gathering file info...", total=len(unfinished)) as t:
                 chunksize: int = self.config["chunksize"]
                 save_timer = datetime.now()
-                collected_data: DataFrame = DataFrame(schema=column_schema)
+                collected_data: DataFrame = DataFrame(schema=self.column_schema)
                 for group in (
                     unfinished.with_row_count("idx").with_columns(pl.col("idx") // chunksize).partition_by("idx")
                 ):
-                    new_data: DataFrame = self.fill_nulls(group, self.build_schema).drop("idx").select(column_schema)
+                    new_data: DataFrame = (
+                        self.fill_nulls(group, self.build_schema).drop("idx").select(self.column_schema)
+                    )
                     collected_data.vstack(new_data, in_place=True)
                     t.update(len(group))
                     if ((new_time := datetime.now()) - save_timer).total_seconds() > self.config["save_interval_secs"]:
@@ -156,6 +157,7 @@ class DatasetBuilder:
         dct_: dict[str, Any] = item.row(0, named=True)
         if all(value is None for value in dct_.values()):
             return item.with_columns(**build_expr)
+
         return item.with_columns(**{col: expr for col, expr in build_expr.items() if dct_[col] is None})
 
     def filter(self, lst, sort_col="path") -> list[Path]:
@@ -178,7 +180,7 @@ class DatasetBuilder:
                         pl.col("path").is_in(
                             dfilter.compare(
                                 set(vdf.select(pl.col("path")).to_series()),
-                                self.df.select(pl.col("path"), *[pl.col(col) for col in dfilter.column_schema]),
+                                self.df.select(pl.col("path"), *[pl.col(col.name) for col in dfilter.schema]),
                             )
                         )
                     )
