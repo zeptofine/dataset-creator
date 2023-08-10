@@ -48,7 +48,7 @@ class StatFilter(DataFilter, FastComparable):
     def fast_comp(self) -> Expr | bool:
         param: Expr | bool = True
         if self.after:
-            param &= self.after < col("modifiedtime)")
+            param &= self.after < col("modifiedtime")
         if self.before:
             param &= self.before > col("modifiedtime")
         return param
