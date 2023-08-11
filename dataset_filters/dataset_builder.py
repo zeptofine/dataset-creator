@@ -98,11 +98,10 @@ class DatasetBuilder:
             self.df = self.df.filter(cond)
 
         from_full_to_relative: dict[str, Path] = self.absolute_dict(lst)
-        abs_paths: set[str] = set(from_full_to_relative.keys())
 
         # add new paths to the dataframe with missing data
         existing_paths = set(self.df.select(pl.col("path")).to_series())
-        new_paths: list[str] = [path for path in abs_paths if path not in existing_paths]
+        new_paths: list[str] = [path for path in from_full_to_relative if path not in existing_paths]
         if new_paths:
             self.df = pl.concat(
                 [self.df, DataFrame({"path": new_paths})],
@@ -114,7 +113,7 @@ class DatasetBuilder:
 
         self.df = self._make_schema_compliant(self.df, self.column_schema)
         updated_df: DataFrame = self.df.with_columns(self.column_schema)
-        search_cols = {*self.build_schema, *self.basic_schema}
+        search_cols: set[str] = {*self.build_schema, *self.basic_schema}
         unfinished: DataFrame = updated_df.filter(
             pl.any(pl.col(col).is_null() for col in updated_df.columns if col in search_cols)
         )
@@ -123,13 +122,21 @@ class DatasetBuilder:
                 chunksize: int = self.config["chunksize"]
                 save_timer = datetime.now()
                 collected_data: DataFrame = DataFrame(schema=self.column_schema)
-                for group in (
-                    unfinished.with_row_count("idx").with_columns(pl.col("idx") // chunksize).partition_by("idx")
+                for nulls, group in (
+                    unfinished.with_columns(self.column_schema)
+                    .with_row_count("idx")
+                    .with_columns(pl.col("idx") // chunksize)
+                    .groupby("idx", *(pl.col(col).is_not_null() for col in self.build_schema))
                 ):
-                    new_data: DataFrame = (
-                        self.fill_nulls(group, self.build_schema).drop("idx").select(self.column_schema)
+                    t.set_postfix_str(str(nulls))
+                    new_data = group.drop("idx").with_columns(
+                        **{
+                            col: expr
+                            for truth, (col, expr) in zip(nulls[1:], self.build_schema.items())  # type: ignore
+                            if not truth
+                        }
                     )
-                    collected_data.vstack(new_data, in_place=True)
+                    collected_data = pl.concat([collected_data, new_data], how="diagonal")
                     t.update(len(group))
                     if ((new_time := datetime.now()) - save_timer).total_seconds() > self.config["save_interval_secs"]:
                         self.df = self.df.update(collected_data, on="path")
@@ -141,24 +148,6 @@ class DatasetBuilder:
             self.df = self.df.update(collected_data, on="path").rechunk()
             self.save_df()
         return
-
-    @staticmethod
-    def fill_nulls(data_frame: DataFrame, build_expr: dict[str, Expr]) -> DataFrame:
-        return (
-            data_frame.with_row_count("i")
-            .groupby("i")
-            .apply(lambda item: DatasetBuilder.apply_only_on_null(item, build_expr))
-            .drop("i")
-        )
-
-    @staticmethod
-    def apply_only_on_null(item: DataFrame, build_expr: dict[str, Expr]):
-        # only use expressions that are valid
-        dct_: dict[str, Any] = item.row(0, named=True)
-        if all(value is None for value in dct_.values()):
-            return item.with_columns(**build_expr)
-
-        return item.with_columns(**{col: expr for col, expr in build_expr.items() if dct_[col] is None})
 
     def filter(self, lst, sort_col="path") -> list[Path]:
         assert (

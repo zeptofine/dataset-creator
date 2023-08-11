@@ -1,8 +1,8 @@
 trim = true
 trim_age_limit_secs = 604800
 trim_check_exists = true
-save_interval_secs = 60
-chunksize = 100
+save_interval_secs = 20
+chunksize = 400
 filepath = "filedb.feather"
 
 [stats]
