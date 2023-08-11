@@ -14,9 +14,10 @@ from tqdm import tqdm
 from typer import Option
 from typing_extensions import Annotated
 
-from dataset_filters.data_filters import BlacknWhitelistFilter, ExistingFilter, StatFilter
-from dataset_filters.dataset_builder import DatasetBuilder
-from dataset_filters.external_filters import ChannelFilter, HashFilter, ResFilter
+
+from src.datafilters.data_filters import BlacknWhitelistFilter, ExistingFilter, StatFilter
+from src.datafilters.dataset_builder import DatasetBuilder
+from src.datafilters.external_filters import ChannelFilter, HashFilter, ResFilter
 from util.file_list import get_file_list, to_recursive
 from util.print_funcs import RichStepper, ipbar
 
