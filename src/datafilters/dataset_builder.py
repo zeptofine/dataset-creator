@@ -1,16 +1,16 @@
+import inspect
 import os
+import warnings
 from collections.abc import Collection, Iterable
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 import polars as pl
 from cfg_param_wrapper import CfgDict
 from polars import DataFrame, Expr
 from tqdm import tqdm
 
-
-from .base_filters import Comparable, DataFilter, FastComparable, Column
+from .base_filters import Column, Comparable, DataFilter, FastComparable
 from .custom_toml import TomlCustomCommentDecoder, TomlCustomCommentEncoder
 
 
@@ -25,24 +25,12 @@ def _time(_=None) -> datetime:
 class DatasetBuilder:
     def __init__(self, origin: str, config_path: Path) -> None:
         super().__init__()
+        self.unready_filters: dict[str, type[DataFilter]] = {}
         self.filters: list[DataFilter] = []
         self.origin: str = origin
 
-        self.config = CfgDict(
-            config_path,
-            {
-                "trim": True,
-                "trim_age_limit_secs": 60 * 60 * 24 * 7,
-                "trim_check_exists": True,
-                "save_interval_secs": 60,
-                "chunksize": 100,
-                "filepath": "filedb.feather",
-            },
-            autofill=True,
-            save_mode="toml",
-            encoder=TomlCustomCommentEncoder(),
-            decoder=TomlCustomCommentDecoder(),
-        )
+        self.config_path = config_path
+        self.config = self.generate_config()
         self.filepath: str = self.config["filepath"]
         self.trim: bool = self.config["trim"]
         self.time_threshold: datetime = datetime.fromtimestamp(self.config["trim_age_limit_secs"])
@@ -56,28 +44,59 @@ class DatasetBuilder:
         else:
             self.df: DataFrame = DataFrame(schema=self.basic_schema)
 
-    def add_filters(self, *filters: DataFilter) -> None:
-        """Adds filters to the filter list."""
-        new_confs = False
+    def add_filters(self, filters: list[type[DataFilter] | DataFilter]) -> None:
+        """Adds filters to the filter list. Filters will be instantiated separately."""
+
         for filter_ in filters:
-            filter_conf: tuple[str | None, dict[str, Any]] = filter_.get_config()
-            if filter_conf[0] not in (*self.config, None):
-                self.config.update({filter_conf[0]: filter_conf[1]})
-                print(f"New filter added to config: {filter_conf[0]}. check database_config.toml to edit.")
-                new_confs = True
-            if filter_conf[0] is not None:
-                filter_.populate_from_cfg(self.config[filter_conf[0]])
+            self.add_filter(filter_)
 
-                if self.config[filter_conf[0]].get("enabled", False):
-                    self.filters.append(filter_)
-                    filter_.enable()
-                    for column in filter_.schema:
-                        if column.build_method is not None:
-                            if column.name not in self.build_schema:
-                                self.add_schema(column)
+    def add_filter(self, filter_: type[DataFilter] | DataFilter):
+        if isinstance(filter_, type):
+            self.unready_filters[filter_.config_keyword] = filter_
+        elif isinstance(filter_, DataFilter):
+            if filter_ not in self.filters:
+                self.filters.append(filter_)
+                for column in filter_.schema:
+                    self.add_schema(column)
+        else:
+            raise TypeError(f"{filter_} is not a filter.")
 
-        if new_confs:
-            self.config.save()
+    def fill_from_config(self, cfg: dict[str, dict], no_warn=False):
+        if not len(self.unready_filters):
+            raise KeyError("Unready filters is empty")
+
+        for kwd, dct in cfg.items():
+            if kwd in self.unready_filters:
+                filter_ = self.unready_filters.pop(kwd)
+                sig: inspect.Signature = inspect.signature(filter_)
+
+                params = {k: v for k, v in dct.items() if k in sig.parameters and k != "self"}
+                self.add_filter(filter_(**params))
+        if len(self.unready_filters) and not no_warn:
+            warnings.warn(f"{self.unready_filters} remain unfilled from config.")
+
+    def generate_config(self) -> CfgDict:
+        dct = CfgDict(
+            self.config_path,
+            {
+                "trim": True,
+                "trim_age_limit_secs": 60 * 60 * 24 * 7,
+                "trim_check_exists": True,
+                "save_interval_secs": 60,
+                "chunksize": 100,
+                "filepath": "filedb.feather",
+            },
+            autofill=False,
+            start_empty=True,
+            save_on_change=False,
+            save_mode="toml",
+            encoder=TomlCustomCommentEncoder(),
+            decoder=TomlCustomCommentDecoder(),
+        )
+        for name, filter_ in self.unready_filters.items():
+            dct[name] = filter_.get_cfg()
+
+        return dct
 
     def add_schema(self, col: Column, overwrite=False):
         if not overwrite:
@@ -96,7 +115,6 @@ class DatasetBuilder:
                 cond &= pl.col("path").apply(os.path.exists)
 
             self.df = self.df.filter(cond)
-
         from_full_to_relative: dict[str, Path] = self.absolute_dict(lst)
 
         # add new paths to the dataframe with missing data
@@ -114,6 +132,7 @@ class DatasetBuilder:
         self.df = self._make_schema_compliant(self.df, self.column_schema)
         updated_df: DataFrame = self.df.with_columns(self.column_schema)
         search_cols: set[str] = {*self.build_schema, *self.basic_schema}
+
         unfinished: DataFrame = updated_df.filter(
             pl.any(pl.col(col).is_null() for col in updated_df.columns if col in search_cols)
         )

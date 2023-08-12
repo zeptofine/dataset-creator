@@ -134,12 +134,25 @@ def main(
             help="Which column in the database to sort by. It must be in the database.", rich_help_panel="modifiers"
         ),
     ] = "path",
+    stat: Annotated[bool, Option("--stat", "-s", help="use statfilter", rich_help_panel="filters")] = False,
+    res: Annotated[bool, Option("--res", "-r", help="use resfilter", rich_help_panel="filters")] = False,
+    hsh: Annotated[bool, Option("--hash", "-h", help="use hashfilter", rich_help_panel="filters")] = False,
+    chn: Annotated[bool, Option("--channel", "-c", help="use channelfilter", rich_help_panel="filters")] = False,
+    blw: Annotated[
+        bool, Option("--blackwhitelist", "-b", help="use blacknwhitelistfilter", rich_help_panel="filters")
+    ] = False,
 ) -> int:
     """Does all the heavy lifting"""
     s: RichStepper = RichStepper(loglevel=1, step=-1)
     s.next("Settings: ")
 
     db = DatasetBuilder(origin=str(input_folder), config_path=config_path)
+    if not config_path.exists():
+        db.add_filters([StatFilter, ResFilter, HashFilter, ChannelFilter, BlacknWhitelistFilter])
+        db.generate_config().save()
+        print(f"{config_path} created. edit it and restart this program.")
+        return 0
+    db.config.load()
 
     def check_for_images(image_list: list[Path]) -> bool:
         if not image_list:
@@ -197,17 +210,19 @@ def main(
 
         return hr_path, lr_path
 
-    stat = StatFilter()
-    res = ResFilter()
-    hsh = HashFilter()
-    chn = ChannelFilter()
-    blw = BlacknWhitelistFilter()
-    db.add_filters(stat, res, hsh, chn, blw)
-
+    filters = []
+    if stat:
+        filters.append(StatFilter)
     if res:
-        s.print(f"Filtering by size ({res.min} <= x <= {res.max})")
+        filters.append(ResFilter)
+    if hsh:
+        filters.append(HashFilter)
+    if chn:
+        filters.append(ChannelFilter)
     if blw:
-        s.print(f"Whitelist: {blw.whitelist}", f"Blacklist: {blw.blacklist}")
+        filters.append(BlacknWhitelistFilter)
+    db.add_filters(filters)
+    db.fill_from_config(db.config)
 
     # * Gather images
     s.next("Gathering images...")
@@ -246,7 +261,7 @@ def main(
         folders: list[Path] = [hr_folder]
         if make_lr:
             folders.append(lr_folder)
-        db.add_filters(ExistingFilter(*folders, recurse_func=recurse))
+        db.add_filter(ExistingFilter(folders, recurse_func=recurse))
 
     # * Run filters
     s.next("Using: ")
