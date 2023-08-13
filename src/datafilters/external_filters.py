@@ -31,7 +31,7 @@ class ResFilter(DataFilter, FastComparable):
         scale=4,
     ) -> None:
         super().__init__()
-        self.schema = (Column("resolution", List(int), col("path").apply(imagesize.get)),)
+        self.schema = (Column(self, "resolution", List(int), col("path").apply(imagesize.get)),)
         self.min: int | None = min
         self.max: int | None = max
         self.crop: bool | None = crop
@@ -61,7 +61,7 @@ class ChannelFilter(DataFilter, FastComparable):
 
     def __init__(self, min_channels=1, max_channels=4) -> None:
         super().__init__()
-        self.schema = (Column("channels", int, col("path").apply(get_channels)),)
+        self.schema = (Column(self, "channels", int, col("path").apply(get_channels)),)
         self.min_channels = min_channels
         self.max_channels = max_channels
 
@@ -126,7 +126,7 @@ class HashFilter(DataFilter, Comparable):
         resolver: RESOLVERS = RESOLVERS.IGNORE_ALL,
     ) -> None:
         super().__init__()
-        self.schema = (Column("hash", str, col("path").apply(self._hash_img)),)
+        self.schema = (Column(self, "hash", str, col("path").apply(self._hash_img)),)
 
         self.hasher: Callable[[Image.Image], imagehash.ImageHash] = _HASHERS[hasher]
         self.resolver: Expr | bool = _RESOLVERS[resolver]

@@ -14,7 +14,7 @@ from tqdm import tqdm
 from typer import Option
 from typing_extensions import Annotated
 
-
+from src.datafilters.custom_toml import TomlCustomCommentDecoder, TomlCustomCommentEncoder
 from src.datafilters.data_filters import BlacknWhitelistFilter, ExistingFilter, StatFilter
 from src.datafilters.dataset_builder import DatasetBuilder
 from src.datafilters.external_filters import ChannelFilter, HashFilter, ResFilter
@@ -145,14 +145,31 @@ def main(
     """Does all the heavy lifting"""
     s: RichStepper = RichStepper(loglevel=1, step=-1)
     s.next("Settings: ")
+    cfg = CfgDict(
+        config_path,
+        {
+            "trim": True,
+            "trim_age_limit": 60 * 60 * 24 * 7,
+            "trim_check_exists": True,
+            "save_interval": 60,
+            "chunksize": 100,
+            "filepath": "filedb.feather",
+        },
+        autofill=False,
+        save_on_change=False,
+        start_empty=True,
+        save_mode="toml",
+        encoder=TomlCustomCommentEncoder(),
+        decoder=TomlCustomCommentDecoder(),
+    )
 
-    db = DatasetBuilder(origin=str(input_folder), config_path=config_path)
+    db = DatasetBuilder(origin=str(input_folder), db_path=Path(cfg["filepath"]))
     if not config_path.exists():
         db.add_filters([StatFilter, ResFilter, HashFilter, ChannelFilter, BlacknWhitelistFilter])
-        db.generate_config().save()
+        cfg.update(db.generate_config()).save()
         print(f"{config_path} created. edit it and restart this program.")
         return 0
-    db.config.load()
+    cfg.load()
 
     def check_for_images(image_list: list[Path]) -> bool:
         if not image_list:
@@ -222,7 +239,7 @@ def main(
     if blw:
         filters.append(BlacknWhitelistFilter)
     db.add_filters(filters)
-    db.fill_from_config(db.config)
+    db.fill_from_config(cfg)
 
     # * Gather images
     s.next("Gathering images...")
@@ -268,7 +285,9 @@ def main(
     s.print(*[f" - {str(filter_)}" for filter_ in db.filters])
 
     s.print("Populating df...")
-    db.populate_df(image_list)
+    db.populate_df(
+        image_list, cfg["trim"], cfg["trim_age_limit"], cfg["save_interval"], cfg["trim_check_exists"], cfg["chunksize"]
+    )
 
     s.print("Filtering...")
     image_list = db.filter(image_list, sort_col=sort_by)

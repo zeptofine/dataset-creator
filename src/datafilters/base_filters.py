@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import inspect
 import sys
 from abc import abstractmethod
@@ -28,6 +30,7 @@ class FastComparable:
 class Column:
     """A class defining what is in a column which a filter may use to apply a"""
 
+    source: DataFilter | None
     name: str
     dtype: PolarsDataType | type
     build_method: Expr | None = None

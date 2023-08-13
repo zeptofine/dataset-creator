@@ -23,24 +23,20 @@ def _time(_=None) -> datetime:
 
 
 class DatasetBuilder:
-    def __init__(self, origin: str, config_path: Path) -> None:
+    def __init__(self, origin: str, db_path: Path) -> None:
         super().__init__()
         self.unready_filters: dict[str, type[DataFilter]] = {}
         self.filters: list[DataFilter] = []
         self.origin: str = origin
 
-        self.config_path = config_path
-        self.config = self.generate_config()
-        self.filepath: str = self.config["filepath"]
-        self.trim: bool = self.config["trim"]
-        self.time_threshold: datetime = datetime.fromtimestamp(self.config["trim_age_limit_secs"])
-        self.check_exists: bool = self.config["trim_check_exists"]
+        self.filepath: Path = db_path
 
         self.basic_schema = {"path": str, "checkedtime": pl.Datetime}
-        self.column_schema = self.basic_schema.copy()
+        self.filter_type_schema = self.basic_schema.copy()
+
         self.build_schema: dict[str, Expr] = {"checkedtime": pl.col("path").apply(_time)}
         if os.path.exists(self.filepath):
-            self.df: DataFrame = pl.read_ipc(self.config["filepath"], use_pyarrow=True)
+            self.df: DataFrame = pl.read_ipc(self.filepath, use_pyarrow=True)
         else:
             self.df: DataFrame = DataFrame(schema=self.basic_schema)
 
@@ -75,48 +71,35 @@ class DatasetBuilder:
         if len(self.unready_filters) and not no_warn:
             warnings.warn(f"{self.unready_filters} remain unfilled from config.")
 
-    def generate_config(self) -> CfgDict:
-        dct = CfgDict(
-            self.config_path,
-            {
-                "trim": True,
-                "trim_age_limit_secs": 60 * 60 * 24 * 7,
-                "trim_check_exists": True,
-                "save_interval_secs": 60,
-                "chunksize": 100,
-                "filepath": "filedb.feather",
-            },
-            autofill=False,
-            start_empty=True,
-            save_on_change=False,
-            save_mode="toml",
-            encoder=TomlCustomCommentEncoder(),
-            decoder=TomlCustomCommentDecoder(),
-        )
-        for name, filter_ in self.unready_filters.items():
-            dct[name] = filter_.get_cfg()
-
-        return dct
+    def generate_config(self) -> dict:
+        return {name: filter_.get_cfg() for name, filter_ in self.unready_filters.items()}
 
     def add_schema(self, col: Column, overwrite=False):
         if not overwrite:
             assert col.name not in self.build_schema, f"Column is already in build_schema ({self.build_schema})"
         if col.build_method is not None:
             self.build_schema[col.name] = col.build_method
-        if col.name not in self.column_schema:
-            self.column_schema[col.name] = col.dtype
+        if col.name not in self.filter_type_schema:
+            self.filter_type_schema[col.name] = col.dtype
 
-    def populate_df(self, lst: Iterable[Path]):
+    def populate_df(
+        self,
+        lst: Iterable[Path],
+        trim: bool = True,
+        trim_age_limit: int = 60 * 60 * 24 * 7,
+        save_interval: int = 60,
+        trim_check_exists: bool = True,
+        chunksize: int = 100,
+    ):
         assert self.filters, "No filters specified"
-        if self.trim and len(self.df):
+        if trim and len(self.df):
             now: datetime = current_time()
-            cond: Expr = now - pl.col("checkedtime") < self.time_threshold
-            if self.check_exists:
+            cond: Expr = now - pl.col("checkedtime") < datetime.fromtimestamp(trim_age_limit)
+            if trim_check_exists:
                 cond &= pl.col("path").apply(os.path.exists)
 
             self.df = self.df.filter(cond)
         from_full_to_relative: dict[str, Path] = self.absolute_dict(lst)
-
         # add new paths to the dataframe with missing data
         existing_paths = set(self.df.select(pl.col("path")).to_series())
         new_paths: list[str] = [path for path in from_full_to_relative if path not in existing_paths]
@@ -128,9 +111,8 @@ class DatasetBuilder:
 
         for filter_ in self.filters:
             filter_.filedict = from_full_to_relative
-
-        self.df = self._make_schema_compliant(self.df, self.column_schema)
-        updated_df: DataFrame = self.df.with_columns(self.column_schema)
+        self.df = self._make_schema_compliant(self.df, self.filter_type_schema)
+        updated_df: DataFrame = self.df.with_columns(self.filter_type_schema)
         search_cols: set[str] = {*self.build_schema, *self.basic_schema}
 
         unfinished: DataFrame = updated_df.filter(
@@ -138,11 +120,10 @@ class DatasetBuilder:
         )
         if len(unfinished):
             with tqdm(desc="Gathering file info...", total=len(unfinished)) as t:
-                chunksize: int = self.config["chunksize"]
                 save_timer = datetime.now()
-                collected_data: DataFrame = DataFrame(schema=self.column_schema)
+                collected_data: DataFrame = DataFrame(schema=self.filter_type_schema)
                 for nulls, group in (
-                    unfinished.with_columns(self.column_schema)
+                    unfinished.with_columns(self.filter_type_schema)
                     .with_row_count("idx")
                     .with_columns(pl.col("idx") // chunksize)
                     .groupby("idx", *(pl.col(col).is_not_null() for col in self.build_schema))
@@ -157,13 +138,12 @@ class DatasetBuilder:
                     )
                     collected_data = pl.concat([collected_data, new_data], how="diagonal")
                     t.update(len(group))
-                    if ((new_time := datetime.now()) - save_timer).total_seconds() > self.config["save_interval_secs"]:
+                    if ((new_time := datetime.now()) - save_timer).total_seconds() > save_interval:
                         self.df = self.df.update(collected_data, on="path")
                         self.save_df()
                         t.set_postfix_str(f"Autosaved at {current_time()}")
                         collected_data = collected_data.clear()
                         save_timer = new_time
-
             self.df = self.df.update(collected_data, on="path").rechunk()
             self.save_df()
         return

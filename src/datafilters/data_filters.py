@@ -27,7 +27,7 @@ class StatFilter(DataFilter, FastComparable):
         after: Annotated[str, "Only get items after this threshold"] = "1980",
     ) -> None:
         super().__init__()
-        self.schema = (Column("modifiedtime", Datetime, col("path").apply(StatFilter.get_modified_time)),)
+        self.schema = (Column(self, "modifiedtime", Datetime, col("path").apply(StatFilter.get_modified_time)),)
         self.before: datetime | None = None
         self.after: datetime | None = None
         if before is not None:
