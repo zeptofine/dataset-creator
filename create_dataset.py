@@ -289,7 +289,12 @@ def main(
 
     s.print("Populating df...")
     db.populate_df(
-        image_list, cfg["trim"], cfg["trim_age_limit"], cfg["save_interval"], cfg["trim_check_exists"], cfg["chunksize"]
+        image_list,
+        trim=cfg["trim"],
+        trim_age_limit=cfg["trim_age_limit"],
+        save_interval=cfg["save_interval"],
+        trim_check_exists=cfg["trim_check_exists"],
+        chunksize=cfg["chunksize"],
     )
 
     s.print("Filtering...")

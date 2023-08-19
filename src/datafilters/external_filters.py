@@ -146,13 +146,18 @@ class HashFilter(DataFilter, Comparable):
     def compare(self, lst: Collection, cols: DataFrame) -> set:
         assert self.resolver is not None
         applied: DataFrame = (
-            cols.filter(col("hash").is_in(cols.filter(col("path").is_in(lst)).select(col("hash")).unique().to_series()))
+            cols.filter(
+                col("hash").is_in(cols.filter(col("path").is_in(lst)).get_column("hash").unique()),
+            )
             .groupby("hash")
             .apply(lambda df: df.filter(self.resolver) if len(df) > 1 else df)  # type: ignore
         )
 
-        resolved_paths = set(applied.select(col("path")).to_series())
+        resolved_paths = set(applied.get_column("path"))
         return resolved_paths
+
+    def apply_resolver(self, df: DataFrame):
+        return df.filter(self.resolver)
 
     def _hash_img(self, pth) -> str:
         assert self.hasher is not None
