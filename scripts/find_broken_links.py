@@ -3,7 +3,7 @@ from tqdm import tqdm
 
 src = "/mnt/Toshiba/.Grabber/"
 
-gen = Path(src).rglob("*/**/*")
+gen = Path(src).rglob("*")
 
 lst: list[Path] = []
 for path in tqdm(gen):
