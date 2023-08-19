@@ -88,7 +88,7 @@ _RESOLVERS: dict[str, Expr | bool] = {
     "ignore_all": False,
     "newest": col("modifiedtime") == col("modifiedtime").max(),
     "oldest": col("modifiedtime") == col("modifiedtime").min(),
-    "size": (sizes := col("path").apply(lambda p: os.stat(str(p)).st_size)) == sizes.max(),
+    "size": col("size") == col("size").max(),
 }
 
 
@@ -126,19 +126,23 @@ class HashFilter(DataFilter, Comparable):
         self,
         hasher: HASHERS = HASHERS.AVERAGE,
         resolver: RESOLVERS = RESOLVERS.IGNORE_ALL,
+        get_optional_cols=False,
     ) -> None:
         super().__init__()
         self.schema = (Column(self, "hash", str, col("path").apply(self._hash_img)),)
+        if get_optional_cols or resolver in [RESOLVERS.NEWEST, RESOLVERS.OLDEST]:
+            self.schema = (
+                *self.schema,
+                Column(self, "modifiedtime", datetime),
+            )
+        elif get_optional_cols or resolver == RESOLVERS.SIZE:
+            self.schema = (
+                *self.schema,
+                Column(self, "size", int, col("path").apply(lambda p: os.stat(str(p)).st_size)),
+            )
 
         self.hasher: Callable[[Image.Image], imagehash.ImageHash] = _HASHERS[hasher]
         self.resolver: Expr | bool = _RESOLVERS[resolver]
-        if resolver in [RESOLVERS.NEWEST, RESOLVERS.OLDEST]:
-            self.schema = (
-                Column(self, "hash", str, col("path").apply(self._hash_img)),
-                Column(self, "modifiedtime", datetime),
-            )
-        else:
-            self.schema = (Column(self, "hash", str, col("path").apply(self._hash_img)),)
 
     def compare(self, lst: Collection, cols: DataFrame) -> set:
         assert self.resolver is not None

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TypeVar
 
 import polars as pl
-from polars import DataFrame, Expr
+from polars import DataFrame, Expr, LazyFrame
 from tqdm import tqdm
 
 from .base_filters import Column, Comparable, DataFilter, FastComparable
@@ -157,7 +157,7 @@ class DatasetBuilder:
             self.save_df()
         return
 
-    def filter(self, lst, sort_col="path", ignore_missing_columns=False) -> list[Path]:
+    def filter(self, lst, sort_col="path", ignore_missing_columns=False) -> Iterable[Path]:
         assert (
             sort_col in self.df.columns
         ), f"the column '{sort_col}' is not in the database. Available columns: {self.df.columns}"
@@ -171,27 +171,26 @@ class DatasetBuilder:
 
         from_full_to_relative: dict[str, Path] = self.absolute_dict(lst)
         paths: set[str] = set(from_full_to_relative.keys())
-        with tqdm(self.filters, "Running full filters...") as t:
-            vdf: DataFrame = self.df.filter(pl.col("path").is_in(paths)).rechunk()
-            count = 0
-            for dfilter in self.filters:
-                if len(vdf) == 0:
-                    break
-                if isinstance(dfilter, FastComparable):
-                    vdf = vdf.filter(dfilter.fast_comp())
-                elif isinstance(dfilter, Comparable):
-                    vdf = vdf.filter(
+
+        vdf: LazyFrame = self.df.lazy().filter(pl.col("path").is_in(paths))
+        for dfilter in self.filters:
+            if isinstance(dfilter, FastComparable):
+                vdf = vdf.filter(dfilter.fast_comp())
+            elif isinstance(dfilter, Comparable):
+                vdf = (
+                    (c := vdf.collect())
+                    .filter(
                         pl.col("path").is_in(
                             dfilter.compare(
-                                set(vdf.select(pl.col("path")).to_series()),
+                                set(c.select(pl.col("path")).to_series()),
                                 self.df.select(pl.col("path"), *[pl.col(col.name) for col in dfilter.schema]),
                             )
                         )
                     )
-                t.update(count + 1)
-                count = 0
-            t.update(count)
-        return [from_full_to_relative[p] for p in vdf.sort(sort_col).select(pl.col("path")).to_series()]
+                    .lazy()
+                )
+
+        return (from_full_to_relative[p] for p in vdf.sort(sort_col).select(pl.col("path")).collect().to_series())
 
     def save_df(self) -> None:
         """saves the dataframe to self.filepath"""

@@ -293,7 +293,7 @@ def main(
     )
 
     s.print("Filtering...")
-    image_list = db.filter(image_list, sort_col=sort_by, ignore_missing_columns=ignore_missing_cols)
+    image_list = list(db.filter(image_list, sort_col=sort_by, ignore_missing_columns=ignore_missing_cols))
 
     if limit and limit_mode == LimitModes.AFTER:
         image_list = image_list[:limit]
