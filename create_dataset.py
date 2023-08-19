@@ -99,9 +99,11 @@ def main(
             help="Whether to replace spaces with underscores when creating the output.", rich_help_panel="modifiers"
         ),
     ] = False,
-    threads: Annotated[int, Option(help="number of threads for multiprocessing.", rich_help_panel="modifiers")] = int(
-        CPU_COUNT * (3 / 4)
-    ),
+    threads: Annotated[
+        int, Option(help="number of threads for multiprocessing.", rich_help_panel="modifiers")
+    ] = CPU_COUNT
+    * 3
+    // 4,
     chunksize: Annotated[
         int, Option(help="number of images to run with one thread per pool chunk", rich_help_panel="modifiers")
     ] = 5,
@@ -134,6 +136,7 @@ def main(
             help="Which column in the database to sort by. It must be in the database.", rich_help_panel="modifiers"
         ),
     ] = "path",
+    ignore_missing_cols: Annotated[bool, Option(help="if columns are missing, don't break filtering")] = False,
     stat: Annotated[bool, Option("--stat", "-s", help="use statfilter", rich_help_panel="filters")] = False,
     res: Annotated[bool, Option("--res", "-r", help="use resfilter", rich_help_panel="filters")] = False,
     hsh: Annotated[bool, Option("--hash", "-h", help="use hashfilter", rich_help_panel="filters")] = False,
@@ -290,7 +293,7 @@ def main(
     )
 
     s.print("Filtering...")
-    image_list = db.filter(image_list, sort_col=sort_by)
+    image_list = db.filter(image_list, sort_col=sort_by, ignore_missing_columns=ignore_missing_cols)
 
     if limit and limit_mode == LimitModes.AFTER:
         image_list = image_list[:limit]

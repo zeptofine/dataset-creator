@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable, Collection, Iterable
+from datetime import datetime
 from enum import Enum
+from typing import Annotated
 
 import imagehash
 import imagesize
 from PIL import Image
 from polars import DataFrame, Expr, List, col
-from typing import Annotated
+
 from .base_filters import Column, Comparable, DataFilter, FastComparable
 
 
@@ -130,6 +132,13 @@ class HashFilter(DataFilter, Comparable):
 
         self.hasher: Callable[[Image.Image], imagehash.ImageHash] = _HASHERS[hasher]
         self.resolver: Expr | bool = _RESOLVERS[resolver]
+        if resolver in [RESOLVERS.NEWEST, RESOLVERS.OLDEST]:
+            self.schema = (
+                Column(self, "hash", str, col("path").apply(self._hash_img)),
+                Column(self, "modifiedtime", datetime),
+            )
+        else:
+            self.schema = (Column(self, "hash", str, col("path").apply(self._hash_img)),)
 
     def compare(self, lst: Collection, cols: DataFrame) -> set:
         assert self.resolver is not None

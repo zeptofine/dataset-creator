@@ -5,6 +5,7 @@ from collections.abc import Collection, Iterable
 from datetime import datetime
 from pathlib import Path
 from typing import TypeVar
+
 import polars as pl
 from polars import DataFrame, Expr
 from tqdm import tqdm
@@ -33,9 +34,10 @@ class DatasetBuilder:
         self.filepath: Path = db_path
 
         self.basic_schema: dict[str, pl.DataType | type] = {"path": str, "checkedtime": pl.Datetime}
-        self.filter_type_schema: dict[str, pl.DataType | type] = self.basic_schema.copy()
-
         self.build_schema: dict[str, Expr] = {"checkedtime": pl.col("path").apply(_time)}
+        self.filter_type_schema: dict[str, pl.DataType | type] = self.basic_schema.copy()
+        self.columns: dict[str, Column] = {}
+
         if os.path.exists(self.filepath):
             self.df: DataFrame = pl.read_ipc(self.filepath, use_pyarrow=True)
         else:
@@ -53,6 +55,7 @@ class DatasetBuilder:
         elif isinstance(filter_, DataFilter):
             if filter_ not in self.filters:
                 self.filters.append(filter_)
+
                 for column in filter_.schema:
                     self.add_schema(column)
         else:
@@ -76,9 +79,9 @@ class DatasetBuilder:
         return {name: filter_.get_cfg() for name, filter_ in self.unready_filters.items()}
 
     def add_schema(self, col: Column, overwrite=False):
-        if not overwrite:
-            assert col.name not in self.build_schema, f"Column is already in build_schema ({self.build_schema})"
+        self.columns[col.name] = col
         if col.build_method is not None:
+            assert col.name not in self.build_schema, f"Column is already in build_schema ({self.build_schema})"
             self.build_schema[col.name] = col.build_method
         if col.name not in self.filter_type_schema:
             self.filter_type_schema[col.name] = col.dtype
@@ -154,12 +157,17 @@ class DatasetBuilder:
             self.save_df()
         return
 
-    def filter(self, lst, sort_col="path") -> list[Path]:
+    def filter(self, lst, sort_col="path", ignore_missing_columns=False) -> list[Path]:
         assert (
             sort_col in self.df.columns
         ), f"the column '{sort_col}' is not in the database. Available columns: {self.df.columns}"
         if len(self.unready_filters):
             warnings.warn(f"{len(self.unready_filters)} filters are not initialized and will not be populated")
+
+        if (missing_requirements := set(self.columns) - set(self.build_schema)) and not ignore_missing_columns:
+            raise ValueError(
+                f"the following columns are required but may not be in the database: {missing_requirements}"
+            )
 
         from_full_to_relative: dict[str, Path] = self.absolute_dict(lst)
         paths: set[str] = set(from_full_to_relative.keys())

@@ -88,14 +88,6 @@ class BlacknWhitelistFilter(DataFilter, FastComparable):
             "!#exclusive": "Only allow files that are valid by every whitelist string",
         }
 
-    @staticmethod
-    def _whitelist(imglist, whitelist) -> filter:
-        return filter(lambda x: any(x in white for white in whitelist), imglist)
-
-    @staticmethod
-    def _blacklist(imglist, blacklist) -> filter:
-        return filter(lambda x: all(x not in black for black in blacklist), imglist)
-
 
 class ExistingFilter(DataFilter, FastComparable):
     def __init__(self, folders: list[str] | list[Path], recurse_func: Callable) -> None:
@@ -104,9 +96,10 @@ class ExistingFilter(DataFilter, FastComparable):
         self.recurse_func: Callable[[Path], Path] = recurse_func
 
     def fast_comp(self) -> Expr | bool:
-        return col("path").apply(
-            lambda x: self.recurse_func(self.filedict[str(x)]).with_suffix("") not in self.existing_list
-        )
+        return col("path").apply(self.intersection)
+
+    def intersection(self, path):
+        return self.recurse_func(path).with_suffix("") not in self.existing_list
 
     @staticmethod
     def _get_existing(*folders: Path) -> set:
