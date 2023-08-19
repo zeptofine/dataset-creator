@@ -135,12 +135,11 @@ class HashFilter(DataFilter, Comparable):
                 *self.schema,
                 Column(self, "modifiedtime", datetime),
             )
-        elif get_optional_cols or resolver == RESOLVERS.SIZE:
+        if get_optional_cols or resolver == RESOLVERS.SIZE:
             self.schema = (
                 *self.schema,
                 Column(self, "size", int, col("path").apply(lambda p: os.stat(str(p)).st_size)),
             )
-
         self.hasher: Callable[[Image.Image], imagehash.ImageHash] = _HASHERS[hasher]
         self.resolver: Expr | bool = _RESOLVERS[resolver]
 
