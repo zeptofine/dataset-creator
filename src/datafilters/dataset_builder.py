@@ -106,7 +106,7 @@ class DatasetBuilder:
 
         from_full_to_relative: dict[str, Path] = self.get_absolutes(lst)
         if new_paths := set(from_full_to_relative) - set(self.df.get_column("path")):
-            self.df = pl.concat((self.df, DataFrame({"path": new_paths})), how="diagonal")
+            self.df = pl.concat((self.df, DataFrame({"path": list(new_paths)})), how="diagonal")
 
         for filter_ in self.filters:
             filter_.filedict = from_full_to_relative

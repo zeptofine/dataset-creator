@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass
 from enum import Enum
+from itertools import chain
 from multiprocessing import Pool, cpu_count, freeze_support
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
@@ -248,9 +249,7 @@ def main(
     s.next("Gathering images...")
     available_extensions: list[str] = extensions.split(",")
     s.print(f"Searching extensions: {available_extensions}")
-    file_list: Generator[Path, None, None] = get_file_list(
-        *[input_folder / "**" / f"*.{ext}" for ext in available_extensions]
-    )
+    file_list: Generator[Path, None, None] = get_file_list(input_folder, *(f"*.{ext}" for ext in available_extensions))
     image_list: list[Path] = [x.relative_to(input_folder) for x in sorted(file_list)]
     if limit and limit == LimitModes.BEFORE:
         image_list = image_list[:limit]
@@ -260,7 +259,7 @@ def main(
     # * Purge existing images
     if purge_all:
         # This could be cleaner
-        to_delete: set[Path] = set(get_file_list(hr_folder / "**" / "*", lr_folder / "**" / "*"))
+        to_delete = set(chain(get_file_list(hr_folder, "*"), get_file_list(lr_folder, "*")))
         if to_delete:
             s.next("Purging...")
             for file in ipbar(to_delete, total=len(to_delete)):
