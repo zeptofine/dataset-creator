@@ -1,5 +1,5 @@
 import time
-from collections.abc import Iterable, Generator
+from collections.abc import Generator, Iterable
 from os import get_terminal_size
 from typing import Callable, TypeVar
 
@@ -19,8 +19,7 @@ def byte_format(size, leading: int = 3, trailing: int = 4, suffix="B") -> str:
                 return f"{size:{leading + trailing + 1}.{trailing}f}{unit}{suffix}"
             size /= 2**10
         return f"{size:3.1f}{unit}{suffix}"
-    else:
-        return f"N/A{suffix}"
+    return f"N/A{suffix}"
 
 
 def pbar(iteration: int, total: int, length=20, fill="#", nullp="-", corner="[]", pref="", suff="") -> str:
@@ -54,7 +53,7 @@ def ipbar(
         if newtime - _time > refresh_interval:  # refresh interval
             output = isbar(i + 1, total, **kwargs)
             if print_item:
-                output += f" {str(obj)}"
+                output += f" {obj!s}"
             print(f"\033[K{output}", end=end)
             _time = newtime
     print(isbar(total, total, **kwargs), end="\033[2K\r" if clear else very_end)

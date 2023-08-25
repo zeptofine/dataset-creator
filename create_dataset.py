@@ -63,11 +63,11 @@ def fileparse(dfile: Scenario) -> Scenario:
     # Save the HR / LR version of the image
     # TODO: Create a dynamic input / output system so this could be replaced with a list ofoutputs with actions
 
-    if not os.path.exists(dfile.hr_path):
+    if not dfile.hr_path.exists():
         cv2.imwrite(str(dfile.hr_path), image)
         os.utime(str(dfile.hr_path), (mtime, mtime))
 
-    if dfile.lr_path is not None and not os.path.exists(dfile.lr_path):
+    if dfile.lr_path is not None and not dfile.lr_path.exists():
         cv2.imwrite(str(dfile.lr_path), cv2.resize(image, (int(image.shape[1] // scale), int(image.shape[0] // scale))))
         os.utime(str(dfile.lr_path), (mtime, mtime))
 
@@ -183,7 +183,7 @@ def main(
     def recurse(path: Path):
         return to_recursive(path, recursive, convert_spaces)
 
-    if not input_folder or not os.path.exists(input_folder):
+    if not input_folder or not input_folder.exists():
         rprint("Please select a directory.")
         return 1
 
@@ -285,7 +285,7 @@ def main(
 
     # * Run filters
     s.next("Using: ")
-    s.print(*[f" - {str(filter_)}" for filter_ in db.filters])
+    s.print(*[f" - {filter_!s}" for filter_ in db.filters])
 
     s.print("Populating df...")
     db.populate_df(

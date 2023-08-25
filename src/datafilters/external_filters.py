@@ -71,6 +71,10 @@ class ChannelFilter(DataFilter, FastComparable):
         return (self.min_channels <= col("channels")) & (col("channels") <= self.max_channels)
 
 
+def get_size(pth):
+    return os.stat(pth).st_size  # noqa: PTH116
+
+
 _HASHERS: dict[str, Callable] = {
     "average": imagehash.average_hash,
     "crop_resistant": imagehash.crop_resistant_hash,
@@ -136,10 +140,7 @@ class HashFilter(DataFilter, Comparable):
                 Column(self, "modifiedtime", datetime),
             )
         if get_optional_cols or resolver == RESOLVERS.SIZE:
-            self.schema = (
-                *self.schema,
-                Column(self, "size", int, col("path").apply(lambda p: os.stat(str(p)).st_size)),
-            )
+            self.schema = (*self.schema, Column(self, "size", int, col("path").apply(get_size)))
         self.hasher: Callable[[Image.Image], imagehash.ImageHash] = _HASHERS[hasher]
         self.resolver: Expr | bool = _RESOLVERS[resolver]
 
@@ -153,8 +154,7 @@ class HashFilter(DataFilter, Comparable):
             .apply(lambda df: df.filter(self.resolver) if len(df) > 1 else df)  # type: ignore
         )
 
-        resolved_paths = set(applied.get_column("path"))
-        return resolved_paths
+        return set(applied.get_column("path"))
 
     def apply_resolver(self, df: DataFrame):
         return df.filter(self.resolver)

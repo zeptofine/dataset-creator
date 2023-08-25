@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from tqdm import tqdm
 
 src = "/mnt/Toshiba/.Grabber/"
@@ -15,4 +16,5 @@ for path in tqdm(gen):
 response = input("These links lead to empty files. Delete them? y/N:")
 if response.lower().startswith("y"):
     print("Deleting...")
-    [i.unlink() for i in lst]
+    for i in lst:
+        i.unlink()

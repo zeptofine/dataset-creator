@@ -38,7 +38,7 @@ class DatasetBuilder:
         self.filter_type_schema: dict[str, pl.DataType | type] = self.basic_schema.copy()
         self.columns: dict[str, Column] = {}
 
-        if os.path.exists(self.filepath):
+        if self.filepath.exists():
             self.df: DataFrame = pl.read_ipc(self.filepath, use_pyarrow=True)
         else:
             self.df: DataFrame = DataFrame(schema=self.basic_schema)
@@ -59,11 +59,11 @@ class DatasetBuilder:
                 for column in filter_.schema:
                     self.add_schema(column)
         else:
-            raise TypeError(f"{filter_} is not a filter.")
+            raise self.NotFilterError(filter_)
 
     def fill_from_config(self, cfg: dict[str, dict], no_warn=False):
         if not len(self.unready_filters):
-            raise KeyError("Unready filters is empty")
+            raise self.UnreadyFilterError()
 
         for kwd, dct in cfg.items():
             if kwd in self.unready_filters:
@@ -177,9 +177,7 @@ class DatasetBuilder:
             warnings.warn(f"{len(self.unready_filters)} filters are not initialized and will not be populated")
 
         if (missing_requirements := set(self.columns) - set(self.build_schema)) and not ignore_missing_columns:
-            raise ValueError(
-                f"the following columns are required but may not be in the database: {missing_requirements}"
-            )
+            raise self.MissingRequirementError(missing_requirements)
 
         from_full_to_relative: dict[str, Path] = self.get_absolutes(lst)
         paths: set[str] = set(from_full_to_relative.keys())
@@ -227,6 +225,18 @@ class DatasetBuilder:
             .with_columns(pl.col(column) // chunksize)
             .groupby(column, maintain_order=True)
         )
+
+    class NotFilterError(TypeError):
+        def __init__(self, obj: object):
+            super().__init__(f"{obj} is not a valid filter")
+
+    class UnreadyFilterError(KeyError):
+        def __init__(self):
+            super().__init__("Unready filters is empty")
+
+    class MissingRequirementError(KeyError):
+        def __init__(self, reqs: Iterable[str]):
+            super().__init__(f"Possibly missing columns: {reqs}")
 
     def __enter__(self, *args, **kwargs):
         self.__init__(*args, **kwargs)

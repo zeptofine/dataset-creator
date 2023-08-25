@@ -35,11 +35,11 @@ class StatFilter(DataFilter, FastComparable):
         if after is not None:
             self.after = timeparser.parse(after)
         if self.before is not None and self.after is not None and self.after > self.before:
-            raise timeparser.ParserError(f"{self.after} is older than {self.before}")
+            raise self.AgeError(self.after, self.before)
 
     @staticmethod
     def get_modified_time(path: str) -> datetime:
-        return datetime.fromtimestamp(os.stat(path).st_mtime)
+        return datetime.fromtimestamp(os.stat(path).st_mtime)  # noqa: PTH116
 
     def fast_comp(self) -> Expr | bool:
         param: Expr | bool = True
@@ -48,6 +48,10 @@ class StatFilter(DataFilter, FastComparable):
         if self.before:
             param &= self.before > col("modifiedtime")
         return param
+
+    class AgeError(timeparser.ParserError):
+        def __init__(self, older, newer):
+            super().__init__(f"{older} is older than {newer}")
 
 
 class BlacknWhitelistFilter(DataFilter, FastComparable):

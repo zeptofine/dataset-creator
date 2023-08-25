@@ -1,1 +1,4 @@
 line-length = 120
+
+extend-select = ["I", "F", "RET", "SIM", "PTH", "TRY", "NPY", "PERF", "RUF"]
+fixable = ["ALL"]

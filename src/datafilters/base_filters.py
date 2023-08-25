@@ -76,7 +76,7 @@ class DataFilter:
     def _obj_to_comment(obj) -> str:
         if type(obj) is EnumType:
             return " | ".join(obj._member_map_.values())  # type: ignore
-        elif hasattr(obj, "__metadata__"):
+        if hasattr(obj, "__metadata__"):
             return str(obj.__metadata__[0])
 
         return ""
