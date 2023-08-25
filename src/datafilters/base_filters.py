@@ -48,7 +48,7 @@ class DataFilter:
             This is filled from the dataset builder, and contains a dictionary going from the resolved versions of
             the files to the ones given from the user.
         """
-        self.schema: tuple[Column, ...] = tuple()
+        self.schema: tuple[Column, ...] = ()
         self.filedict: dict[str, Path] = {}  # used for certain filters, like Existing
 
     @classmethod

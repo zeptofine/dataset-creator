@@ -108,8 +108,5 @@ class ExistingFilter(DataFilter, FastComparable):
     @staticmethod
     def _get_existing(*folders: Path) -> set:
         return set.intersection(
-            *(
-                {file.relative_to(folder).with_suffix("") for file in get_file_list((folder / "**" / "*"))}
-                for folder in folders
-            )
+            *({file.relative_to(folder).with_suffix("") for file in get_file_list(folder, "*")} for folder in folders)
         )
