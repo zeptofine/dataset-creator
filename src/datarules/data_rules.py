@@ -10,7 +10,7 @@ from polars import Datetime, col
 
 from util.file_list import get_file_list
 
-from .base_filters import Column, DataRule, FastComparable
+from .base_rules import Column, DataRule, FastComparable
 
 if TYPE_CHECKING:
     from collections.abc import Callable

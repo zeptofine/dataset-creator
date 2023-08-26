@@ -11,7 +11,7 @@ import imagesize
 from PIL import Image
 from polars import DataFrame, Expr, List, col
 
-from .base_filters import Column, Comparable, DataRule, FastComparable
+from .base_rules import Column, Comparable, DataRule, FastComparable
 
 
 def whash_db4(img) -> imagehash.ImageHash:

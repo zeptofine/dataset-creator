@@ -10,7 +10,7 @@ import polars as pl
 from polars import DataFrame, Expr
 from tqdm import tqdm
 
-from .base_filters import Column, Comparable, DataRule, FastComparable
+from .base_rules import Column, Comparable, DataRule, FastComparable
 
 
 def current_time() -> datetime:

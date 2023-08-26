@@ -15,10 +15,10 @@ from tqdm import tqdm
 from typer import Option
 from typing_extensions import Annotated
 
-from src.datafilters.custom_toml import TomlCustomCommentDecoder, TomlCustomCommentEncoder
-from src.datafilters.data_filters import BlacknWhitelistRule, ExistingRule, StatRule
-from src.datafilters.dataset_builder import DatasetBuilder
-from src.datafilters.external_filters import ChannelRule, HashRule, ResRule
+from src.datarules.custom_toml import TomlCustomCommentDecoder, TomlCustomCommentEncoder
+from src.datarules.data_rules import BlacknWhitelistRule, ExistingRule, StatRule
+from src.datarules.dataset_builder import DatasetBuilder
+from src.datarules.image_rules import ChannelRule, HashRule, ResRule
 from util.file_list import get_file_list, to_recursive
 from util.print_funcs import RichStepper, ipbar
 
