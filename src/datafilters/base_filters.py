@@ -3,10 +3,8 @@ from __future__ import annotations
 import inspect
 import sys
 from abc import abstractmethod
-from collections.abc import Collection
 from dataclasses import dataclass
 from enum import Enum, EnumType
-from pathlib import Path
 from typing import Any, Self
 
 from polars import DataFrame, Expr, PolarsDataType
@@ -14,7 +12,7 @@ from polars import DataFrame, Expr, PolarsDataType
 
 class Comparable:
     @abstractmethod
-    def compare(self, lst: Collection[Path], cols: DataFrame) -> list:
+    def compare(self, selected: DataFrame, full: DataFrame) -> DataFrame:
         """Uses all collected data to return a new list of only valid images, depending on what the filter does."""
         raise NotImplementedError
 
@@ -30,26 +28,19 @@ class FastComparable:
 class Column:
     """A class defining what is in a column which a filter may use to apply a"""
 
-    source: DataFilter | None
+    source: DataRule | None
     name: str
     dtype: PolarsDataType | type
     build_method: Expr | None = None
 
 
-class DataFilter:
+class DataRule:
     """An abstract DataFilter format, for use in DatasetBuilder."""
 
     config_keyword: str
 
     def __init__(self) -> None:
-        """
-
-        filedict: dict[str, Path]
-            This is filled from the dataset builder, and contains a dictionary going from the resolved versions of
-            the files to the ones given from the user.
-        """
         self.schema: tuple[Column, ...] = ()
-        self.filedict: dict[str, Path] = {}  # used for certain filters, like Existing
 
     @classmethod
     def from_cfg(cls, *args, **kwargs) -> Self:
@@ -66,7 +57,7 @@ class DataFilter:
                 cfg[key] = val.default
             if val.annotation is not inspect._empty:
                 annotation = eval(val.annotation, module.__dict__)
-                comment = DataFilter._obj_to_comment(annotation)
+                comment = DataRule._obj_to_comment(annotation)
                 if comment:
                     cfg[f"!#{key}"] = comment
 

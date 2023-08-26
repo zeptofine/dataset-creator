@@ -16,9 +16,9 @@ from typer import Option
 from typing_extensions import Annotated
 
 from src.datafilters.custom_toml import TomlCustomCommentDecoder, TomlCustomCommentEncoder
-from src.datafilters.data_filters import BlacknWhitelistFilter, ExistingFilter, StatFilter
+from src.datafilters.data_filters import BlacknWhitelistRule, ExistingRule, StatRule
 from src.datafilters.dataset_builder import DatasetBuilder
-from src.datafilters.external_filters import ChannelFilter, HashFilter, ResFilter
+from src.datafilters.external_filters import ChannelRule, HashRule, ResRule
 from util.file_list import get_file_list, to_recursive
 from util.print_funcs import RichStepper, ipbar
 
@@ -92,7 +92,7 @@ def main(
     scale: Annotated[int, Option(help="the scale to downscale.")] = 4,
     extension: Annotated[Optional[str], Option(help="export extension.")] = None,
     extensions: Annotated[str, Option(help="extensions to search for. (split with commas)")] = "webp,png,jpg",
-    config_path: Annotated[Path, Option(help="Where the filter config is placed.")] = Path("database_config.toml"),
+    config_path: Annotated[Path, Option(help="Where the rule config is placed.")] = Path("database_config.toml"),
     recursive: Annotated[bool, Option(help="preserves the tree hierarchy.", rich_help_panel="modifiers")] = False,
     convert_spaces: Annotated[
         bool,
@@ -138,12 +138,12 @@ def main(
         ),
     ] = "path",
     ignore_missing_cols: Annotated[bool, Option(help="if columns are missing, don't break filtering")] = False,
-    stat: Annotated[bool, Option("--stat", "-s", help="use statfilter", rich_help_panel="filters")] = False,
-    res: Annotated[bool, Option("--res", "-r", help="use resfilter", rich_help_panel="filters")] = False,
-    hsh: Annotated[bool, Option("--hash", "-h", help="use hashfilter", rich_help_panel="filters")] = False,
-    chn: Annotated[bool, Option("--channel", "-c", help="use channelfilter", rich_help_panel="filters")] = False,
+    stat: Annotated[bool, Option("--stat", "-s", help="use statrule", rich_help_panel="rules")] = False,
+    res: Annotated[bool, Option("--res", "-r", help="use resrule", rich_help_panel="rules")] = False,
+    hsh: Annotated[bool, Option("--hash", "-h", help="use hashrule", rich_help_panel="rules")] = False,
+    chn: Annotated[bool, Option("--channel", "-c", help="use channelrule", rich_help_panel="rules")] = False,
     blw: Annotated[
-        bool, Option("--blackwhitelist", "-b", help="use blacknwhitelistfilter", rich_help_panel="filters")
+        bool, Option("--blackwhitelist", "-b", help="use blacknwhitelistrule", rich_help_panel="rules")
     ] = False,
 ) -> int:
     """Does all the heavy lifting"""
@@ -169,7 +169,7 @@ def main(
 
     db = DatasetBuilder(origin=str(input_folder), db_path=Path(cfg["filepath"]))
     if not config_path.exists():
-        db.add_filters([StatFilter, ResFilter, HashFilter, ChannelFilter, BlacknWhitelistFilter])
+        db.add_rules([StatRule, ResRule, HashRule, ChannelRule, BlacknWhitelistRule])
         cfg.update(db.generate_config()).save()
         print(f"{config_path} created. edit it and restart this program.")
         return 0
@@ -231,18 +231,18 @@ def main(
 
         return hr_path, lr_path
 
-    filters = []
+    rules = []
     if stat:
-        filters.append(StatFilter)
+        rules.append(StatRule)
     if res:
-        filters.append(ResFilter)
+        rules.append(ResRule)
     if hsh:
-        filters.append(HashFilter)
+        rules.append(HashRule)
     if chn:
-        filters.append(ChannelFilter)
+        rules.append(ChannelRule)
     if blw:
-        filters.append(BlacknWhitelistFilter)
-    db.add_filters(filters)
+        rules.append(BlacknWhitelistRule)
+    db.add_rules(rules)
     db.fill_from_config(cfg)
 
     # * Gather images
@@ -280,11 +280,11 @@ def main(
         folders: list[Path] = [hr_folder]
         if make_lr:
             folders.append(lr_folder)
-        db.add_filter(ExistingFilter(folders, recurse_func=recurse))
+        db.add_rule(ExistingRule(folders, recurse_func=recurse))
 
     # * Run filters
     s.next("Using: ")
-    s.print(*[f" - {filter_!s}" for filter_ in db.filters])
+    s.print(*[f" - {rule!s}" for rule in db.rules])
 
     s.print("Populating df...")
     db.populate_df(
@@ -320,7 +320,7 @@ def main(
             for file in t:
                 if verbose:
                     print()
-                    print(db.df.filter(col("path") == str(file.resolved_path)))  # I can't imagine this is fast
+                    print(db.__df.filter(col("path") == str(file.resolved_path)))  # I can't imagine this is fast
                     if file.lr_path is not None:
                         rprint(f"├hr -> '{file.hr_path}'")
                         rprint(f"└lr -> '{file.lr_path}'")

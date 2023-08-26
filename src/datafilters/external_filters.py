@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Callable, Collection, Iterable
+from collections.abc import Callable, Iterable
 from datetime import datetime
 from enum import Enum
 from typing import Annotated
@@ -11,14 +11,14 @@ import imagesize
 from PIL import Image
 from polars import DataFrame, Expr, List, col
 
-from .base_filters import Column, Comparable, DataFilter, FastComparable
+from .base_filters import Column, Comparable, DataRule, FastComparable
 
 
 def whash_db4(img) -> imagehash.ImageHash:
     return imagehash.whash(img, mode="db4")
 
 
-class ResFilter(DataFilter, FastComparable):
+class ResRule(DataRule, FastComparable):
     """A filter checking the size of an image."""
 
     config_keyword = "resolution"
@@ -56,7 +56,7 @@ def get_channels(pth: str) -> int:
     return len(Image.open(pth).getbands())
 
 
-class ChannelFilter(DataFilter, FastComparable):
+class ChannelRule(DataRule, FastComparable):
     """Checks the number of channels in the image."""
 
     config_keyword = "channels"
@@ -123,7 +123,7 @@ class RESOLVERS(str, Enum):
     SIZE = "size"
 
 
-class HashFilter(DataFilter, Comparable):
+class HashRule(DataRule, Comparable):
     config_keyword = "hashing"
 
     def __init__(
@@ -144,20 +144,16 @@ class HashFilter(DataFilter, Comparable):
         self.hasher: Callable[[Image.Image], imagehash.ImageHash] = _HASHERS[hasher]
         self.resolver: Expr | bool = _RESOLVERS[resolver]
 
-    def compare(self, lst: Collection, cols: DataFrame) -> set:
-        assert self.resolver is not None
-        applied: DataFrame = (
-            cols.filter(
-                col("hash").is_in(cols.filter(col("path").is_in(lst)).get_column("hash").unique()),
+    def compare(self, partial: DataFrame, full: DataFrame) -> DataFrame:
+        return (
+            full.filter(
+                col("hash").is_in(
+                    full.filter(col("path").is_in(partial.get_column("path"))).get_column("hash").unique()
+                ),
             )
             .groupby("hash")
             .apply(lambda df: df.filter(self.resolver) if len(df) > 1 else df)  # type: ignore
         )
-
-        return set(applied.get_column("path"))
-
-    def apply_resolver(self, df: DataFrame):
-        return df.filter(self.resolver)
 
     def _hash_img(self, pth) -> str:
         assert self.hasher is not None

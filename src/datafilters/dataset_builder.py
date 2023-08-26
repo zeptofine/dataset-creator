@@ -7,10 +7,10 @@ from pathlib import Path
 from typing import TypeVar
 
 import polars as pl
-from polars import DataFrame, Expr, LazyFrame
+from polars import DataFrame, Expr
 from tqdm import tqdm
 
-from .base_filters import Column, Comparable, DataFilter, FastComparable
+from .base_filters import Column, Comparable, DataRule, FastComparable
 
 
 def current_time() -> datetime:
@@ -27,64 +27,64 @@ T = TypeVar("T")
 class DatasetBuilder:
     def __init__(self, origin: str, db_path: Path) -> None:
         super().__init__()
-        self.unready_filters: dict[str, type[DataFilter]] = {}
-        self.filters: list[DataFilter] = []
+        self.unready_rules: dict[str, type[DataRule]] = {}
+        self.rules: list[DataRule] = []
         self.origin: str = origin
 
         self.filepath: Path = db_path
 
         self.basic_schema: dict[str, pl.DataType | type] = {"path": str, "checkedtime": pl.Datetime}
         self.build_schema: dict[str, Expr] = {"checkedtime": pl.col("path").apply(_time)}
-        self.filter_type_schema: dict[str, pl.DataType | type] = self.basic_schema.copy()
+        self.rule_type_schema: dict[str, pl.DataType | type] = self.basic_schema.copy()
         self.columns: dict[str, Column] = {}
 
         if self.filepath.exists():
-            self.df: DataFrame = pl.read_ipc(self.filepath, use_pyarrow=True)
+            self.__df: DataFrame = pl.read_ipc(self.filepath, use_pyarrow=True)
         else:
-            self.df: DataFrame = DataFrame(schema=self.basic_schema)
+            self.__df: DataFrame = DataFrame(schema=self.basic_schema)
 
-    def add_filters(self, filters: list[type[DataFilter] | DataFilter]) -> None:
-        """Adds filters to the filter list. Filters will be instantiated separately."""
+    def add_rules(self, rules: list[type[DataRule] | DataRule]) -> None:
+        """Adds rules to the rule list. Rules will be instantiated separately."""
 
-        for filter_ in filters:
-            self.add_filter(filter_)
+        for rule in rules:
+            self.add_rule(rule)
 
-    def add_filter(self, filter_: type[DataFilter] | DataFilter):
-        if isinstance(filter_, type):
-            self.unready_filters[filter_.config_keyword] = filter_
-        elif isinstance(filter_, DataFilter):
-            if filter_ not in self.filters:
-                self.filters.append(filter_)
+    def add_rule(self, rule: type[DataRule] | DataRule):
+        if isinstance(rule, type):
+            self.unready_rules[rule.config_keyword] = rule
+        elif isinstance(rule, DataRule):
+            if rule not in self.rules:
+                self.rules.append(rule)
 
-                for column in filter_.schema:
+                for column in rule.schema:
                     self.add_schema(column)
         else:
-            raise self.NotFilterError(filter_)
+            raise self.NotARuleError(rule)
 
     def fill_from_config(self, cfg: dict[str, dict], no_warn=False):
-        if not len(self.unready_filters):
-            raise self.UnreadyFilterError()
+        if not len(self.unready_rules):
+            raise self.AllAreReadyError()
 
         for kwd, dct in cfg.items():
-            if kwd in self.unready_filters:
-                filter_ = self.unready_filters.pop(kwd)
-                sig: inspect.Signature = inspect.signature(filter_)
+            if kwd in self.unready_rules:
+                rule = self.unready_rules.pop(kwd)
+                sig: inspect.Signature = inspect.signature(rule)
 
                 params = {k: v for k, v in dct.items() if k in sig.parameters and k != "self"}
-                self.add_filter(filter_(**params))
-        if len(self.unready_filters) and not no_warn:
-            warnings.warn(f"{self.unready_filters} remain unfilled from config.")
+                self.add_rule(rule(**params))
+        if len(self.unready_rules) and not no_warn:
+            warnings.warn(f"{self.unready_rules} remain unfilled from config.", stacklevel=2)
 
     def generate_config(self) -> dict:
-        return {name: filter_.get_cfg() for name, filter_ in self.unready_filters.items()}
+        return {name: rule.get_cfg() for name, rule in self.unready_rules.items()}
 
-    def add_schema(self, col: Column, overwrite=False):
+    def add_schema(self, col: Column):
         self.columns[col.name] = col
         if col.build_method is not None:
             assert col.name not in self.build_schema, f"Column is already in build_schema ({self.build_schema})"
             self.build_schema[col.name] = col.build_method
-        if col.name not in self.filter_type_schema:
-            self.filter_type_schema[col.name] = col.dtype
+        if col.name not in self.rule_type_schema:
+            self.rule_type_schema[col.name] = col.dtype
 
     def populate_df(
         self,
@@ -96,24 +96,22 @@ class DatasetBuilder:
         trim_check_exists: bool = True,
         chunksize: int = 100,
     ):
-        assert self.filters, "No filters specified"
-        if trim and len(self.df):
+        assert self.rules, "No rules specified"
+        if trim and len(self.__df):
             now: datetime = current_time()
             cond: Expr = now - pl.col("checkedtime") < datetime.fromtimestamp(trim_age_limit)
             if trim_check_exists:
                 cond &= pl.col("path").apply(os.path.exists)
-            self.df = self.df.filter(cond)
+            self.__df = self.__df.filter(cond)
 
         from_full_to_relative: dict[str, Path] = self.get_absolutes(lst)
-        if new_paths := set(from_full_to_relative) - set(self.df.get_column("path")):
-            self.df = pl.concat((self.df, DataFrame({"path": list(new_paths)})), how="diagonal")
+        if new_paths := set(from_full_to_relative) - set(self.__df.get_column("path")):
+            self.__df = pl.concat((self.__df, DataFrame({"path": list(new_paths)})), how="diagonal")
 
-        for filter_ in self.filters:
-            filter_.filedict = from_full_to_relative
-        self.df = self._comply_to_schema(self.df, self.filter_type_schema)
+        self.__df = self._comply_to_schema(self.__df, self.rule_type_schema)
 
         search_cols: set[str] = {*self.build_schema, *self.basic_schema}
-        updated_df: DataFrame = self.df.with_columns(self.filter_type_schema)
+        updated_df: DataFrame = self.__df.with_columns(self.rule_type_schema)
         unfinished: DataFrame = updated_df.filter(
             pl.any(pl.col(col).is_null() for col in updated_df.columns if col in search_cols)
         )
@@ -122,13 +120,13 @@ class DatasetBuilder:
             def trigger_save(save_timer: datetime, collected: list[DataFrame]) -> tuple[datetime, list[DataFrame]]:
                 if ((new_time := datetime.now()) - save_timer).total_seconds() > save_interval:
                     data = pl.concat(collected, how="diagonal")
-                    self.df = self.df.update(data, on="path")
+                    self.__df = self.__df.update(data, on="path")
                     self.save_df()
                     return new_time, []
                 return save_timer, collected
 
             def get_nulls_chunks_expr():
-                for nulls, group in unfinished.with_columns(self.filter_type_schema).groupby(
+                for nulls, group in unfinished.with_columns(self.rule_type_schema).groupby(
                     *(pl.col(col).is_not_null() for col in self.build_schema)
                 ):
                     yield (
@@ -165,16 +163,18 @@ class DatasetBuilder:
                             sub_t.set_postfix_str(str(idx))
                             sub_t.update()
                             total_t.update(len(subgroup))
-            self.df = self.df.update(pl.concat(collected, how="diagonal"), on="path")
+            self.__df = self.__df.update(pl.concat(collected, how="diagonal"), on="path")
             self.save_df()
         return
 
     def filter(self, lst, sort_col="path", ignore_missing_columns=False) -> Iterable[Path]:
         assert (
-            sort_col in self.df.columns
-        ), f"the column '{sort_col}' is not in the database. Available columns: {self.df.columns}"
-        if len(self.unready_filters):
-            warnings.warn(f"{len(self.unready_filters)} filters are not initialized and will not be populated")
+            sort_col in self.__df.columns
+        ), f"the column '{sort_col}' is not in the database. Available columns: {self.__df.columns}"
+        if len(self.unready_rules):
+            warnings.warn(
+                f"{len(self.unready_rules)} filters are not initialized and will not be populated", stacklevel=2
+            )
 
         if (missing_requirements := set(self.columns) - set(self.build_schema)) and not ignore_missing_columns:
             raise self.MissingRequirementError(missing_requirements)
@@ -182,35 +182,43 @@ class DatasetBuilder:
         from_full_to_relative: dict[str, Path] = self.get_absolutes(lst)
         paths: set[str] = set(from_full_to_relative.keys())
 
-        vdf: LazyFrame = self.df.lazy().filter(pl.col("path").is_in(paths))
-        for dfilter in self.filters:
-            if isinstance(dfilter, FastComparable):
-                vdf = vdf.filter(dfilter.fast_comp())
-            elif isinstance(dfilter, Comparable):
-                vdf = (
-                    (c := vdf.collect())
-                    .filter(
-                        pl.col("path").is_in(
-                            dfilter.compare(
-                                set(c.get_column("path")),
-                                self.df.select(pl.col("path"), *[pl.col(col.name) for col in dfilter.schema]),
-                            )
-                        )
-                    )
-                    .lazy()
-                )
+        vdf: DataFrame = self.__df.filter(pl.col("path").is_in(paths))
+        combined = self.combine_exprs(self.rules)
+        for rule in combined:
+            vdf = rule.compare(vdf, self.__df) if isinstance(rule, Comparable) else vdf.filter(rule)
 
-        return (from_full_to_relative[p] for p in vdf.sort(sort_col).collect().get_column("path"))
+        return (from_full_to_relative[p] for p in vdf.sort(sort_col).get_column("path"))
+
+    @staticmethod
+    def combine_exprs(rules: Iterable[DataRule]) -> list[Expr | bool | Comparable]:
+        """this combines expressions from different objects to a list of compressed expressions.
+        DataRules that are FastComparable can be combined, but Comparables cannot. They will be copied to the list.
+        """
+        combinations: list[Expr | bool | Comparable] = []
+        combination: Expr | bool | None = None
+        for rule in rules:
+            if isinstance(rule, FastComparable):
+                combination = combination & rule.fast_comp() if combination is not None else rule.fast_comp()
+
+            elif isinstance(rule, Comparable):
+                if combination is not None:
+                    combinations.append(combination)
+                    combination = None
+                combinations.append(rule)
+
+        if combination is not None:
+            combinations.append(combination)
+        return combinations
 
     def save_df(self) -> None:
         """saves the dataframe to self.filepath"""
-        self.df.write_ipc(self.filepath)
+        self.__df.write_ipc(self.filepath)
 
     def get_absolutes(self, lst: Iterable[Path]) -> dict[str, Path]:
         return {(str((self.origin / pth).resolve())): pth for pth in lst}  # type: ignore
 
     def get_path_data(self, pths: Collection[str]):
-        return self.df.filter(pl.col("path").is_in(pths))
+        return self.__df.filter(pl.col("path").is_in(pths))
 
     @staticmethod
     def _comply_to_schema(data_frame: DataFrame, schema) -> DataFrame:
@@ -226,13 +234,17 @@ class DatasetBuilder:
             .groupby(column, maintain_order=True)
         )
 
-    class NotFilterError(TypeError):
-        def __init__(self, obj: object):
-            super().__init__(f"{obj} is not a valid filter")
+    @property
+    def df(self):
+        return self.__df
 
-    class UnreadyFilterError(KeyError):
+    class NotARuleError(TypeError):
+        def __init__(self, obj: object):
+            super().__init__(f"{obj} is not a valid rule")
+
+    class AllAreReadyError(KeyError):
         def __init__(self):
-            super().__init__("Unready filters is empty")
+            super().__init__("Unready rules are empty")
 
     class MissingRequirementError(KeyError):
         def __init__(self, reqs: Iterable[str]):

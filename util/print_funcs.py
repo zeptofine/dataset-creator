@@ -14,7 +14,7 @@ def byte_format(size, leading: int = 3, trailing: int = 4, suffix="B") -> str:
     if size != "":
         size = int(size)
         unit = ""
-        for unit in [unit, "Ki", "Mi", "Gi", "Ti"]:
+        for unit in ["", "Ki", "Mi", "Gi", "Ti"]:
             if abs(size) < 2**10:
                 return f"{size:{leading + trailing + 1}.{trailing}f}{unit}{suffix}"
             size /= 2**10

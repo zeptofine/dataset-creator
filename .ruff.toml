@@ -4,6 +4,8 @@ extend-select = [
     "ASYNC",
     "UP",
     "I",
+    "B",
+    "ICN",
     "F",
     "RET",
     "SIM",

@@ -10,7 +10,7 @@ from polars import Datetime, col
 
 from util.file_list import get_file_list
 
-from .base_filters import Column, DataFilter, FastComparable
+from .base_filters import Column, DataRule, FastComparable
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from polars import Expr
 
 
-class StatFilter(DataFilter, FastComparable):
+class StatRule(DataRule, FastComparable):
     config_keyword = "stats"
 
     def __init__(
@@ -27,7 +27,7 @@ class StatFilter(DataFilter, FastComparable):
         after: Annotated[str, "Only get items after this threshold"] = "1980",
     ) -> None:
         super().__init__()
-        self.schema = (Column(self, "modifiedtime", Datetime, col("path").apply(StatFilter.get_modified_time)),)
+        self.schema = (Column(self, "modifiedtime", Datetime, col("path").apply(StatRule.get_modified_time)),)
         self.before: datetime | None = None
         self.after: datetime | None = None
         if before is not None:
@@ -54,7 +54,7 @@ class StatFilter(DataFilter, FastComparable):
             super().__init__(f"{older} is older than {newer}")
 
 
-class BlacknWhitelistFilter(DataFilter, FastComparable):
+class BlacknWhitelistRule(DataRule, FastComparable):
     config_keyword = "blackwhitelists"
 
     def __init__(
@@ -93,10 +93,10 @@ class BlacknWhitelistFilter(DataFilter, FastComparable):
         }
 
 
-class ExistingFilter(DataFilter, FastComparable):
+class ExistingRule(DataRule, FastComparable):
     def __init__(self, folders: list[str] | list[Path], recurse_func: Callable) -> None:
         super().__init__()
-        self.existing_list = ExistingFilter._get_existing(*map(Path, folders))
+        self.existing_list = ExistingRule._get_existing(*map(Path, folders))
         self.recurse_func: Callable[[Path], Path] = recurse_func
 
     def fast_comp(self) -> Expr | bool:
