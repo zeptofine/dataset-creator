@@ -3,22 +3,64 @@ from __future__ import annotations
 import os
 from datetime import datetime
 from pathlib import Path
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Annotated
 
 from dateutil import parser as timeparser
-from polars import Datetime, col
+from polars import DataFrame, Datetime, col
 
 from util.file_list import get_file_list
 
-from .base_rules import Column, DataRule, FastComparable
+from .base_rules import Column, Comparable, FastComparable, Producer, Rule
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from polars import Expr
 
+STAT_TRACKED = ("st_mode", "st_ino", "st_size", "st_atime", "st_mtime", "st_ctime")
 
-class StatRule(DataRule, FastComparable):
+
+def stat2dict(result: os.stat_result) -> dict:
+    return {k: getattr(result, k) for k in dir(result) if k in STAT_TRACKED}
+
+
+class FileInfoProducer(Producer):
+    produces = MappingProxyType(
+        {
+            "mtime": Datetime("ms"),
+            "size": int,
+        }
+    )
+
+    def __call__(self):
+        return [
+            {"stat": col("path").apply(stat)},
+            {
+                "mtime": col("stat").struct.field("st_mtime").apply(timestamp2datetime),
+                "size": col("stat").struct.field("st_size"),
+            },
+        ]  # type: ignore
+
+
+def stat(pth):
+    result = os.stat(pth)  # noqa: PTH116
+    return stat2dict(result)
+
+
+def timestamp2datetime(mtime: int) -> datetime:
+    return datetime.fromtimestamp(mtime)
+
+
+def get_modified_time(path: str) -> datetime:
+    return datetime.fromtimestamp(os.stat(path).st_mtime)  # noqa: PTH116
+
+
+def get_size(path: str):
+    return os.stat(path).st_size  # noqa: PTH116
+
+
+class StatRule(Rule, FastComparable):
     config_keyword = "stats"
 
     def __init__(
@@ -27,7 +69,8 @@ class StatRule(DataRule, FastComparable):
         after: Annotated[str, "Only get items after this threshold"] = "1980",
     ) -> None:
         super().__init__()
-        self.schema = (Column(self, "modifiedtime", Datetime, col("path").apply(StatRule.get_modified_time)),)
+        self.requires = Column(self, "mtime", Datetime("ms"))
+
         self.before: datetime | None = None
         self.after: datetime | None = None
         if before is not None:
@@ -37,16 +80,12 @@ class StatRule(DataRule, FastComparable):
         if self.before is not None and self.after is not None and self.after > self.before:
             raise self.AgeError(self.after, self.before)
 
-    @staticmethod
-    def get_modified_time(path: str) -> datetime:
-        return datetime.fromtimestamp(os.stat(path).st_mtime)  # noqa: PTH116
-
     def fast_comp(self) -> Expr | bool:
         param: Expr | bool = True
         if self.after:
-            param &= self.after < col("modifiedtime")
+            param &= self.after < col("mtime")
         if self.before:
-            param &= self.before > col("modifiedtime")
+            param &= self.before > col("mtime")
         return param
 
     class AgeError(timeparser.ParserError):
@@ -54,7 +93,7 @@ class StatRule(DataRule, FastComparable):
             super().__init__(f"{older} is older than {newer}")
 
 
-class BlacknWhitelistRule(DataRule, FastComparable):
+class BlacknWhitelistRule(Rule, FastComparable):
     config_keyword = "blackwhitelists"
 
     def __init__(
@@ -93,7 +132,7 @@ class BlacknWhitelistRule(DataRule, FastComparable):
         }
 
 
-class ExistingRule(DataRule, FastComparable):
+class ExistingRule(Rule, FastComparable):
     def __init__(self, folders: list[str] | list[Path], recurse_func: Callable) -> None:
         super().__init__()
         self.existing_list = ExistingRule._get_existing(*map(Path, folders))
@@ -110,3 +149,14 @@ class ExistingRule(DataRule, FastComparable):
         return set.intersection(
             *({file.relative_to(folder).with_suffix("") for file in get_file_list(folder, "*")} for folder in folders)
         )
+
+
+class TotalLimitRule(Rule, Comparable):
+    config_keyword = "limit"
+
+    def __init__(self, total=1000):
+        super().__init__()
+        self.total = total
+
+    def compare(self, selected: DataFrame, _) -> DataFrame:
+        return selected.head(self.total)

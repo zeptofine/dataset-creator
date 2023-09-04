@@ -2,23 +2,55 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable, Iterable
-from datetime import datetime
 from enum import Enum
-from typing import Annotated
+from functools import cache
+from types import MappingProxyType
+from typing import Annotated, Literal
 
 import imagehash
-import imagesize
+import polars as pl
 from PIL import Image
-from polars import DataFrame, Expr, List, col
+from polars import DataFrame, Expr, col
 
-from .base_rules import Column, Comparable, DataRule, FastComparable
+from .base_rules import Column, Comparable, FastComparable, Producer, Rule
 
 
 def whash_db4(img) -> imagehash.ImageHash:
     return imagehash.whash(img, mode="db4")
 
 
-class ResRule(DataRule, FastComparable):
+def get_channels(img: Image.Image) -> int:
+    return len(img.getbands())
+
+
+def imopen(pth):
+    print(pth)
+    return Image.open(pth)
+
+
+@cache
+def get_hwc(pth):
+    img = Image.open(pth)
+    return {"width": img.width, "height": img.height, "channels": len(img.getbands())}
+
+
+class ImShapeProducer(Producer):
+    produces = MappingProxyType({"width": int, "height": int, "channels": int})
+
+    def __call__(self):
+        return [
+            {
+                "shape": col("path").apply(get_hwc),
+            },
+            {
+                "width": col("shape").struct.field("width"),
+                "height": col("shape").struct.field("height"),
+                "channels": col("shape").struct.field("channels"),
+            },
+        ]
+
+
+class ResRule(Rule, FastComparable):
     """A filter checking the size of an image."""
 
     config_keyword = "resolution"
@@ -27,13 +59,14 @@ class ResRule(DataRule, FastComparable):
         self,
         min=0,
         max=2048,
-        crop: Annotated[
-            bool, "if true, then it will check if it is valid after cropping a little to be divisible by scale"
-        ] = False,
+        crop: Annotated[bool, "checks if valid after a slight crop"] = False,
         scale=4,
     ) -> None:
         super().__init__()
-        self.schema = (Column(self, "resolution", List(int), col("path").apply(imagesize.get)),)
+        self.requires = (
+            Column(self, "width", int),
+            Column(self, "height", int),
+        )
         self.min: int | None = min
         self.max: int | None = max
         self.crop: bool | None = crop
@@ -41,8 +74,12 @@ class ResRule(DataRule, FastComparable):
 
     def fast_comp(self) -> Expr | bool:
         if self.crop:
-            return col("resolution").apply(lambda lst: self.is_valid(map(self.resize, lst)))
-        return col("resolution").apply(lambda lst: all(dim % self.scale == 0 for dim in lst) and self.is_valid(lst))
+            return (pl.min_horizontal(col("width"), col("height")) // self.scale * self.scale >= self.min) & (
+                pl.max_horizontal(col("width"), col("height")) // self.scale * self.scale <= self.max
+            )
+        return (pl.min_horizontal(col("width"), col("height")) >= self.min) & (
+            pl.max_horizontal(col("width"), col("height")) <= self.max
+        )
 
     def is_valid(self, lst: Iterable[int]) -> bool:
         lst = set(lst)
@@ -52,18 +89,14 @@ class ResRule(DataRule, FastComparable):
         return (i // self.scale) * self.scale  # type: ignore
 
 
-def get_channels(pth: str) -> int:
-    return len(Image.open(pth).getbands())
-
-
-class ChannelRule(DataRule, FastComparable):
+class ChannelRule(Rule, FastComparable):
     """Checks the number of channels in the image."""
 
     config_keyword = "channels"
 
     def __init__(self, min_channels=1, max_channels=4) -> None:
         super().__init__()
-        self.schema = (Column(self, "channels", int, col("path").apply(get_channels)),)
+        self.requires = Column(self, "channels", int)
         self.min_channels = min_channels
         self.max_channels = max_channels
 
@@ -88,14 +121,6 @@ _HASHERS: dict[str, Callable] = {
 }
 
 
-_RESOLVERS: dict[str, Expr | bool] = {
-    "ignore_all": False,
-    "newest": col("modifiedtime") == col("modifiedtime").max(),
-    "oldest": col("modifiedtime") == col("modifiedtime").min(),
-    "size": col("size") == col("size").max(),
-}
-
-
 class HASHERS(str, Enum):
     """
     Available hashers.
@@ -112,37 +137,33 @@ class HASHERS(str, Enum):
     WHASH_DB4 = "whash_db4"
 
 
-class RESOLVERS(str, Enum):
-    """
-    Available resolvers.
-    """
+class HashProducer(Producer):
+    produces = MappingProxyType({"hash": str})
 
-    IGNORE_ALL = "ignore_all"
-    NEWEST = "newest"
-    OLDEST = "oldest"
-    SIZE = "size"
+    def __init__(self, hasher: HASHERS = HASHERS.AVERAGE):
+        self.hasher: Callable[[Image.Image], imagehash.ImageHash] = _HASHERS[hasher]
+
+    def __call__(self):
+        return [{"hash": col("path").apply(self._hash_img)}]
+
+    def _hash_img(self, pth) -> str:
+        assert self.hasher is not None
+        return str(self.hasher(Image.open(pth)))
 
 
-class HashRule(DataRule, Comparable):
+class HashRule(Rule, Comparable):
     config_keyword = "hashing"
 
     def __init__(
         self,
-        hasher: HASHERS = HASHERS.AVERAGE,
-        resolver: RESOLVERS = RESOLVERS.IGNORE_ALL,
-        get_optional_cols=False,
+        resolver: str | Literal["ignore_all"] = "ignore_all",
     ) -> None:
         super().__init__()
-        self.schema = (Column(self, "hash", str, col("path").apply(self._hash_img)),)
-        if get_optional_cols or resolver in [RESOLVERS.NEWEST, RESOLVERS.OLDEST]:
-            self.schema = (
-                *self.schema,
-                Column(self, "modifiedtime", datetime),
-            )
-        if get_optional_cols or resolver == RESOLVERS.SIZE:
-            self.schema = (*self.schema, Column(self, "size", int, col("path").apply(get_size)))
-        self.hasher: Callable[[Image.Image], imagehash.ImageHash] = _HASHERS[hasher]
-        self.resolver: Expr | bool = _RESOLVERS[resolver]
+
+        self.requires = Column(self, "hash", str)
+        if resolver != "ignore_all":
+            self.requires = (self.requires, Column(self, resolver))
+        self.resolver: Expr | bool = {"ignore_all": False}.get(resolver, col(resolver) == col(resolver).max())
 
     def compare(self, partial: DataFrame, full: DataFrame) -> DataFrame:
         return (
@@ -155,6 +176,11 @@ class HashRule(DataRule, Comparable):
             .apply(lambda df: df.filter(self.resolver) if len(df) > 1 else df)  # type: ignore
         )
 
-    def _hash_img(self, pth) -> str:
-        assert self.hasher is not None
-        return str(self.hasher(Image.open(pth)))
+    @classmethod
+    def get_cfg(cls) -> dict:
+        return {
+            "resolver": "ignore_all",
+            "!#resolver": " ignore_all | column name",
+            "hasher": "average",
+            "!#hasher": " | ".join(HASHERS),
+        }

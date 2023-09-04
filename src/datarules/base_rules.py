@@ -3,9 +3,11 @@ from __future__ import annotations
 import inspect
 import sys
 from abc import abstractmethod
+from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum, EnumType
-from typing import Any, Self
+from types import MappingProxyType
+from typing import Any, ClassVar, Iterable, Self
 
 from polars import DataFrame, Expr, PolarsDataType
 
@@ -28,19 +30,47 @@ class FastComparable:
 class Column:
     """A class defining what is in a column which a filter may use to apply a"""
 
-    source: DataRule | None
+    source: Rule | None
     name: str
-    dtype: PolarsDataType | type
-    build_method: Expr | None = None
+    dtype: PolarsDataType | type | None = None
 
 
-class DataRule:
+class Producer:
+    """A class that produces a certain column in a dataframe"""
+
+    produces: MappingProxyType[str, PolarsDataType | type]
+    all_producers: ClassVar[list[type[Producer]]] = []
+
+    def __init__(self):
+        pass
+
+    def __init_subclass__(cls) -> None:
+        Producer.all_producers.append(cls)
+
+    @staticmethod
+    def build_producer_schema(producers: Iterable[Producer]) -> list[dict[str, Expr | bool]]:
+        dct = defaultdict(list)
+        for producer in producers:
+            exprs: list[dict[str, Expr | bool]] = producer()
+            for idx, exprdct in enumerate(exprs):
+                dct[idx].append(exprdct)
+        return [Producer._build_producer_schema(sequence) for sequence in list(dct.values())]
+
+    @staticmethod
+    def _build_producer_schema(exprs: list[dict[str, Expr | bool]]):
+        return {col: expr for expression in exprs for col, expr in expression.items()}
+
+    def __call__(self) -> list[dict[str, Expr | bool]]:
+        raise NotImplementedError
+
+
+class Rule:
     """An abstract DataFilter format, for use in DatasetBuilder."""
 
     config_keyword: str
 
     def __init__(self) -> None:
-        self.schema: tuple[Column, ...] = ()
+        self.requires: Column | tuple[Column, ...] = ()
 
     @classmethod
     def from_cfg(cls, *args, **kwargs) -> Self:
@@ -57,7 +87,7 @@ class DataRule:
                 cfg[key] = val.default
             if val.annotation is not inspect._empty:
                 annotation = eval(val.annotation, module.__dict__)
-                comment = DataRule._obj_to_comment(annotation)
+                comment = Rule._obj_to_comment(annotation)
                 if comment:
                     cfg[f"!#{key}"] = comment
 

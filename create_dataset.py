@@ -1,6 +1,5 @@
 import os
 from dataclasses import dataclass
-from enum import Enum
 from itertools import chain
 from multiprocessing import Pool, cpu_count, freeze_support
 from pathlib import Path
@@ -15,10 +14,10 @@ from tqdm import tqdm
 from typer import Option
 from typing_extensions import Annotated
 
+import src.datarules.data_rules as drules
+import src.datarules.image_rules as irules
 from src.datarules.custom_toml import TomlCustomCommentDecoder, TomlCustomCommentEncoder
-from src.datarules.data_rules import BlacknWhitelistRule, ExistingRule, StatRule
 from src.datarules.dataset_builder import DatasetBuilder
-from src.datarules.image_rules import ChannelRule, HashRule, ResRule
 from util.file_list import get_file_list, to_recursive
 from util.print_funcs import RichStepper, ipbar
 
@@ -75,76 +74,34 @@ def fileparse(dfile: Scenario) -> Scenario:
     return dfile
 
 
-class LimitModes(str, Enum):
-    """Modes to limit the output images based on a timestamp."""
-
-    BEFORE = "before"
-    AFTER = "after"
-
-
-config = CfgDict("config.toml", save_mode="toml")
+config = CfgDict("config.toml", save_mode="toml", autofill=True)
 
 
 @app.command()
 @wrap_config(config)
 def main(
-    input_folder: Annotated[Path, Option(help="the folder to scan.")] = Path(),
-    scale: Annotated[int, Option(help="the scale to downscale.")] = 4,
-    extension: Annotated[Optional[str], Option(help="export extension.")] = None,
-    extensions: Annotated[str, Option(help="extensions to search for. (split with commas)")] = "webp,png,jpg",
-    config_path: Annotated[Path, Option(help="Where the rule config is placed.")] = Path("database_config.toml"),
-    recursive: Annotated[bool, Option(help="preserves the tree hierarchy.", rich_help_panel="modifiers")] = False,
-    convert_spaces: Annotated[
-        bool,
-        Option(
-            help="Whether to replace spaces with underscores when creating the output.", rich_help_panel="modifiers"
-        ),
-    ] = False,
-    threads: Annotated[
-        int, Option(help="number of threads for multiprocessing.", rich_help_panel="modifiers")
-    ] = CPU_COUNT
-    * 3
-    // 4,
-    chunksize: Annotated[
-        int, Option(help="number of images to run with one thread per pool chunk", rich_help_panel="modifiers")
-    ] = 5,
-    limit: Annotated[
-        Optional[int], Option(help="only gathers a given number of images.", rich_help_panel="modifiers")
-    ] = None,
-    limit_mode: Annotated[
-        LimitModes, Option(help="which order the limiter is activated.", rich_help_panel="modifiers")
-    ] = LimitModes.BEFORE,
-    simulate: Annotated[
-        bool, Option(help="skips the conversion step. Used for debugging.", rich_help_panel="modifiers")
-    ] = False,
-    purge: Annotated[
-        bool, Option(help="deletes output corresponding to input files.", rich_help_panel="modifiers")
-    ] = False,
-    purge_all: Annotated[
-        bool, Option(help="Same as above, but deletes *everything*.", rich_help_panel="modifiers")
-    ] = False,
-    make_lr: Annotated[bool, Option(help="whether to make an LR folder.", rich_help_panel="modifiers")] = True,
-    overwrite: Annotated[
-        bool,
-        Option(help="Skips checking existing files, overwrites existing files.", rich_help_panel="modifiers"),
-    ] = False,
-    verbose: Annotated[
-        bool, Option(help="Prints the files when they are fully converted.", rich_help_panel="modifiers")
-    ] = False,
-    sort_by: Annotated[
-        str,
-        Option(
-            help="Which column in the database to sort by. It must be in the database.", rich_help_panel="modifiers"
-        ),
-    ] = "path",
-    ignore_missing_cols: Annotated[bool, Option(help="if columns are missing, don't break filtering")] = False,
+    input_folder: Annotated[Path, Option(help="the folder to scan")] = Path(),
+    scale: Annotated[int, Option(help="the scale to downscale")] = 4,
+    extension: Annotated[Optional[str], Option(help="export extension")] = None,
+    extensions: Annotated[str, Option(help="extensions to search for (split with commas)")] = "webp,png,jpg",
+    config_path: Annotated[Path, Option(help="Where the rule config is placed")] = Path("database_config.toml"),
+    recursive: Annotated[bool, Option(help="preserves the tree hierarchy", rich_help_panel="modifiers")] = False,
+    underscores: Annotated[bool, Option(help="replaces spaces with underscores", rich_help_panel="modifiers")] = False,
+    threads: Annotated[int, Option(help="multiprocessing threads", rich_help_panel="modifiers")] = CPU_COUNT * 3 // 4,
+    chunksize: Annotated[int, Option(help="imap chunksize", rich_help_panel="modifiers")] = 5,
+    simulate: Annotated[bool, Option(help="stops before conversion", rich_help_panel="modifiers")] = False,
+    purge: Annotated[bool, Option(help="deletes output before conversion", rich_help_panel="modifiers")] = False,
+    purge_all: Annotated[bool, Option(help="deletes *everything* in output", rich_help_panel="modifiers")] = False,
+    make_lr: Annotated[bool, Option(help="whether to make an LR folder", rich_help_panel="modifiers")] = True,
+    overwrite: Annotated[bool, Option(help="overwrites existing files", rich_help_panel="modifiers")] = False,
+    verbose: Annotated[bool, Option(help="prints converted files", rich_help_panel="modifiers")] = False,
+    sort_by: Annotated[str, Option(help="Which database column to sort by", rich_help_panel="modifiers")] = "path",
     stat: Annotated[bool, Option("--stat", "-s", help="use statrule", rich_help_panel="rules")] = False,
     res: Annotated[bool, Option("--res", "-r", help="use resrule", rich_help_panel="rules")] = False,
     hsh: Annotated[bool, Option("--hash", "-h", help="use hashrule", rich_help_panel="rules")] = False,
     chn: Annotated[bool, Option("--channel", "-c", help="use channelrule", rich_help_panel="rules")] = False,
-    blw: Annotated[
-        bool, Option("--blackwhitelist", "-b", help="use blacknwhitelistrule", rich_help_panel="rules")
-    ] = False,
+    blw: Annotated[bool, Option("--bwlist", "-b", help="use blacknwhitelistrule", rich_help_panel="rules")] = False,
+    lim: Annotated[bool, Option("--limit", "-l", help="limit num of files", rich_help_panel="rules")] = False,
 ) -> int:
     """Does all the heavy lifting"""
     s: RichStepper = RichStepper(loglevel=1, step=-1)
@@ -152,9 +109,6 @@ def main(
     cfg = CfgDict(
         config_path,
         {
-            "trim": True,
-            "trim_age_limit": 60 * 60 * 24 * 7,
-            "trim_check_exists": True,
             "save_interval": 60,
             "chunksize": 100,
             "filepath": "filedb.feather",
@@ -169,7 +123,16 @@ def main(
 
     db = DatasetBuilder(origin=str(input_folder), db_path=Path(cfg["filepath"]))
     if not config_path.exists():
-        db.add_rules([StatRule, ResRule, HashRule, ChannelRule, BlacknWhitelistRule])
+        db.add_rules(
+            [
+                drules.StatRule,
+                irules.ResRule,
+                irules.HashRule,
+                irules.ChannelRule,
+                drules.BlacknWhitelistRule,
+                drules.TotalLimitRule,
+            ]
+        )
         cfg.update(db.generate_config()).save()
         print(f"{config_path} created. edit it and restart this program.")
         return 0
@@ -182,10 +145,13 @@ def main(
         return True
 
     def recurse(path: Path):
-        return to_recursive(path, recursive, convert_spaces)
+        return to_recursive(path, recursive, underscores)
 
-    if not input_folder or not input_folder.exists():
+    if not input_folder:
         rprint("Please select a directory.")
+        return 1
+    if not input_folder.exists():
+        rprint(f"Folder {input_folder} does not exist.")
         return 1
 
     if extension:
@@ -232,17 +198,26 @@ def main(
         return hr_path, lr_path
 
     rules = []
+    producers = set()
+
     if stat:
-        rules.append(StatRule)
-    if res:
-        rules.append(ResRule)
-    if hsh:
-        rules.append(HashRule)
+        rules.append(drules.StatRule)
+        producers.add(drules.FileInfoProducer())
+    if res or chn:
+        producers.add(irules.ImShapeProducer())
     if chn:
-        rules.append(ChannelRule)
+        rules.append(irules.ChannelRule)
+    if res:
+        rules.append(irules.ResRule)
+    if hsh:
+        rules.append(irules.HashRule(cfg["hashing"]["resolver"]))
+        producers.add(irules.HashProducer(cfg["hashing"]["hasher"]))
     if blw:
-        rules.append(BlacknWhitelistRule)
+        rules.append(drules.BlacknWhitelistRule)
+    if lim:
+        rules.append(drules.TotalLimitRule)
     db.add_rules(rules)
+    db.add_producers(producers)
     db.fill_from_config(cfg)
 
     # * Gather images
@@ -251,8 +226,6 @@ def main(
     s.print(f"Searching extensions: {available_extensions}")
     file_list: Generator[Path, None, None] = get_file_list(input_folder, *(f"*.{ext}" for ext in available_extensions))
     image_list: list[Path] = [x.relative_to(input_folder) for x in sorted(file_list)]
-    if limit and limit == LimitModes.BEFORE:
-        image_list = image_list[:limit]
 
     s.print(f"Gathered {len(image_list)} images")
 
@@ -280,7 +253,7 @@ def main(
         folders: list[Path] = [hr_folder]
         if make_lr:
             folders.append(lr_folder)
-        db.add_rule(ExistingRule(folders, recurse_func=recurse))
+        db.add_rule(drules.ExistingRule(folders, recurse_func=recurse))
 
     # * Run filters
     s.next("Using: ")
@@ -289,18 +262,13 @@ def main(
     s.print("Populating df...")
     db.populate_df(
         image_list,
-        trim=cfg["trim"],
-        trim_age_limit=cfg["trim_age_limit"],
         save_interval=cfg["save_interval"],
-        trim_check_exists=cfg["trim_check_exists"],
         chunksize=cfg["chunksize"],
+        # use_tqdm=False,
     )
 
     s.print("Filtering...")
-    image_list = list(db.filter(image_list, sort_col=sort_by, ignore_missing_columns=ignore_missing_cols))
-
-    if limit and limit_mode == LimitModes.AFTER:
-        image_list = image_list[:limit]
+    image_list = list(db.filter(image_list, sort_col=sort_by))
 
     if not check_for_images(image_list):
         return 0
