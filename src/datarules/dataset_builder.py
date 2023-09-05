@@ -7,7 +7,8 @@ from typing import Generator, TypeVar
 
 import polars as pl
 from polars import DataFrame, Expr
-from rich import print as rprint
+
+# from rich import print as rprint
 from tqdm import tqdm
 
 from .base_rules import Comparable, FastComparable, Producer, Rule
@@ -107,7 +108,6 @@ class DatasetBuilder:
             if self.__df.filter(pl.all(pl.col(col).is_null() for col in producer.produces)).is_empty():
                 potential_producers.remove(producer)
 
-        #
         type_schema: dict[str, pl.DataType | type] = self.get_type_schema()
         build_schemas: list[dict[str, Expr | bool]] = Producer.build_producer_schema(potential_producers)
         self.__df = self._comply_to_schema(self.__df, type_schema)
@@ -131,6 +131,7 @@ class DatasetBuilder:
             save_timer: datetime = datetime.now()
             collected: list[DataFrame] = []
 
+            # Split the data into groups based on null values in columns
             splitted = (
                 (
                     dict(zip(unfinished.columns, *nulls if hasattr(nulls, "__next__") else (nulls,))),  # type: ignore
