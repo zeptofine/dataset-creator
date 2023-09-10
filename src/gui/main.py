@@ -250,11 +250,6 @@ def main():
     args = parser.parse_args()
     app = QtWidgets.QApplication([])
     central_window = Window(Path(args.cfg_path)) if args.cfg_path else Window()
-    if sys.platform == "win32":
-        import pywinstyles
-
-        pywinstyles.apply_style(central_window, "acrylic")
-
     central_window.show()
     code = app.exec()
     sys.exit(code)
