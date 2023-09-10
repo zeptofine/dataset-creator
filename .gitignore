@@ -68,3 +68,4 @@ env.bak/
 venv.bak/
 
 filedb.feather
+config.json

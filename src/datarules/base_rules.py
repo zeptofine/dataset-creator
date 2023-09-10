@@ -63,6 +63,13 @@ class Producer:
     def __call__(self) -> list[dict[str, Expr | bool]]:
         raise NotImplementedError
 
+    def __repr__(self) -> str:
+        attrlist: list[str] = [
+            f"{key}=..." if hasattr(val, "__iter__") and not isinstance(val, str) else f"{key}={val}"
+            for key, val in self.__dict__.items()
+        ]
+        return f"{self.__class__.__name__}({', '.join(attrlist)})"
+
 
 class Rule:
     """An abstract DataFilter format, for use in DatasetBuilder."""
@@ -74,7 +81,7 @@ class Rule:
 
     @classmethod
     def from_cfg(cls, *args, **kwargs) -> Self:
-        return cls(*args, **kwargs)  # type: ignore
+        return cls(*args, **kwargs)
 
     @classmethod
     def get_cfg(cls) -> dict:

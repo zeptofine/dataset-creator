@@ -121,7 +121,7 @@ def main(
         decoder=TomlCustomCommentDecoder(),
     )
 
-    db = DatasetBuilder(origin=str(input_folder), db_path=Path(cfg["filepath"]))
+    db = DatasetBuilder(db_path=Path(cfg["filepath"]))
     if not config_path.exists():
         db.add_rules(
             [
@@ -260,19 +260,20 @@ def main(
     s.print(*[f" - {rule!s}" for rule in db.rules])
 
     s.print("Populating df...")
+
+    abs2relative: dict[str, Path] = {str((input_folder / pth).resolve()): pth for pth in image_list}
+
     db.populate_df(
-        image_list,
+        set(abs2relative),
         save_interval=cfg["save_interval"],
         chunksize=cfg["chunksize"],
-        # use_tqdm=False,
     )
-
     s.print("Filtering...")
-    image_list = list(db.filter(image_list, sort_col=sort_by))
+    filtered = db.filter(set(abs2relative), sort_col=sort_by)
+    image_list = [abs2relative[image] for image in filtered]
 
     if not check_for_images(image_list):
         return 0
-
     if simulate:
         s.next(f"Simulated. {len(image_list)} images remain.")
         return 0

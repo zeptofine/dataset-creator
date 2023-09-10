@@ -37,10 +37,10 @@ class FileInfoProducer(Producer):
         return [
             {"stat": col("path").apply(stat)},
             {
-                "mtime": col("stat").struct.field("st_mtime").apply(timestamp2datetime),
+                "mtime": col("stat").struct.field("st_mtime").apply(timestamp2datetime).cast(Datetime("ms")),
                 "size": col("stat").struct.field("st_size"),
             },
-        ]  # type: ignore
+        ]
 
 
 def stat(pth):
@@ -133,7 +133,7 @@ class BlacknWhitelistRule(Rule, FastComparable):
 
 
 class ExistingRule(Rule, FastComparable):
-    def __init__(self, folders: list[str] | list[Path], recurse_func: Callable) -> None:
+    def __init__(self, folders: list[str] | list[Path], recurse_func: Callable = lambda x: x) -> None:
         super().__init__()
         self.existing_list = ExistingRule._get_existing(*map(Path, folders))
         self.recurse_func: Callable[[Path], Path] = recurse_func

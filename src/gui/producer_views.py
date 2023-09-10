@@ -34,6 +34,7 @@ from .frames import FlowItem
 
 class ProducerView(FlowItem):
     title = "Producer"
+    movable = False
 
     bound_producer: type[base_rules.Producer]
 
@@ -46,7 +47,7 @@ class ProducerView(FlowItem):
         # return super().setup_widget()
 
     @abstractmethod
-    def get_producer(self):
+    def get(self):
         """Evaluates the settings and returns a Producer instance"""
 
 
@@ -54,20 +55,38 @@ class FileInfoProducerView(ProducerView):
     title = "File Info Producer"
     bound_producer = data_rules.FileInfoProducer
 
+    def get(self):
+        return self.bound_producer()
+
 
 class ImShapeProducerView(ProducerView):
     title = "Image shape"
     bound_producer = image_rules.ImShapeProducer
 
+    def get(self):
+        return self.bound_producer()
+
 
 class HashProducerView(ProducerView):
     title = "Hash Producer"
     desc = "gets a hash for the contents of an image"
-    bound_producer = image_rules.HashProducer
+    bound_producer: type[image_rules.HashProducer] = image_rules.HashProducer
     needs_settings = True
 
     def configure_settings_group(self):
-        hash_type = QComboBox()
-        hash_type.addItems([*image_rules.HASHERS])
-        self.groupgrid.addWidget(QLabel("Hash type: "), 0, 0)
-        self.groupgrid.addWidget(hash_type, 0, 1)
+        self.hash_type = QComboBox()
+        self.hash_type.addItems([*image_rules.HASHERS])
+        self.groupgrid.addWidget(QLabel("Hash type: ", self), 0, 0)
+        self.groupgrid.addWidget(self.hash_type, 0, 1)
+
+    def get_json(self) -> dict:
+        return {"hash_type": self.hash_type.currentText()}
+
+    @classmethod
+    def from_json(cls, cfg: dict, parent=None):
+        self = cls(parent)
+        self.hash_type.setCurrentText(cfg["hash_type"])
+        return self
+
+    def get(self):
+        return self.bound_producer(image_rules.HASHERS(self.hash_type.currentText()))

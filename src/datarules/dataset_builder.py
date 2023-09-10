@@ -26,21 +26,31 @@ T = TypeVar("T")
 
 
 class DatasetBuilder:
-    def __init__(self, origin: str, db_path: Path) -> None:
+    def __init__(self, db_path: Path) -> None:
         super().__init__()
         self.producers: set[Producer] = set()
         self.unready_rules: dict[str, type[Rule]] = {}
         self.rules: list[Rule] = []
-        self.origin: str = origin
 
         self.filepath: Path = db_path
 
         self.basic_schema: dict[str, pl.DataType | type] = {"path": str}
 
-        if self.filepath.exists():
-            self.__df: DataFrame = pl.read_ipc(self.filepath, use_pyarrow=True)
-        else:
-            self.__df: DataFrame = DataFrame(schema=self.basic_schema)
+        self.___df = None
+
+    # only get __df when __df is needed
+    @property
+    def __df(self):
+        if self.___df is None:
+            if self.filepath.exists():
+                self.___df = pl.read_ipc(self.filepath, use_pyarrow=True, memory_map=False)
+            else:
+                self.___df = DataFrame(schema=self.basic_schema)
+        return self.___df
+
+    @__df.setter
+    def __df(self, df):
+        self.___df = df
 
     def add_rules(self, rules: Iterable[type[Rule] | Rule]) -> None:
         """Adds rules to the rule list. Rules will be instantiated separately."""
@@ -81,14 +91,14 @@ class DatasetBuilder:
                 params = {k: v for k, v in dct.items() if k in sig.parameters and k != "self"}
                 self.add_rule(rule(**params))
         if len(self.unready_rules) and not no_warn:
-            warnings.warn(f"{self.unready_rules} remain unfilled from config.", stacklevel=2)  # type: ignore
+            warnings.warn(f"{self.unready_rules} remain unfilled from config.", stacklevel=2)
 
     def generate_config(self) -> dict:
         return {name: rule.get_cfg() for name, rule in self.unready_rules.items()}
 
     def populate_df(
         self,
-        lst: Iterable[Path],
+        lst: Iterable[str],
         use_tqdm=True,
         save_interval: int = 60,
         save=True,
@@ -96,8 +106,9 @@ class DatasetBuilder:
     ):
         assert self.producers, "No producers specified"
 
+        lst = set(lst)
         # add new paths to the df
-        if new_paths := set(self.get_absolutes(lst)) - set(self.__df.get_column("path")):
+        if new_paths := lst - set(self.__df.get_column("path")):
             self.__df = pl.concat((self.__df, DataFrame({"path": list(new_paths)})), how="diagonal")
 
         # check if producers are completely finished
@@ -110,7 +121,7 @@ class DatasetBuilder:
 
         type_schema: dict[str, pl.DataType | type] = self.get_type_schema()
         build_schemas: list[dict[str, Expr | bool]] = Producer.build_producer_schema(potential_producers)
-        self.__df = self._comply_to_schema(self.__df, type_schema)
+        self.__df = _comply_to_schema(self.__df, type_schema)
         updated_df: DataFrame = self.__df.with_columns(type_schema)
         search_cols: set[str] = {*type_schema}
 
@@ -148,9 +159,10 @@ class DatasetBuilder:
                 for truth_table, df in splitted
             )
 
+            chunk: DataFrame
             if not use_tqdm:
                 for schemas, df in splitted_with_schema:
-                    for _, chunk in self._split_into_chunks(df, chunksize=chunksize):
+                    for _, chunk in _split_into_chunks(df, chunksize=chunksize):
                         for schema in schemas:
                             chunk = chunk.with_columns(**schema)
                         collected.append(chunk.select(type_schema))
@@ -161,7 +173,7 @@ class DatasetBuilder:
                     tqdm(unit="chunk", total=len(unfinished) // chunksize) as sub_t,
                 ):
                     for schemas, df in splitted_with_schema:
-                        chunks = list(self._split_into_chunks(df, chunksize=chunksize))
+                        chunks = list(_split_into_chunks(df, chunksize=chunksize))
                         sub_t.total = len(chunks)
                         sub_t.update(-sub_t.n)
                         for (idx, size), chunk in chunks:
@@ -182,21 +194,19 @@ class DatasetBuilder:
                 self.save_df()
         return
 
-    def filter(self, lst, sort_col="path") -> Iterable[Path]:
+    def filter(self, lst, sort_col="path") -> Iterable[str]:
         assert sort_col in self.__df.columns, f"'{sort_col}' is not in {self.__df.columns}"
         if len(self.unready_rules):
             warnings.warn(
                 f"{len(self.unready_rules)} filters are not initialized and will not be populated", stacklevel=2
             )
 
-        fulltorelativedict: dict[str, Path] = self.get_absolutes(lst)
-
-        vdf: DataFrame = self.__df.filter(pl.col("path").is_in(fulltorelativedict.keys()))
+        vdf: DataFrame = self.__df.filter(pl.col("path").is_in(lst))
         combined = self.combine_exprs(self.rules)
         for rule in combined:
             vdf = rule.compare(vdf, self.__df) if isinstance(rule, Comparable) else vdf.filter(rule)
 
-        return (fulltorelativedict[p] for p in vdf.sort(sort_col).get_column("path"))
+        return vdf.sort(sort_col).get_column("path")
 
     @staticmethod
     def combine_exprs(rules: Iterable[Rule]) -> list[Expr | bool | Comparable]:
@@ -222,25 +232,8 @@ class DatasetBuilder:
         """saves the dataframe to self.filepath"""
         self.__df.write_ipc(self.filepath)
 
-    def get_absolutes(self, lst: Iterable[Path]) -> dict[str, Path]:
-        return {(str((self.origin / pth).resolve())): pth for pth in lst}  # type: ignore
-
     def get_path_data(self, pths: Collection[str]):
         return self.__df.filter(pl.col("path").is_in(pths))
-
-    @staticmethod
-    def _comply_to_schema(data_frame: DataFrame, schema) -> DataFrame:
-        """adds columns from the schema to the dataframe. (not in-place)"""
-        return pl.concat((data_frame, DataFrame(schema=schema)), how="diagonal")
-
-    @staticmethod
-    def _split_into_chunks(df: DataFrame, chunksize: int, column="_idx"):
-        return (
-            ((idx, len(part)), part.drop(column))
-            for idx, part in df.with_row_count(column)
-            .with_columns(pl.col(column) // chunksize)
-            .groupby(column, maintain_order=True)
-        )
 
     @staticmethod
     def blacklist_schema(schema: list[dict[str, Expr | bool]], blacklist: Iterable) -> list[dict[str, Expr | bool]]:
@@ -264,3 +257,21 @@ class DatasetBuilder:
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         pass
+
+    def __repr__(self) -> str:
+        attrlist: list[str] = [f"{key}={val!r}" for key, val in self.__dict__.items()]
+        return f"{self.__class__.__name__}({', '.join(attrlist)})"
+
+
+def _comply_to_schema(data_frame: DataFrame, schema) -> DataFrame:
+    """adds columns from the schema to the dataframe. (not in-place)"""
+    return pl.concat((data_frame, DataFrame(schema=schema)), how="diagonal")
+
+
+def _split_into_chunks(df: DataFrame, chunksize: int, column="_idx"):
+    return (
+        ((idx, len(part)), part.drop(column))
+        for idx, part in df.with_row_count(column)
+        .with_columns(pl.col(column) // chunksize)
+        .groupby(column, maintain_order=True)
+    )

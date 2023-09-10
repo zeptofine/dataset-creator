@@ -10,3 +10,4 @@ python-dateutil
 rich
 tqdm
 typer[all]
+pywinstyles; sys.platform=='win32'

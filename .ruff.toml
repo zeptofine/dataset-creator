@@ -18,3 +18,5 @@ extend-select = [
     "C4",
 ]
 fixable = ["ALL"]
+
+extend-ignore = ["F401"]

@@ -1,5 +1,5 @@
 save_interval = 60
-chunksize = 100
+chunksize = 1000
 filepath = "filedb.feather"
 
 [stats]
@@ -14,7 +14,7 @@ scale = 4
 resolver = "ignore_all" # ignore_all | column name
 hasher = "average"      #average | color | crop_resistant | dhash | dhash_vertical | phash | phash_simple | whash | whash_db4
 [channels]
-min_channels = 4
+min_channels = 1
 max_channels = 4
 [blackwhitelists]
 whitelist = []

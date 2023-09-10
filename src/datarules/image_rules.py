@@ -85,8 +85,8 @@ class ResRule(Rule, FastComparable):
         lst = set(lst)
         return not ((self.min and min(lst) < self.min) or (self.max and max(lst) > self.max))
 
-    def resize(self, i: int) -> int:
-        return (i // self.scale) * self.scale  # type: ignore
+    def resize(self, i) -> int:
+        return (i // self.scale) * self.scale
 
 
 class ChannelRule(Rule, FastComparable):
@@ -155,8 +155,7 @@ class HashRule(Rule, Comparable):
     config_keyword = "hashing"
 
     def __init__(
-        self,
-        resolver: str | Literal["ignore_all"] = "ignore_all",
+        self, resolver: str | Literal["ignore_all"] = "ignore_all", include_only_partial: bool = False
     ) -> None:
         super().__init__()
 
@@ -173,7 +172,7 @@ class HashRule(Rule, Comparable):
                 ),
             )
             .groupby("hash")
-            .apply(lambda df: df.filter(self.resolver) if len(df) > 1 else df)  # type: ignore
+            .apply(lambda df: df.filter(self.resolver) if len(df) > 1 else df)
         )
 
     @classmethod
@@ -181,6 +180,8 @@ class HashRule(Rule, Comparable):
         return {
             "resolver": "ignore_all",
             "!#resolver": " ignore_all | column name",
+            "include_only_partial": False,
+            "!#include_only_partial": " only takes in account the part of the dataframe given",
             "hasher": "average",
             "!#hasher": " | ".join(HASHERS),
         }
