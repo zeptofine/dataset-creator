@@ -71,14 +71,14 @@ class OutputView(InputView):
     def get(self) -> str:
         return self.text.text()
 
-    def get_json(self):
+    def get_config(self):
         return {
             "file": self.text.text(),
-            "list": self.list.get_cfg(),
+            "list": self.list.get_config(),
         }
 
     @classmethod
-    def from_json(cls, cfg: dict, parent=None):
+    def from_config(cls, cfg: dict, parent=None):
         self = cls(parent)
         self.text.setText(cfg["file"])
         self.list.add_from_cfg(cfg["list"])

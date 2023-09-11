@@ -54,11 +54,11 @@ class ResizeFilter(Filter):
         self.groupgrid.addWidget(QLabel("Scale:", self), 0, 0)
         self.groupgrid.addWidget(self.scale, 0, 1)
 
-    def get_json(self):
+    def get_config(self):
         return {"scale": self.scale.value()}
 
     @classmethod
-    def from_json(cls, cfg: dict, parent=None):
+    def from_config(cls, cfg: dict, parent=None):
         self = cls(parent)
         self.scale.setValue(cfg["scale"])
         return self

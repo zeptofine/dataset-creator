@@ -32,6 +32,7 @@ def catch_errors(msg):
             try:
                 return func(*args, **kwargs)
             except Exception as e:
+                print(e)
                 dlg = ErrorDialog(e, msg)
                 dlg.exec_()
 

@@ -14,9 +14,6 @@ from PySide6 import QtWidgets
 from PySide6.QtCore import Qt, Signal, Slot  # QThread,,
 from PySide6.QtGui import QAction, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
-    # QGridLayout,
-    # QGroupBox,
-    # QProgressBar,
     # QPushButton,
     QDialog,
     QDialogButtonBox,
@@ -26,6 +23,9 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QLabel,
     QLineEdit,
+    # QGridLayout,
+    # QGroupBox,
+    QProgressBar,
     # QScrollArea,
     # QSlider,
     QSplitter,
@@ -52,6 +52,7 @@ from .rule_views import (
     ChannelRuleView,
     ExistingRuleView,
     HashRuleView,
+    ResolvedRuleView,
     ResRuleView,
     RuleView,
     StatRuleView,
@@ -128,6 +129,7 @@ class Window(QWidget):
             StatRuleView,
             BlacklistWhitelistView,
             ExistingRuleView,
+            ResolvedRuleView,
             TotalLimitRuleView,
             ResRuleView,
             ChannelRuleView,
@@ -140,53 +142,47 @@ class Window(QWidget):
         self.lists.addWidget(self.inputlist)
         self.producers_rules.addWidget(self.producerlist)
         self.producers_rules.addWidget(self.rulelist)
-        # self.producers_rules.setStretchFactor(1, 10)
-        # self.producers_rules.setStretchFactor(1, 10)
         self.lists.addWidget(self.producers_rules)
         self.lists.addWidget(self.outputlist)
 
-        self.save_shortcut = QShortcut(QKeySequence("Ctrl+S"), self, self.save_cfg)
+        self.save_shortcut = QShortcut(QKeySequence("Ctrl+S"), self, self.save_config)
         (get_producers := QAction("get producers", self)).triggered.connect(self.gather_producers)
         (get_rules := QAction("get rules", self)).triggered.connect(self.gather_rules)
         (get_builder := QAction("get builder", self)).triggered.connect(self.create_builder)
         (get_files := QAction("get files", self)).triggered.connect(self.gather_files)
-        (print_files := QAction("print files", self)).triggered.connect(lambda: rprint(self.filedict))
-        self.addActions([get_producers, get_rules, get_builder, get_files, print_files])
-
-        self.file_select_txt = QLineEdit(self)
-        self.fileselect = QToolButton(self)
-        self.fileselect.setText("...")
-        self.fileselect.setIcon(QIcon.fromTheme("folder-open"))
-        self.fileselect.clicked.connect(self.select_folders)
+        (run_builder := QAction("run builder", self)).triggered.connect(self.run_builder)
+        self.addActions([get_producers, get_rules, get_builder, get_files, run_builder])
 
         self._layout.addWidget(self.lists, 0, 0, 1, 10)
-        self._layout.addWidget(self.file_select_txt, 2, 0, 1, 3)
-        self._layout.addWidget(self.fileselect, 2, 3)
 
         if not cfg_path.exists():
-            self.save_cfg()
+            self.save_config()
         with self.cfg_path.open("r") as f:
             self.load_cfg(Config(json.load(f)))
 
-    def get_cfg(self):
+    def get_config(self):
         return Config(
             {
-                "inputs": self.inputlist.get_cfg(),
-                "output": self.outputlist.get_cfg(),
-                "producers": self.producerlist.get_cfg(),
-                "rules": self.rulelist.get_cfg(),
+                "inputs": self.inputlist.get_config(),
+                "output": self.outputlist.get_config(),
+                "producers": self.producerlist.get_config(),
+                "rules": self.rulelist.get_config(),
             }
         )
 
     @catch_errors("Error saving")
     @Slot()
-    def save_cfg(self):
+    def save_config(self):
         with self.cfg_path.open("w") as f:
-            json.dump(self.get_cfg(), f, indent=4)
+            json.dump(self.get_config(), f, indent=4)
 
     @catch_loading
     @Slot(dict)
     def load_cfg(self, cfg):
+        self.inputlist.empty()
+        self.producerlist.empty()
+        self.rulelist.empty()
+        self.outputlist.empty()
         self.inputlist.add_from_cfg(cfg["inputs"])
         self.producerlist.add_from_cfg(cfg["producers"])
         self.rulelist.add_from_cfg(cfg["rules"])
@@ -211,34 +207,31 @@ class Window(QWidget):
 
     @Slot(dict)
     def collect_files(self, dct):
-        # print(dct)
         self.filedict.update(dct)
 
     @catch_building
     @Slot()
     def create_builder(self):
-        print("building...")
+        print("building builder...")
         producers = self.producerlist.get()
         rules = self.rulelist.get()
-        rprint(producers, rules)
 
-        builder = DatasetBuilder(Path("filedb.feather"))
+        self.builder = DatasetBuilder(Path("filedb.feather"))
 
-        builder.add_producers(producers)
-        builder.add_rules(rules)
-        rprint(builder)
-        pass
+        self.builder.add_producers(producers)
+        self.builder.add_rules(rules)
+        rprint(self.builder)
+        print("built builder.")
+        return self.builder
 
     @Slot()
-    def select_folders(self):
-        filename: str = QFileDialog.getExistingDirectory(
-            self,
-            "Select output folder",
-            str(Path.home()),
-            QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontResolveSymlinks,
-        )
-        if filename:
-            self.file_select_txt.setText(filename)
+    def run_builder(self):
+        pathdict: dict[Path, list[Path]] = {Path(src): list(map(Path, dst)) for src, dst in self.filedict.items()}
+        all_files = {str(src / file) for src, lst in pathdict.items() for file in lst}
+
+        self.builder.add_new_paths(all_files)
+
+        print("gathered resources")
 
 
 def main():
@@ -246,7 +239,6 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--cfg_path")
-
     args = parser.parse_args()
     app = QtWidgets.QApplication([])
     central_window = Window(Path(args.cfg_path)) if args.cfg_path else Window()

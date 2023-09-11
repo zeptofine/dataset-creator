@@ -29,19 +29,17 @@ from .frames import FlowItem
 class RuleView(FlowItem):
     title = "Rule"
 
-    bound_rule: type[base_rules.Rule]
-
     @abstractmethod
     def get(self):
         """Evaluates the settings and returns a Rule instance"""
-        return self.bound_rule()
+        super().get()
+        return base_rules.Rule()
 
 
 class StatRuleView(RuleView):
     title = "Time Range"
     desc = "only allow files created within a time frame."
 
-    bound_rule = data_rules.StatRule
     needs_settings = True
 
     _datetime_format: str = "dd/MM/yyyy h:mm AP"
@@ -61,18 +59,25 @@ class StatRuleView(RuleView):
         self.groupgrid.addWidget(self.after_widget, 1, 1, 1, 2)
         self.groupgrid.addWidget(self.before_widget, 2, 1, 1, 2)
 
+    def get(self):
+        super().get()
+        return data_rules.StatRule(
+            self.before_widget.dateTime().toString(self._datetime_format),
+            self.after_widget.dateTime().toString(self._datetime_format),
+        )
+
     def reset_settings_group(self):
         self.after_widget.setDateTime(QDateTime(QDate(1970, 1, 1), QTime(0, 0, 0)))
         self.before_widget.setDateTime(QDateTime.currentDateTime())
 
-    def get_json(self):
+    def get_config(self):
         return {
             "after": self.after_widget.dateTime().toString(self._datetime_format),
             "before": self.before_widget.dateTime().toString(self._datetime_format),
         }
 
     @classmethod
-    def from_json(cls, cfg, parent=None):
+    def from_config(cls, cfg, parent=None):
         self = cls(parent)
         self.after_widget.setDateTime(QDateTime.fromString(cfg["after"], cls._datetime_format))
         self.before_widget.setDateTime(QDateTime.fromString(cfg["before"], cls._datetime_format))
@@ -83,7 +88,6 @@ class BlacklistWhitelistView(RuleView):
     title = "Blacklist and whitelist"
     desc = "Only allows paths that include strs in the whitelist and not in the blacklist"
 
-    bound_rule = data_rules.BlacknWhitelistRule
     needs_settings = True
 
     def configure_settings_group(self):
@@ -103,7 +107,15 @@ class BlacklistWhitelistView(RuleView):
         self.whitelist_exclusive.setChecked(False)
         self.blacklist.clear()
 
-    def get_json(self):
+    def get(self):
+        super().get()
+        return data_rules.BlacknWhitelistRule(
+            self.whitelist.toPlainText().splitlines(),
+            self.blacklist.toPlainText().splitlines(),
+            exclusive=self.whitelist_exclusive.isChecked(),
+        )
+
+    def get_config(self):
         return {
             "whitelist": self.whitelist.toPlainText().splitlines(),
             "whitelist_exclusive": self.whitelist_exclusive.isChecked(),
@@ -111,7 +123,7 @@ class BlacklistWhitelistView(RuleView):
         }
 
     @classmethod
-    def from_json(cls, cfg, parent=None):
+    def from_config(cls, cfg, parent=None):
         self = cls(parent)
         self.whitelist.setText("\n".join(cfg["whitelist"]))
         self.whitelist_exclusive.setChecked(cfg["whitelist_exclusive"])
@@ -123,7 +135,6 @@ class TotalLimitRuleView(RuleView):
     title = "Total count"
     desc = "Limits the total number of files past this point"
 
-    bound_rule = data_rules.TotalLimitRule
     needs_settings = True
 
     def configure_settings_group(self):
@@ -135,20 +146,49 @@ class TotalLimitRuleView(RuleView):
     def reset_settings_group(self):
         self.limit_widget.setValue(0)
 
-    def get_json(self):
+    def get(self):
+        super().get()
+        return data_rules.TotalLimitRule(self.limit_widget.value())
+
+    def get_config(self):
         return {"limit": self.limit_widget.value()}
 
     @classmethod
-    def from_json(cls, cfg, parent=None):
+    def from_config(cls, cfg, parent=None):
         self = cls(parent)
         self.limit_widget.setValue(cfg["limit"])
+        return self
+
+
+class ResolvedRuleView(RuleView):
+    title = "Resolved"
+
+    needs_settings = True
+
+    def configure_settings_group(self) -> None:
+        self.use_full = QCheckBox("use full", self)
+        self.groupgrid.addWidget(self.use_full, 0, 0)
+
+    def reset_settings_group(self):
+        self.use_full.setChecked(False)
+
+    def get(self):
+        super().get()
+        return data_rules.ResolvedRule(use_full=self.use_full.isChecked())
+
+    def get_config(self):
+        return {"use_full": self.use_full.isChecked()}
+
+    @classmethod
+    def from_config(cls, cfg: dict, parent=None):
+        self = cls(parent)
+        self.use_full.setChecked(cfg["use_full"])
         return self
 
 
 class ExistingRuleView(RuleView):
     title = "Existing"
 
-    bound_rule = data_rules.ExistingRule
     needs_settings = True
 
     def configure_settings_group(self):
@@ -166,18 +206,19 @@ class ExistingRuleView(RuleView):
         self.existing_list.clear()
 
     def get(self):
+        super().get()
         return data_rules.ExistingRule(
             folders=self.existing_list.toPlainText().splitlines(),
         )
 
-    def get_json(self):
+    def get_config(self):
         return {
             "list": self.existing_list.toPlainText().splitlines(),
             "exists_in": self.exists_in.currentText(),
         }
 
     @classmethod
-    def from_json(cls, cfg, parent=None):
+    def from_config(cls, cfg, parent=None):
         self = cls(parent)
         self.existing_list.setText("\n".join(cfg["list"]))
         self.exists_in.setCurrentText(cfg["exists_in"])
@@ -187,7 +228,6 @@ class ExistingRuleView(RuleView):
 class ResRuleView(RuleView):
     title = "Resolution"
 
-    bound_rule = image_rules.ResRule
     needs_settings = True
 
     def configure_settings_group(self):
@@ -214,7 +254,13 @@ class ResRuleView(RuleView):
         self.scale.setValue(4)
         self.crop.setChecked(True)
 
-    def get_json(self):
+    def get(self):
+        super().get()
+        return image_rules.ResRule(
+            min=self.min.value(), max=self.max.value(), crop=self.crop.isChecked(), scale=self.scale.value()
+        )
+
+    def get_config(self):
         return {
             "min": self.min.value(),
             "max": self.max.value(),
@@ -223,7 +269,7 @@ class ResRuleView(RuleView):
         }
 
     @classmethod
-    def from_json(cls, cfg, parent=None):
+    def from_config(cls, cfg, parent=None):
         self = cls(parent)
         self.min.setValue(cfg["min"])
         self.max.setValue(cfg["max"])
@@ -235,7 +281,6 @@ class ResRuleView(RuleView):
 class ChannelRuleView(RuleView):
     title = "Channels"
 
-    bound_rule = image_rules.ChannelRule
     needs_settings = True
 
     def configure_settings_group(self):
@@ -252,7 +297,11 @@ class ChannelRuleView(RuleView):
         self.min.setValue(1)
         self.max.setValue(3)
 
-    def get_json(self):
+    def get(self):
+        super().get()
+        return image_rules.ChannelRule(min_channels=self.min.value(), max_channels=self.max.value())
+
+    def get_config(self):
         return {
             "min": self.min.value(),
             "max": self.max.value(),
@@ -263,7 +312,6 @@ class HashRuleView(RuleView):
     title = "Hash"
     desc = "Uses imagehash functions to eliminate similar looking images"
 
-    bound_rule = image_rules.HashRule
     needs_settings = True
 
     def configure_settings_group(self):
@@ -276,14 +324,20 @@ class HashRuleView(RuleView):
         self.groupgrid.addWidget(QLabel("Conflict resolver column: ", self), 1, 0)
         self.groupgrid.addWidget(self.resolver, 2, 0, 1, 2)
 
-    def get_json(self):
+    def get(self):
+        super().get()
+        return image_rules.HashRule(
+            resolver=self.resolver.text() if not self.ignore_all_btn.isChecked() else "ignore_all"
+        )
+
+    def get_config(self):
         return {
             "resolver": self.resolver.text(),
             "ignore_all": self.ignore_all_btn.isChecked(),
         }
 
     @classmethod
-    def from_json(cls, cfg, parent=None):
+    def from_config(cls, cfg, parent=None):
         self = cls(parent)
         self.ignore_all_btn.setChecked(cfg["ignore_all"])
         self.resolver.setText(cfg["resolver"])

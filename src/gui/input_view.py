@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
+from re import S
 
 import cv2
 import wcmatch.glob as wglob
 from PySide6.QtCore import QRect, QThread, Signal, Slot
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QCheckBox,
     QComboBox,
     QFileDialog,
@@ -15,6 +17,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListView,
     QMenu,
     QPushButton,
     QScrollArea,
@@ -23,6 +26,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QTextEdit,
     QToolButton,
+    QTreeView,
     QWidget,
 )
 
@@ -55,9 +59,6 @@ class GathererThread(QThread):
     count = Signal(int)
     total = Signal(int)
     files = Signal(list)
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
 
     def run(self):
         print(f"Starting search in: '{self.source}' with expressions: {self.expressions}")
@@ -107,6 +108,18 @@ class InputView(FlowItem):
         self.groupgrid.addWidget(self.text, 0, 1)
         self.groupgrid.addWidget(self.fileselect, 0, 2)
 
+        self.filedialog = QFileDialog(self)
+        self.filedialog.setFileMode(QFileDialog.FileMode.Directory)
+        self.filedialog.setOption(QFileDialog.Option.ShowDirsOnly, True)
+        self.filedialog.setOption(QFileDialog.Option.DontResolveSymlinks, True)
+
+        fileview: QListView = self.filedialog.findChild(QListView, "listView")  # type: ignore
+        if fileview:
+            fileview.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        f_tree_view: QTreeView = self.filedialog.findChild(QTreeView)  # type: ignore
+        if f_tree_view:
+            f_tree_view.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+
     def configure_settings_group(self):
         self.gather_button = QToolButton(self)
         self.globexprs = QTextEdit(self)
@@ -116,6 +129,7 @@ class InputView(FlowItem):
         self.gatherer.files.connect(self.on_gathered)
         self.gatherer.started.connect(self.on_started)
         self.gatherer.finished.connect(self.on_finished)
+        self.gatherer.finished.connect(self.increment.emit)
 
         self.gatherer.flags = self.flags
 
@@ -129,7 +143,6 @@ class InputView(FlowItem):
     def _top_bar(self) -> list[QWidget]:
         top: list[QWidget] = super()._top_bar()
         self.toptext = QLabel(self)
-        self.toptext.setDisabled(True)
         self.filecount = QLabel(self)
 
         top[:1] += [self.toptext, self.filecount]
@@ -162,14 +175,14 @@ class InputView(FlowItem):
     def on_gathered(self, lst):
         self.gathered.emit({self.text.text(): lst})
 
-    def get_json(self):
+    def get_config(self):
         return {
             "file": self.text.text(),
             "expressions": self.globexprs.toPlainText().splitlines(),
         }
 
     @classmethod
-    def from_json(cls, cfg: dict, parent=None):
+    def from_config(cls, cfg: dict, parent=None):
         self = cls(parent)
         self.text.setText(cfg["file"])
         self.globexprs.setText("\n".join(cfg["expressions"]))
@@ -178,9 +191,15 @@ class InputView(FlowItem):
 
     @Slot()
     def select_folder(self):
-        filename = QFileDialog.getExistingDirectory(
-            self,
-            "Select output folder",
-            self.text.text() or str(Path.home()),
-        )
-        self.text.setText(filename)
+        # ! this as a whole is very fucky
+
+        self.filedialog.setDirectory(self.text.text() or str(Path.home()))
+        if self.filedialog.exec():
+            print(self.filedialog.selectedFiles())
+            files = self.filedialog.selectedFiles()
+
+            while len(files) > 1:
+                self.text.setText(files.pop(0))
+                self.duplicate.emit()
+
+            self.text.setText(files.pop(0))

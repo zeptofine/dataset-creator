@@ -46,16 +46,13 @@ class ProducerView(FlowItem):
         self.descriptionwidget.setText(self.desc)
         # return super().setup_widget()
 
-    @abstractmethod
-    def get(self):
-        """Evaluates the settings and returns a Producer instance"""
-
 
 class FileInfoProducerView(ProducerView):
     title = "File Info Producer"
     bound_producer = data_rules.FileInfoProducer
 
     def get(self):
+        super().get()
         return self.bound_producer()
 
 
@@ -64,6 +61,7 @@ class ImShapeProducerView(ProducerView):
     bound_producer = image_rules.ImShapeProducer
 
     def get(self):
+        super().get()
         return self.bound_producer()
 
 
@@ -79,14 +77,18 @@ class HashProducerView(ProducerView):
         self.groupgrid.addWidget(QLabel("Hash type: ", self), 0, 0)
         self.groupgrid.addWidget(self.hash_type, 0, 1)
 
-    def get_json(self) -> dict:
+    def reset_settings_group(self):
+        self.hash_type.setCurrentIndex(0)
+
+    def get_config(self) -> dict:
         return {"hash_type": self.hash_type.currentText()}
 
     @classmethod
-    def from_json(cls, cfg: dict, parent=None):
+    def from_config(cls, cfg: dict, parent=None):
         self = cls(parent)
         self.hash_type.setCurrentText(cfg["hash_type"])
         return self
 
     def get(self):
+        super().get()
         return self.bound_producer(image_rules.HASHERS(self.hash_type.currentText()))

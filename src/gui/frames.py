@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMenu,
+    QProgressBar,
     QScrollArea,
     QSizePolicy,
     QSpinBox,
@@ -44,21 +45,25 @@ class FlowItem(QFrame):  # TODO: Better name lmao
     closed = Signal()
     duplicate = Signal()
 
+    increment = Signal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Sunken)
         self.setLineWidth(2)
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Maximum)
 
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.ActionsContextMenu)
+        (collapse_action := QAction("collapse", self)).triggered.connect(self.toggle_group)
+        (duplicate_action := QAction("duplicate", self)).triggered.connect(self.duplicate.emit)
+        revert_action = QAction("revert to defaults", self)
+        revert_action.triggered.connect(self.reset_settings_group)
+        self.addActions([collapse_action, duplicate_action, revert_action])
+
         self.setup_widget()
         self.configure_settings_group()
         self.reset_settings_group()
         self.opened = True
-
-        self.setContextMenuPolicy(Qt.ContextMenuPolicy.ActionsContextMenu)
-        (collapse_action := QAction("collapse", self)).triggered.connect(self.toggle_group)
-        (duplicate_action := QAction("duplicate", self)).triggered.connect(self.duplicate.emit)
-        self.addActions([collapse_action, duplicate_action])
 
     def setup_widget(self):
         self._layout = QGridLayout()
@@ -99,17 +104,6 @@ class FlowItem(QFrame):  # TODO: Better name lmao
             widgets.append(self.uparrow)
             widgets.append(self.downarrow)
 
-        if self.needs_settings or self.desc:
-            self.dropdown = QToolButton()
-            self.dropdown.setText("⌤")
-            self.dropdown.clicked.connect(self.toggle_group)
-            widgets.append(self.dropdown)
-
-        self.revertbutton = QToolButton()
-        self.revertbutton.setIcon(QIcon.fromTheme("edit-undo"))
-        self.revertbutton.clicked.connect(self.reset_settings_group)
-        widgets.append(self.revertbutton)
-
         self.closebutton = QToolButton()
         self.closebutton.setText("X")
         self.closebutton.clicked.connect(self.closed)
@@ -120,6 +114,7 @@ class FlowItem(QFrame):  # TODO: Better name lmao
     @abstractmethod
     def get(self):
         """produces something the item represents"""
+        self.increment.emit()
 
     @abstractmethod
     def configure_settings_group(self) -> None:
@@ -160,16 +155,19 @@ class FlowItem(QFrame):  # TODO: Better name lmao
     # Saving and creating methods
 
     @abstractmethod
-    def get_json(self) -> dict:
+    def get_config(self) -> dict:
         return {}
 
     @classmethod
     @abstractmethod
-    def from_json(cls, cfg: dict, parent=None):
+    def from_config(cls, cfg: dict, parent=None):
         return cls(parent=parent)
 
 
 class FlowList(QGroupBox):  # TODO: Better name lmao
+    n = Signal(int)
+    total = Signal(int)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._layout = QGridLayout()
@@ -192,13 +190,26 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
         self.addbutton = QToolButton(self)
         self.addbutton.setText("+")
         self.addbutton.hide()
+        self.progressbar = QProgressBar(self)
+        self.progressbar.setFormat("%p%  %v/%m")
+        # self.n.connect(self.progresslabel.set_n)
+        # self.n.connect(lambda i: print(i))
+        # self.count = QLabel(self)
+        # self.total_count = QLabel(self)
+        # self.total.connect(lambda i: self.total_count.setText(f"/{i}"))
+        # self.total.connect(self.progressbar.setMaximum)
+        # self.n.connect(self.progressbar.setValue)
+        # self.n.connect(lambda i: self.count.setText(f"{i}"))
+        self.total.connect(self.progressbar.setMaximum)
+        self.n.connect(self.progressbar.setValue)
 
         self.addmenu = QMenu(self)
         self.addbox.setMenu(self.addmenu)
 
         self._layout.addWidget(self.addbox, 0, 0)
         self._layout.addWidget(self.addbutton, 0, 0)
-        self._layout.addWidget(self.scrollarea, 1, 0)
+        self._layout.addWidget(self.progressbar, 0, 1)
+        self._layout.addWidget(self.scrollarea, 1, 0, 1, 2)
 
     def register_item(self, item: type[FlowItem]):
         self.addmenu.addAction(item.title, lambda: self.initialize_item(item))
@@ -228,6 +239,7 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
         item.move_down.connect(lambda: self.move_item(item, 1))
         item.closed.connect(lambda: self.remove_item(item))
         item.duplicate.connect(lambda: self.duplicate_item(item))
+        item.increment.connect(self.increment_pbar)
 
     def remove_item(self, item: FlowItem):
         item.setGeometry(QRect(0, 0, 0, 0))
@@ -261,16 +273,24 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
 
     def duplicate_item(self, item: FlowItem):
         """duplicates an item"""
-        cfg = item.get_json()
-        new_item = item.from_json(cfg)
+        cfg = item.get_config()
+        new_item = item.from_config(cfg)
 
         self.add_item(new_item, self.box.indexOf(item) + 1)
 
+    def empty(self):
+        for item in self.items.copy():
+            self.remove_item(item)
+
     @Slot()
-    def get_cfg(self) -> list:
+    def increment_pbar(self):
+        self.n.emit(self.progressbar.value() + 1)
+
+    @Slot()
+    def get_config(self) -> list:
         return [
             ItemConfig(
-                data=item.get_json(),
+                data=item.get_config(),
                 enabled=item.enabled,
                 name=item.title or item.cfg_name,
                 open=item.opened,
@@ -280,10 +300,12 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
 
     def add_from_cfg(self, lst: list[ItemConfig]):
         for new_item in lst:
-            item = self.registered_items[new_item["name"]].from_json(new_item["data"], parent=self)
+            item = self.registered_items[new_item["name"]].from_config(new_item["data"], parent=self)
             item.enabled = new_item.get("enabled", True)
             item.opened = new_item.get("open", False)
             self.add_item(item)
 
     def get(self, include_not_enabled=False) -> list:
+        self.total.emit(len(self.items))
+        self.n.emit(0)
         return [item.get() for item in self.items if item.enabled or include_not_enabled]
