@@ -135,6 +135,7 @@ class BlacknWhitelistRule(Rule, FastComparable):
 class ExistingRule(Rule, FastComparable):
     def __init__(self, folders: list[str] | list[Path], recurse_func: Callable = lambda x: x) -> None:
         super().__init__()
+        assert folders, "No folders given to check for existing files"
         self.existing_list = ExistingRule._get_existing(*map(Path, folders))
         self.recurse_func: Callable[[Path], Path] = recurse_func
 
@@ -148,6 +149,19 @@ class ExistingRule(Rule, FastComparable):
     def _get_existing(*folders: Path) -> set:
         return set.intersection(
             *({file.relative_to(folder).with_suffix("") for file in get_file_list(folder, "*")} for folder in folders)
+        )
+
+
+class ResolvedRule(Rule, Comparable):
+    def __init__(self, use_full=False):
+        super().__init__()
+        self.use_full = use_full
+
+    def compare(self, selected: DataFrame, full: DataFrame) -> DataFrame:
+        return selected.filter(
+            col("path").is_in(
+                {Path(p).resolve(): p for p in (full if self.use_full else selected).get_column("path")}.values()
+            )
         )
 
 

@@ -48,7 +48,7 @@ class Producer:
         Producer.all_producers.append(cls)
 
     @staticmethod
-    def build_producer_schema(producers: Iterable[Producer]) -> list[dict[str, Expr | bool]]:
+    def build_schema(producers: Iterable[Producer]) -> list[dict[str, Expr | bool]]:
         dct = defaultdict(list)
         for producer in producers:
             exprs: list[dict[str, Expr | bool]] = producer()

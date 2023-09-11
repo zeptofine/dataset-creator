@@ -6,9 +6,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 import cv2
+import polars as pl
 import typer
 from cfg_param_wrapper import CfgDict, wrap_config
-from polars import col
+from polars import DataFrame, col
 from rich import print as rprint
 from tqdm import tqdm
 from typer import Option
@@ -17,7 +18,7 @@ from typing_extensions import Annotated
 import src.datarules.data_rules as drules
 import src.datarules.image_rules as irules
 from src.datarules.custom_toml import TomlCustomCommentDecoder, TomlCustomCommentEncoder
-from src.datarules.dataset_builder import DatasetBuilder
+from src.datarules.dataset_builder import DatasetBuilder, chunk_split
 from util.file_list import get_file_list, to_recursive
 from util.print_funcs import RichStepper, ipbar
 
@@ -262,12 +263,38 @@ def main(
     s.print("Populating df...")
 
     abs2relative: dict[str, Path] = {str((input_folder / pth).resolve()): pth for pth in image_list}
+    db.add_new_paths(set(abs2relative))
+    db_schema = db.type_schema
+    db.comply_to_schema(db_schema)
+    unfinished: DataFrame = db.get_unfinished()
+    if not unfinished.is_empty():
+        print(unfinished)
+        collected: list[DataFrame] = []
+        chunk: DataFrame
+        with (
+            tqdm(desc="Gathering...", unit="file", total=len(unfinished)) as total_t,
+            tqdm(unit="chunk", total=len(unfinished) // chunksize) as sub_t,
+        ):
+            for schemas, df in db.split_files_via_nulls(unfinished):
+                chunks = list(chunk_split(df, chunksize=cfg["chunksize"]))
+                sub_t.total = len(chunks)
+                sub_t.update(-sub_t.n)
+                for (idx, size), chunk in chunks:
+                    for schema in schemas:
+                        chunk = chunk.with_columns(**schema)
+                    chunk = chunk.select(db_schema)
+                    collected.append(chunk)
 
-    db.populate_df(
-        set(abs2relative),
-        save_interval=cfg["save_interval"],
-        chunksize=cfg["chunksize"],
-    )
+                    sub_t.set_postfix_str(str(idx))
+                    sub_t.update()
+                    total_t.update(size)
+        concatted = pl.concat(collected, how="diagonal")
+        # This breaks with datatypes like Array(3, pl.UInt32). Not sure why.
+        # `pyo3_runtime.PanicException: implementation error, cannot get ref Array(Null, 0) from Array(UInt32, 3)`
+        db.update(concatted)
+        db.save_df()
+    exit()
+
     s.print("Filtering...")
     filtered = db.filter(set(abs2relative), sort_col=sort_by)
     image_list = [abs2relative[image] for image in filtered]

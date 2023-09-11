@@ -3,13 +3,11 @@ import warnings
 from collections.abc import Collection, Iterable
 from datetime import datetime
 from pathlib import Path
-from typing import Generator, TypeVar
+from typing import Generator, Literal, TypeVar, overload
 
 import polars as pl
 from polars import DataFrame, Expr
-
-# from rich import print as rprint
-from tqdm import tqdm
+from polars.type_aliases import SchemaDefinition
 
 from .base_rules import Comparable, FastComparable, Producer, Rule
 
@@ -18,11 +16,10 @@ def current_time() -> datetime:
     return datetime.now().replace(microsecond=0)
 
 
-def _time(_=None) -> datetime:
-    return current_time()
-
-
 T = TypeVar("T")
+
+DataTypeSchema = dict[str, pl.DataType | type]
+ExprDict = dict[str, Expr | bool]
 
 
 class DatasetBuilder:
@@ -34,23 +31,13 @@ class DatasetBuilder:
 
         self.filepath: Path = db_path
 
-        self.basic_schema: dict[str, pl.DataType | type] = {"path": str}
+        self.basic_schema: DataTypeSchema = {"path": str}
 
-        self.___df = None
-
-    # only get __df when __df is needed
-    @property
-    def __df(self):
-        if self.___df is None:
-            if self.filepath.exists():
-                self.___df = pl.read_ipc(self.filepath, use_pyarrow=True, memory_map=False)
-            else:
-                self.___df = DataFrame(schema=self.basic_schema)
-        return self.___df
-
-    @__df.setter
-    def __df(self, df):
-        self.___df = df
+        self.__df: DataFrame
+        if self.filepath.exists():
+            self.__df = pl.read_ipc(self.filepath, use_pyarrow=True, memory_map=False)
+        else:
+            self.__df = DataFrame(schema=self.basic_schema)
 
     def add_rules(self, rules: Iterable[type[Rule] | Rule]) -> None:
         """Adds rules to the rule list. Rules will be instantiated separately."""
@@ -67,8 +54,9 @@ class DatasetBuilder:
         else:
             raise self.NotARuleError(rule)
 
-    def get_type_schema(self) -> dict[str, pl.DataType | type]:
-        schema: dict[str, pl.DataType | type] = self.basic_schema.copy()
+    @property
+    def type_schema(self) -> DataTypeSchema:
+        schema: DataTypeSchema = self.basic_schema.copy()
         schema.update({col: dtype for producer in self.producers for col, dtype in producer.produces.items()})
         return schema
 
@@ -96,103 +84,100 @@ class DatasetBuilder:
     def generate_config(self) -> dict:
         return {name: rule.get_cfg() for name, rule in self.unready_rules.items()}
 
-    def populate_df(
+    def add_new_paths(self, pths: set[str]) -> bool:
+        """
+        - Adds paths to the df.
+
+        Parameters
+        ----------
+        pths : set[os.PathLike]
+            The paths to add to the dataframe.
+
+        Returns
+        -------
+        bool
+            whether any new paths were added to the dataframe
+        """
+        if new_paths := pths - set(self.__df.get_column("path")):
+            self.__df = pl.concat((self.__df, DataFrame({"path": list(new_paths)})), how="diagonal")
+            return True
+        return False
+
+    def get_unfinished_producers(self) -> set[Producer]:
+        """
+        gets producers that do not have their column requirements fulfilled.
+
+        Returns
+        -------
+        set[Producer]
+            unfinished producers.
+        """
+        return {
+            producer
+            for producer in self.producers
+            if not set(producer.produces) - set(self.__df.columns)
+            and not self.__df.filter(pl.all_horizontal(pl.col(col).is_null() for col in producer.produces)).is_empty()
+        }
+
+    def unfinished_by_col(self, df: DataFrame, cols: Iterable[str] | None = None) -> DataFrame:
+        if cols is None:
+            cols = {*self.type_schema} & set(df.columns)
+        return df.filter(pl.any_horizontal(pl.col(col).is_null() for col in cols))
+
+    def split_files_via_nulls(
         self,
-        lst: Iterable[str],
-        use_tqdm=True,
-        save_interval: int = 60,
-        save=True,
-        chunksize: int = 100,
-    ):
+        df: DataFrame,
+        schema: list[ExprDict] | None = None,
+    ) -> Generator[tuple[list[ExprDict], DataFrame], None, None]:
+        """
+        groups a df by nulls, and splits a schema based on the nulls
+
+        Parameters
+        ----------
+        df : DataFrame
+            the dataframe to split
+        schema : list[ExprDict] | None, optional
+            the schema to combine with the groups, by default None
+
+        Yields
+        ------
+        Generator[tuple[list[ExprDict], DataFrame], None, None]
+            each group is given separately
+        """
+        if schema is None:
+            schema = Producer.build_schema(self.get_unfinished_producers())
+
+        # Split the data into groups based on null values in columns
+        for nulls, group in df.groupby(*(pl.col(col).is_null() for col in df.columns)):
+            truth_table = {
+                col
+                for col, truth in zip(  # type: ignore
+                    df.columns,
+                    *nulls if hasattr(nulls, "__next__") else (nulls,),
+                )
+                if not truth
+            }
+            yield (
+                blacklist_schema(schema, truth_table),
+                group,
+            )
+
+    def df_with_types(self, types: DataTypeSchema | None = None):
+        if types is None:
+            types = self.type_schema
+        return self.comply_to_schema(types).with_columns(types)
+
+    def get_unfinished(
+        self,
+    ) -> DataFrame:
         assert self.producers, "No producers specified"
 
-        lst = set(lst)
-        # add new paths to the df
-        if new_paths := lst - set(self.__df.get_column("path")):
-            self.__df = pl.concat((self.__df, DataFrame({"path": list(new_paths)})), how="diagonal")
-
         # check if producers are completely finished
-        potential_producers: set[Producer] = self.producers.copy()
-        for producer in self.producers:
-            if set(producer.produces) - set(self.__df.columns):
-                continue
-            if self.__df.filter(pl.all(pl.col(col).is_null() for col in producer.produces)).is_empty():
-                potential_producers.remove(producer)
-
-        type_schema: dict[str, pl.DataType | type] = self.get_type_schema()
-        build_schemas: list[dict[str, Expr | bool]] = Producer.build_producer_schema(potential_producers)
-        self.__df = _comply_to_schema(self.__df, type_schema)
+        type_schema: DataTypeSchema = self.type_schema
+        self.comply_to_schema(type_schema, in_place=True)
         updated_df: DataFrame = self.__df.with_columns(type_schema)
-        search_cols: set[str] = {*type_schema}
-
-        unfinished: DataFrame = updated_df.filter(
-            pl.any(pl.col(col).is_null() for col in updated_df.columns if col in search_cols)
-        )
-
-        if len(unfinished):
-
-            def trigger_save(save_timer: datetime, collected: list[DataFrame]) -> tuple[datetime, list[DataFrame]]:
-                if save and ((new_time := datetime.now()) - save_timer).total_seconds() > save_interval:
-                    self.__df = self.__df.update(pl.concat(collected, how="diagonal"), on="path")
-                    if save:
-                        self.save_df()
-                    return new_time, []
-                return save_timer, collected
-
-            save_timer: datetime = datetime.now()
-            collected: list[DataFrame] = []
-
-            # Split the data into groups based on null values in columns
-            splitted = (
-                (
-                    dict(zip(unfinished.columns, *nulls if hasattr(nulls, "__next__") else (nulls,))),  # type: ignore
-                    group,
-                )
-                for nulls, group in unfinished.groupby(*(pl.col(col).is_null() for col in unfinished.columns))
-            )
-
-            splitted_with_schema: Generator[tuple[list[dict[str, Expr | bool]], DataFrame], None, None] = (
-                (
-                    self.blacklist_schema(build_schemas, {col for col, truth in truth_table.items() if not truth}),
-                    df,
-                )
-                for truth_table, df in splitted
-            )
-
-            chunk: DataFrame
-            if not use_tqdm:
-                for schemas, df in splitted_with_schema:
-                    for _, chunk in _split_into_chunks(df, chunksize=chunksize):
-                        for schema in schemas:
-                            chunk = chunk.with_columns(**schema)
-                        collected.append(chunk.select(type_schema))
-                        save_timer, collected = trigger_save(save_timer, collected)
-            else:
-                with (
-                    tqdm(desc="Gathering...", unit="file", total=len(unfinished)) as total_t,
-                    tqdm(unit="chunk", total=len(unfinished) // chunksize) as sub_t,
-                ):
-                    for schemas, df in splitted_with_schema:
-                        chunks = list(_split_into_chunks(df, chunksize=chunksize))
-                        sub_t.total = len(chunks)
-                        sub_t.update(-sub_t.n)
-                        for (idx, size), chunk in chunks:
-                            for schema in schemas:
-                                chunk = chunk.with_columns(**schema)
-                            chunk = chunk.select(type_schema)
-                            collected.append(chunk)
-                            save_timer, collected = trigger_save(save_timer, collected)
-
-                            sub_t.set_postfix_str(str(idx))
-                            sub_t.update()
-                            total_t.update(size)
-
-            # This breaks with datatypes like Array(3, pl.UInt32). Not sure why.
-            # `pyo3_runtime.PanicException: implementation error, cannot get ref Array(Null, 0) from Array(UInt32, 3)`
-            self.__df = self.__df.update(pl.concat(collected, how="diagonal"), on="path")
-            if save:
-                self.save_df()
-        return
+        unfinished: DataFrame = self.unfinished_by_col(updated_df)
+        return unfinished
 
     def filter(self, lst, sort_col="path") -> Iterable[str]:
         assert sort_col in self.__df.columns, f"'{sort_col}' is not in {self.__df.columns}"
@@ -228,19 +213,15 @@ class DatasetBuilder:
 
         return combinations
 
-    def save_df(self) -> None:
+    def save_df(self, pth: str | Path | None = None) -> None:
         """saves the dataframe to self.filepath"""
-        self.__df.write_ipc(self.filepath)
+        self.__df.write_ipc(pth or self.filepath)
 
-    def get_path_data(self, pths: Collection[str]):
-        return self.__df.filter(pl.col("path").is_in(pths))
-
-    @staticmethod
-    def blacklist_schema(schema: list[dict[str, Expr | bool]], blacklist: Iterable) -> list[dict[str, Expr | bool]]:
-        return [out for dct in schema if (out := {k: v for k, v in dct.items() if k not in blacklist})]
+    def update(self, df: DataFrame, on="path", how: Literal["left", "inner"] = "left"):
+        self.__df = self.__df.update(df, on=on, how=how)
 
     @property
-    def df(self):
+    def df(self) -> DataFrame:
         return self.__df
 
     class NotARuleError(TypeError):
@@ -259,19 +240,38 @@ class DatasetBuilder:
         pass
 
     def __repr__(self) -> str:
-        attrlist: list[str] = [f"{key}={val!r}" for key, val in self.__dict__.items()]
+        attrlist: list[str] = [
+            f"{key}={val!r}" for key, val in self.__dict__.items() if all(k not in key for k in ("__"))
+        ]
         return f"{self.__class__.__name__}({', '.join(attrlist)})"
 
+    @overload
+    def comply_to_schema(self, schema: SchemaDefinition, in_place: Literal[True]) -> None:
+        ...
 
-def _comply_to_schema(data_frame: DataFrame, schema) -> DataFrame:
-    """adds columns from the schema to the dataframe. (not in-place)"""
-    return pl.concat((data_frame, DataFrame(schema=schema)), how="diagonal")
+    @overload
+    def comply_to_schema(self, schema: SchemaDefinition, in_place: Literal[False] = False) -> DataFrame:
+        ...
+
+    def comply_to_schema(self, schema: SchemaDefinition, in_place=False) -> DataFrame | None:
+        new_df: DataFrame = pl.concat((self.__df, DataFrame(schema=schema)), how="diagonal")
+        if in_place:
+            self.__df = new_df
+        return new_df
 
 
-def _split_into_chunks(df: DataFrame, chunksize: int, column="_idx"):
+def chunk_split(
+    df: DataFrame,
+    chunksize: int,
+    col_name: str = "_idx",
+):
     return (
-        ((idx, len(part)), part.drop(column))
-        for idx, part in df.with_row_count(column)
-        .with_columns(pl.col(column) // chunksize)
-        .groupby(column, maintain_order=True)
+        ((idx, len(part)), part.drop(col_name))
+        for idx, part in df.with_row_count(col_name)
+        .with_columns(pl.col(col_name) // chunksize)
+        .groupby(col_name, maintain_order=True)
     )
+
+
+def blacklist_schema(schema: list[ExprDict], blacklist: Collection) -> list[ExprDict]:
+    return [out for dct in schema if (out := {k: v for k, v in dct.items() if k not in blacklist})]

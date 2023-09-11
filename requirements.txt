@@ -9,4 +9,8 @@ pyarrow
 python-dateutil
 rich
 tqdm
+
+# GUI requirements
+wcmatch
 typer[all]
+pyside6-essentials
