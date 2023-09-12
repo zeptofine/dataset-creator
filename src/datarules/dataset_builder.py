@@ -9,7 +9,7 @@ import polars as pl
 from polars import DataFrame, Expr
 from polars.type_aliases import SchemaDefinition
 
-from .base_rules import Comparable, FastComparable, Producer, Rule
+from .base_rules import Comparable, ExprDict, FastComparable, Producer, Rule
 
 
 def current_time() -> datetime:
@@ -19,7 +19,6 @@ def current_time() -> datetime:
 T = TypeVar("T")
 
 DataTypeSchema = dict[str, pl.DataType | type]
-ExprDict = dict[str, Expr | bool]
 
 
 class DatasetBuilder:
@@ -130,7 +129,7 @@ class DatasetBuilder:
         schema: list[ExprDict] | None = None,
     ) -> Generator[tuple[list[ExprDict], DataFrame], None, None]:
         """
-        groups a df by nulls, and splits a schema based on the nulls
+        groups a df by nulls, and gets a schema based on the nulls
 
         Parameters
         ----------
@@ -145,8 +144,7 @@ class DatasetBuilder:
             each group is given separately
         """
         if schema is None:
-            schema = Producer.build_schema(self.get_unfinished_producers())
-
+            schema = Producer.build_schema(self.producers)
         # Split the data into groups based on null values in columns
         for nulls, group in df.groupby(*(pl.col(col).is_null() for col in df.columns)):
             truth_table = {

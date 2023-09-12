@@ -9,7 +9,7 @@ import cv2
 import polars as pl
 import typer
 from cfg_param_wrapper import CfgDict, wrap_config
-from polars import DataFrame, col
+from polars import DataFrame
 from rich import print as rprint
 from tqdm import tqdm
 from typer import Option
@@ -268,7 +268,6 @@ def main(
     db.comply_to_schema(db_schema)
     unfinished: DataFrame = db.get_unfinished()
     if not unfinished.is_empty():
-        print(unfinished)
         collected: list[DataFrame] = []
         chunk: DataFrame
         with (
@@ -276,6 +275,9 @@ def main(
             tqdm(unit="chunk", total=len(unfinished) // chunksize) as sub_t,
         ):
             for schemas, df in db.split_files_via_nulls(unfinished):
+                if verbose:
+                    print(df)
+                    print(schemas)
                 chunks = list(chunk_split(df, chunksize=cfg["chunksize"]))
                 sub_t.total = len(chunks)
                 sub_t.update(-sub_t.n)
@@ -288,16 +290,13 @@ def main(
                     sub_t.set_postfix_str(str(idx))
                     sub_t.update()
                     total_t.update(size)
-        concatted = pl.concat(collected, how="diagonal")
+        concatted: DataFrame = pl.concat(collected, how="diagonal")
         # This breaks with datatypes like Array(3, pl.UInt32). Not sure why.
         # `pyo3_runtime.PanicException: implementation error, cannot get ref Array(Null, 0) from Array(UInt32, 3)`
         db.update(concatted)
         db.save_df()
-    exit()
-
     s.print("Filtering...")
-    filtered = db.filter(set(abs2relative), sort_col=sort_by)
-    image_list = [abs2relative[image] for image in filtered]
+    image_list = [abs2relative[image] for image in db.filter(set(abs2relative), sort_col=sort_by)]
 
     if not check_for_images(image_list):
         return 0
@@ -308,7 +307,7 @@ def main(
     # * convert files. Finally!
     try:
         pargs: list[Scenario] = [
-            Scenario(path, input_folder / path, (input_folder / path).resolve(), *hrlr_pair(path), scale)
+            Scenario(path, (full := input_folder / path), full.resolve(), *hrlr_pair(path), scale)
             for path in image_list
         ]
         print(len(pargs))
@@ -316,7 +315,6 @@ def main(
             for file in t:
                 if verbose:
                     print()
-                    print(db.__df.filter(col("path") == str(file.resolved_path)))  # I can't imagine this is fast
                     if file.lr_path is not None:
                         rprint(f"├hr -> '{file.hr_path}'")
                         rprint(f"└lr -> '{file.lr_path}'")
