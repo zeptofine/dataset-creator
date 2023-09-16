@@ -18,17 +18,24 @@ if TYPE_CHECKING:
 
     from polars import Expr
 
-STAT_TRACKED = ("st_mode", "st_ino", "st_size", "st_atime", "st_mtime", "st_ctime")
+STAT_TRACKED = ("st_size", "st_atime", "st_mtime", "st_ctime")
 
 
 def stat2dict(result: os.stat_result) -> dict:
     return {k: getattr(result, k) for k in dir(result) if k in STAT_TRACKED}
 
 
+def stat(pth):
+    result = os.stat(pth)  # noqa: PTH116
+    return stat2dict(result)
+
+
 class FileInfoProducer(Producer):
     produces = MappingProxyType(
         {
             "mtime": Datetime("ms"),
+            "atime": Datetime("ms"),
+            "ctime": Datetime("ms"),
             "size": int,
         }
     )
@@ -38,14 +45,11 @@ class FileInfoProducer(Producer):
             {"stat": col("path").apply(stat)},
             {
                 "mtime": col("stat").struct.field("st_mtime").apply(timestamp2datetime).cast(Datetime("ms")),
+                "atime": col("stat").struct.field("st_ctime").apply(timestamp2datetime).cast(Datetime("ms")),
+                "ctime": col("stat").struct.field("st_atime").apply(timestamp2datetime).cast(Datetime("ms")),
                 "size": col("stat").struct.field("st_size"),
             },
         ]
-
-
-def stat(pth):
-    result = os.stat(pth)  # noqa: PTH116
-    return stat2dict(result)
 
 
 def timestamp2datetime(mtime: int) -> datetime:
@@ -60,7 +64,7 @@ def get_size(path: str):
     return os.stat(path).st_size  # noqa: PTH116
 
 
-class StatRule(Rule, FastComparable):
+class StatRule(Rule):
     config_keyword = "stats"
 
     def __init__(
@@ -69,31 +73,29 @@ class StatRule(Rule, FastComparable):
         after: Annotated[str, "Only get items after this threshold"] = "1980",
     ) -> None:
         super().__init__()
-        self.requires = Column(self, "mtime", Datetime("ms"))
+        self.requires = Column("mtime", Datetime("ms"))
+
+        expr: Expr | bool = True
 
         self.before: datetime | None = None
         self.after: datetime | None = None
-        if before is not None:
-            self.before = timeparser.parse(before)
         if after is not None:
             self.after = timeparser.parse(after)
+            expr &= self.after < col("mtime")
+        if before is not None:
+            self.before = timeparser.parse(before)
+            expr &= self.before > col("mtime")
         if self.before is not None and self.after is not None and self.after > self.before:
             raise self.AgeError(self.after, self.before)
 
-    def fast_comp(self) -> Expr | bool:
-        param: Expr | bool = True
-        if self.after:
-            param &= self.after < col("mtime")
-        if self.before:
-            param &= self.before > col("mtime")
-        return param
+        self.comparer = FastComparable(expr)
 
     class AgeError(timeparser.ParserError):
         def __init__(self, older, newer):
             super().__init__(f"{older} is older than {newer}")
 
 
-class BlacknWhitelistRule(Rule, FastComparable):
+class BlacknWhitelistRule(Rule):
     config_keyword = "blackwhitelists"
 
     def __init__(
@@ -108,19 +110,18 @@ class BlacknWhitelistRule(Rule, FastComparable):
         self.blacklist: list[str] | None = blacklist
         self.exclusive: bool = exclusive
 
-    def fast_comp(self) -> Expr | bool:
-        args: Expr | bool = True
+        expr: Expr | bool = True
+
         if self.whitelist:
             for item in self.whitelist:
                 if self.exclusive:
-                    args &= col("path").str.contains(item)
+                    expr &= col("path").str.contains(item)
                 else:
-                    args |= col("path").str.contains(item)
-
+                    expr |= col("path").str.contains(item)
         if self.blacklist:
             for item in self.blacklist:
-                args &= col("path").str.contains(item).is_not()
-        return args
+                expr &= col("path").str.contains(item).is_not()
+        self.comparer = FastComparable(expr)
 
     @classmethod
     def get_cfg(cls):
@@ -132,15 +133,13 @@ class BlacknWhitelistRule(Rule, FastComparable):
         }
 
 
-class ExistingRule(Rule, FastComparable):
+class ExistingRule(Rule):
     def __init__(self, folders: list[str] | list[Path], recurse_func: Callable = lambda x: x) -> None:
         super().__init__()
         assert folders, "No folders given to check for existing files"
         self.existing_list = ExistingRule._get_existing(*map(Path, folders))
         self.recurse_func: Callable[[Path], Path] = recurse_func
-
-    def fast_comp(self) -> Expr | bool:
-        return col("path").apply(self.intersection)
+        self.comparer = FastComparable(col("path").apply(self.intersection))
 
     def intersection(self, path):
         return self.recurse_func(path).with_suffix("") not in self.existing_list
@@ -152,10 +151,11 @@ class ExistingRule(Rule, FastComparable):
         )
 
 
-class ResolvedRule(Rule, Comparable):
+class ResolvedRule(Rule):
     def __init__(self, use_full=False):
         super().__init__()
         self.use_full = use_full
+        self.comparer = Comparable(self.compare)
 
     def compare(self, selected: DataFrame, full: DataFrame) -> DataFrame:
         return selected.filter(
@@ -165,12 +165,13 @@ class ResolvedRule(Rule, Comparable):
         )
 
 
-class TotalLimitRule(Rule, Comparable):
+class TotalLimitRule(Rule):
     config_keyword = "limit"
 
     def __init__(self, total=1000):
         super().__init__()
         self.total = total
+        self.comparer = Comparable(self.compare)
 
     def compare(self, selected: DataFrame, _) -> DataFrame:
         return selected.head(self.total)

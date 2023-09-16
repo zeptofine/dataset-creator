@@ -69,7 +69,7 @@ class FlowItem(QFrame):  # TODO: Better name lmao
         self._layout = QGridLayout()
         self.setLayout(self._layout)
 
-        top_bar = self._top_bar()
+        top_bar: list[QWidget] = self._top_bar()
         for idx, widget in enumerate(top_bar):
             self._layout.addWidget(widget, 0, idx)
 
@@ -192,14 +192,7 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
         self.addbutton.hide()
         self.progressbar = QProgressBar(self)
         self.progressbar.setFormat("%p%  %v/%m")
-        # self.n.connect(self.progresslabel.set_n)
-        # self.n.connect(lambda i: print(i))
-        # self.count = QLabel(self)
-        # self.total_count = QLabel(self)
-        # self.total.connect(lambda i: self.total_count.setText(f"/{i}"))
-        # self.total.connect(self.progressbar.setMaximum)
-        # self.n.connect(self.progressbar.setValue)
-        # self.n.connect(lambda i: self.count.setText(f"{i}"))
+
         self.total.connect(self.progressbar.setMaximum)
         self.n.connect(self.progressbar.setValue)
 
@@ -248,8 +241,7 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
         self.items.remove(item)
 
     def move_item(self, item: FlowItem, direction: int):
-        """
-        moves items up and down the list via +n or -n
+        """moves items up (-) and down (+) the list
 
         Parameters
         ----------
@@ -261,11 +253,7 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
         index: int = self.box.indexOf(item)
         if index == -1:
             return
-        newindex = index + direction
-        if newindex < 0:
-            return
-        if newindex >= self.box.count():
-            return
+        newindex = min(max(index + direction, 0), self.box.count())
 
         self.box.removeWidget(item)
         self.box.insertWidget(newindex, item)
@@ -273,10 +261,10 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
 
     def duplicate_item(self, item: FlowItem):
         """duplicates an item"""
-        cfg = item.get_config()
-        new_item = item.from_config(cfg)
-
-        self.add_item(new_item, self.box.indexOf(item) + 1)
+        self.add_item(
+            item.from_config(item.get_config(), parent=self),
+            self.box.indexOf(item) + 1,
+        )
 
     def empty(self):
         for item in self.items.copy():
@@ -300,7 +288,7 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
 
     def add_from_cfg(self, lst: list[ItemConfig]):
         for new_item in lst:
-            item = self.registered_items[new_item["name"]].from_config(new_item["data"], parent=self)
+            item: FlowItem = self.registered_items[new_item["name"]].from_config(new_item["data"], parent=self)
             item.enabled = new_item.get("enabled", True)
             item.opened = new_item.get("open", False)
             self.add_item(item)
@@ -308,4 +296,6 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
     def get(self, include_not_enabled=False) -> list:
         self.total.emit(len(self.items))
         self.n.emit(0)
-        return [item.get() for item in self.items if item.enabled or include_not_enabled]
+        if include_not_enabled:
+            return list(map(FlowItem.get, self.items))
+        return [item.get() for item in self.items if item.enabled]

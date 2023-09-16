@@ -63,7 +63,7 @@ CPU_COUNT = os.cpu_count()
 PROGRAM_ORIGIN = Path(__file__).parent
 
 
-class Config(TypedDict):
+class MainConfig(TypedDict):
     inputs: list[ItemConfig]
     producers: list[ItemConfig]
     rules: list[ItemConfig]
@@ -158,10 +158,10 @@ class Window(QWidget):
         if not cfg_path.exists():
             self.save_config()
         with self.cfg_path.open("r") as f:
-            self.load_cfg(Config(json.load(f)))
+            self.load_cfg(MainConfig(json.load(f)))
 
-    def get_config(self):
-        return Config(
+    def get_config(self) -> MainConfig:
+        return MainConfig(
             {
                 "inputs": self.inputlist.get_config(),
                 "output": self.outputlist.get_config(),
@@ -178,7 +178,7 @@ class Window(QWidget):
 
     @catch_loading
     @Slot(dict)
-    def load_cfg(self, cfg):
+    def load_cfg(self, cfg: MainConfig):
         self.inputlist.empty()
         self.producerlist.empty()
         self.rulelist.empty()

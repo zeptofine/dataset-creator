@@ -112,7 +112,7 @@ class RichStepper(Stepper):
             self._print(f"\n[{self.stepcolor}]{self.step}:[/{self.stepcolor}]", **kwargs)
         return self
 
-    def print(self, *lines, **kwargs):
+    def print(self, *lines, **_):
         if isinstance(lines[0], int) or str(lines[0]).isdigit():
             level = int(lines[0])
             lines = lines[1:]

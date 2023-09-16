@@ -2,37 +2,51 @@ from __future__ import annotations
 
 import inspect
 import sys
-from abc import abstractmethod
 from collections import defaultdict
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import Enum, EnumType
 from types import MappingProxyType
-from typing import Any, ClassVar, Iterable, Self
+from typing import ClassVar, Self
 
 from polars import DataFrame, Expr, PolarsDataType
 
+PartialDataFrame = FullDataFrame = DataFrame
+
 
 class Comparable:
-    @abstractmethod
-    def compare(self, selected: DataFrame, full: DataFrame) -> DataFrame:
-        """Uses all collected data to return a new list of only valid images, depending on what the filter does."""
-        raise NotImplementedError
+    func: Callable[[PartialDataFrame, FullDataFrame], DataFrame]
+
+    def __init__(self, func: Callable[[PartialDataFrame, FullDataFrame], DataFrame]):
+        self.func = func
+
+    def __call__(self, *args, **kwargs):
+        return self.func(*args, **kwargs)
+
+    def __repr__(self):
+        return f"<Comparable {self.func.__name__}>"
 
 
 class FastComparable:
-    @abstractmethod
-    def fast_comp(self) -> Expr | bool:
-        """Returns an Expr that can be used to filter more efficiently"""
-        raise NotImplementedError
+    expr: Expr | bool
+
+    def __init__(self, expr: Expr | bool):
+        self.expr = expr
+
+    def __call__(self) -> Expr | bool:
+        return self.expr
 
 
 @dataclass(frozen=True)
 class Column:
-    """A class defining what is in a column which a filter may use to apply a"""
+    """A class defining a column that a filter may need"""
 
-    source: Rule | None
     name: str
     dtype: PolarsDataType | type | None = None
+
+
+ExprDict = dict[str, Expr | bool]
+ProducerResult = list[ExprDict]
 
 
 class Producer:
@@ -42,25 +56,12 @@ class Producer:
     all_producers: ClassVar[list[type[Producer]]] = []
 
     def __init__(self):
-        pass
+        ...
 
     def __init_subclass__(cls) -> None:
         Producer.all_producers.append(cls)
 
-    @staticmethod
-    def build_schema(producers: Iterable[Producer]) -> list[dict[str, Expr | bool]]:
-        dct = defaultdict(list)
-        for producer in producers:
-            exprs: list[dict[str, Expr | bool]] = producer()
-            for idx, exprdct in enumerate(exprs):
-                dct[idx].append(exprdct)
-        return [Producer._build_producer_schema(sequence) for sequence in list(dct.values())]
-
-    @staticmethod
-    def _build_producer_schema(exprs: list[dict[str, Expr | bool]]):
-        return {col: expr for expression in exprs for col, expr in expression.items()}
-
-    def __call__(self) -> list[dict[str, Expr | bool]]:
+    def __call__(self) -> ProducerResult:
         raise NotImplementedError
 
     def __repr__(self) -> str:
@@ -71,13 +72,28 @@ class Producer:
         return f"{self.__class__.__name__}({', '.join(attrlist)})"
 
 
+def _combine_schema(exprs: ProducerResult) -> ExprDict:
+    return {col: expr for expression in exprs for col, expr in expression.items()}
+
+
+def combine_schema(producers: Iterable[Producer]) -> ProducerResult:
+    dct = defaultdict(list)
+    for producer in producers:
+        exprs: ProducerResult = producer()
+        for idx, exprdct in enumerate(exprs):
+            dct[idx].append(exprdct)
+    return [_combine_schema(sequence) for sequence in dct.values()]
+
+
 class Rule:
     """An abstract DataFilter format, for use in DatasetBuilder."""
 
     config_keyword: str
+    requires: Column | tuple[Column, ...]
+    comparer: Comparable | FastComparable
 
     def __init__(self) -> None:
-        self.requires: Column | tuple[Column, ...] = ()
+        self.requires = ()
 
     @classmethod
     def from_cfg(cls, *args, **kwargs) -> Self:
@@ -85,7 +101,7 @@ class Rule:
 
     @classmethod
     def get_cfg(cls) -> dict:
-        cfg: dict[str, Any] = {}
+        cfg = {}
         module = sys.modules[cls.__module__]
         for key, val in list(inspect.signature(cls.__init__).parameters.items())[1:]:
             if issubclass(type(val.default), Enum):

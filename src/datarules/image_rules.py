@@ -50,7 +50,7 @@ class ImShapeProducer(Producer):
         ]
 
 
-class ResRule(Rule, FastComparable):
+class ResRule(Rule):
     """A filter checking the size of an image."""
 
     config_keyword = "resolution"
@@ -64,44 +64,31 @@ class ResRule(Rule, FastComparable):
     ) -> None:
         super().__init__()
         self.requires = (
-            Column(self, "width", int),
-            Column(self, "height", int),
+            Column("width", int),
+            Column("height", int),
         )
-        self.min: int | None = min
-        self.max: int | None = max
-        self.crop: bool | None = crop
-        self.scale: int | None = scale
 
-    def fast_comp(self) -> Expr | bool:
-        if self.crop:
-            return (pl.min_horizontal(col("width"), col("height")) // self.scale * self.scale >= self.min) & (
-                pl.max_horizontal(col("width"), col("height")) // self.scale * self.scale <= self.max
+        if crop:
+            self.comparer = FastComparable(
+                (pl.min_horizontal(col("width"), col("height")) // scale * scale >= min)
+                & (pl.max_horizontal(col("width"), col("height")) // scale * scale <= max)
             )
-        return (pl.min_horizontal(col("width"), col("height")) >= self.min) & (
-            pl.max_horizontal(col("width"), col("height")) <= self.max
-        )
-
-    def is_valid(self, lst: Iterable[int]) -> bool:
-        lst = set(lst)
-        return not ((self.min and min(lst) < self.min) or (self.max and max(lst) > self.max))
-
-    def resize(self, i) -> int:
-        return (i // self.scale) * self.scale
+        else:
+            self.comparer = FastComparable(
+                (pl.min_horizontal(col("width"), col("height")) >= min)
+                & (pl.max_horizontal(col("width"), col("height")) <= max)
+            )
 
 
-class ChannelRule(Rule, FastComparable):
+class ChannelRule(Rule):
     """Checks the number of channels in the image."""
 
     config_keyword = "channels"
 
     def __init__(self, min_channels=1, max_channels=4) -> None:
         super().__init__()
-        self.requires = Column(self, "channels", int)
-        self.min_channels = min_channels
-        self.max_channels = max_channels
-
-    def fast_comp(self) -> Expr | bool:
-        return (self.min_channels <= col("channels")) & (col("channels") <= self.max_channels)
+        self.requires = Column("channels", int)
+        self.comparer = FastComparable((min_channels <= col("channels")) & (col("channels") <= max_channels))
 
 
 def get_size(pth):
@@ -151,18 +138,17 @@ class HashProducer(Producer):
         return str(self.hasher(Image.open(pth)))
 
 
-class HashRule(Rule, Comparable):
+class HashRule(Rule):
     config_keyword = "hashing"
 
-    def __init__(
-        self, resolver: str | Literal["ignore_all"] = "ignore_all", include_only_partial: bool = False
-    ) -> None:
+    def __init__(self, resolver: str | Literal["ignore_all"] = "ignore_all") -> None:
         super().__init__()
 
-        self.requires = Column(self, "hash", str)
+        self.requires = Column("hash", str)
         if resolver != "ignore_all":
-            self.requires = (self.requires, Column(self, resolver))
+            self.requires = (self.requires, Column(resolver))
         self.resolver: Expr | bool = {"ignore_all": False}.get(resolver, col(resolver) == col(resolver).max())
+        self.comparer = Comparable(self.compare)
 
     def compare(self, partial: DataFrame, full: DataFrame) -> DataFrame:
         return (

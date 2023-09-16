@@ -9,7 +9,7 @@ import polars as pl
 from polars import DataFrame, Expr
 from polars.type_aliases import SchemaDefinition
 
-from .base_rules import Comparable, ExprDict, FastComparable, Producer, Rule
+from .base_rules import Comparable, ExprDict, FastComparable, Producer, Rule, combine_schema
 
 
 def current_time() -> datetime:
@@ -144,7 +144,7 @@ class DatasetBuilder:
             each group is given separately
         """
         if schema is None:
-            schema = Producer.build_schema(self.producers)
+            schema = combine_schema(self.producers)
         # Split the data into groups based on null values in columns
         for nulls, group in df.groupby(*(pl.col(col).is_null() for col in df.columns)):
             truth_table = {
@@ -186,8 +186,8 @@ class DatasetBuilder:
 
         vdf: DataFrame = self.__df.filter(pl.col("path").is_in(lst))
         combined = self.combine_exprs(self.rules)
-        for rule in combined:
-            vdf = rule.compare(vdf, self.__df) if isinstance(rule, Comparable) else vdf.filter(rule)
+        for f in combined:
+            vdf = f(vdf, self.__df) if isinstance(f, Comparable) else vdf.filter(f)
 
         return vdf.sort(sort_col).get_column("path")
 
@@ -199,13 +199,14 @@ class DatasetBuilder:
         combinations: list[Expr | bool | Comparable] = []
         combination: Expr | bool | None = None
         for rule in rules:
-            if isinstance(rule, FastComparable):
-                combination = combination & rule.fast_comp() if combination is not None else rule.fast_comp()
-            elif isinstance(rule, Comparable):
+            comparer: Comparable | FastComparable = rule.comparer
+            if isinstance(comparer, FastComparable):
+                combination = combination & comparer() if combination is not None else comparer()
+            elif isinstance(comparer, Comparable):
                 if combination is not None:
                     combinations.append(combination)
                     combination = None
-                combinations.append(rule)
+                combinations.append(comparer)
         if combination is not None:
             combinations.append(combination)
 
