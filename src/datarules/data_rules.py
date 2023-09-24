@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Self
 
 from dateutil import parser as timeparser
 from polars import DataFrame, Datetime, col
@@ -56,10 +56,6 @@ def timestamp2datetime(mtime: int) -> datetime:
     return datetime.fromtimestamp(mtime)
 
 
-def get_modified_time(path: str) -> datetime:
-    return datetime.fromtimestamp(os.stat(path).st_mtime)  # noqa: PTH116
-
-
 def get_size(path: str):
     return os.stat(path).st_size  # noqa: PTH116
 
@@ -69,8 +65,8 @@ class StatRule(Rule):
 
     def __init__(
         self,
-        before: Annotated[str, "Only get items before this threshold"] = "2100",
-        after: Annotated[str, "Only get items after this threshold"] = "1980",
+        before: str | datetime = "2100",
+        after: str | datetime = "1980",
     ) -> None:
         super().__init__()
         self.requires = Column("mtime", Datetime("ms"))
@@ -80,15 +76,25 @@ class StatRule(Rule):
         self.before: datetime | None = None
         self.after: datetime | None = None
         if after is not None:
-            self.after = timeparser.parse(after)
+            if not isinstance(after, datetime):
+                self.after = timeparser.parse(after)
             expr &= self.after < col("mtime")
         if before is not None:
-            self.before = timeparser.parse(before)
+            if not isinstance(before, datetime):
+                self.before = timeparser.parse(before)
             expr &= self.before > col("mtime")
         if self.before is not None and self.after is not None and self.after > self.before:
             raise self.AgeError(self.after, self.before)
 
         self.comparer = FastComparable(expr)
+
+    @classmethod
+    def from_cfg(cls, **kwargs) -> Self:
+        return cls(before=kwargs["before"], after=kwargs["after"])
+
+    @classmethod
+    def get_cfg(cls) -> dict:
+        return {"before": "2100", "after": "1980"}
 
     class AgeError(timeparser.ParserError):
         def __init__(self, older, newer):
@@ -102,7 +108,7 @@ class BlacknWhitelistRule(Rule):
         self,
         whitelist: list[str] | None = None,
         blacklist: list[str] | None = None,
-        exclusive: Annotated[bool, "Only allow files that are valid by every whitelist string"] = False,
+        exclusive: bool = False,
     ) -> None:
         super().__init__()
 
@@ -125,12 +131,7 @@ class BlacknWhitelistRule(Rule):
 
     @classmethod
     def get_cfg(cls):
-        return {
-            "whitelist": [],
-            "blackist": [],
-            "exclusive": False,
-            "!#exclusive": "Only allow files that are valid by every whitelist string",
-        }
+        return {"whitelist": [], "blacklist": [], "exclusive": False}
 
 
 class ExistingRule(Rule):
@@ -140,6 +141,14 @@ class ExistingRule(Rule):
         self.existing_list = ExistingRule._get_existing(*map(Path, folders))
         self.recurse_func: Callable[[Path], Path] = recurse_func
         self.comparer = FastComparable(col("path").apply(self.intersection))
+
+    @classmethod
+    def get_cfg(cls) -> dict:
+        return {"folders": []}
+
+    @classmethod
+    def from_cfg(cls, **kwargs) -> Self:
+        return cls(folders=kwargs["folders"])
 
     def intersection(self, path):
         return self.recurse_func(path).with_suffix("") not in self.existing_list
@@ -152,9 +161,11 @@ class ExistingRule(Rule):
 
 
 class ResolvedRule(Rule):
+    config_keyword = "resolved"
+
     def __init__(self, use_full=False):
         super().__init__()
-        self.use_full = use_full
+        self.use_full: bool = use_full
         self.comparer = Comparable(self.compare)
 
     def compare(self, selected: DataFrame, full: DataFrame) -> DataFrame:

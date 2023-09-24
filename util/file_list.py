@@ -11,7 +11,7 @@ def get_file_list(folder, *patterns: str) -> Generator[Path, None, None]:
     return (y for pattern in patterns for y in folder.rglob(pattern))
 
 
-def to_recursive(path: Path, recursive: bool = False, replace_spaces: bool = False) -> Path:
+def to_recursive(path: Path | str, recursive: bool = False, replace_spaces: bool = False) -> Path:
     """Convert the file path to a recursive path if recursive is False
     (Also replaces spaces with underscores)
     Ex: i/path/to/image.png => i/path_to_image.png"""

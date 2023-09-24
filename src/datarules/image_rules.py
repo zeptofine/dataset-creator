@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from enum import Enum
 from functools import cache
 from types import MappingProxyType
@@ -59,7 +59,7 @@ class ResRule(Rule):
         self,
         min=0,
         max=2048,
-        crop: Annotated[bool, "checks if valid after a slight crop"] = False,
+        crop: bool = False,
         scale=4,
     ) -> None:
         super().__init__()

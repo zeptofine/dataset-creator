@@ -1,18 +1,16 @@
 from pathlib import Path
 
-from tqdm import tqdm
+from rich.progress import track
 
-src = "/mnt/Toshiba/.Grabber/"
+src = "/mnt/Toshiba/"
 
 gen = Path(src).rglob("*")
+gen_ = (x for x in track(gen) if not ((resolved := x.resolve()) == x or resolved.exists()))
 
-lst: list[Path] = []
-for path in tqdm(gen):
-    x = path.resolve()
-    if x != path and not x.exists():
-        lst.append(path)
-        print(path)
-
+lst = []
+for p in gen_:
+    print(p)
+    lst.append(p)
 response = input("These links lead to empty files. Delete them? y/N:")
 if response.lower().startswith("y"):
     print("Deleting...")

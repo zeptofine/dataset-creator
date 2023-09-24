@@ -9,7 +9,15 @@ import polars as pl
 from polars import DataFrame, Expr
 from polars.type_aliases import SchemaDefinition
 
-from .base_rules import Comparable, ExprDict, FastComparable, Producer, Rule, combine_schema
+from .base_rules import (
+    Comparable,
+    DataTypeSchema,
+    ExprDict,
+    FastComparable,
+    Producer,
+    ProducerSet,
+    Rule,
+)
 
 
 def current_time() -> datetime:
@@ -18,13 +26,11 @@ def current_time() -> datetime:
 
 T = TypeVar("T")
 
-DataTypeSchema = dict[str, pl.DataType | type]
-
 
 class DatasetBuilder:
     def __init__(self, db_path: Path) -> None:
         super().__init__()
-        self.producers: set[Producer] = set()
+        self.producers: ProducerSet = ProducerSet()
         self.unready_rules: dict[str, type[Rule]] = {}
         self.rules: list[Rule] = []
 
@@ -38,7 +44,7 @@ class DatasetBuilder:
         else:
             self.__df = DataFrame(schema=self.basic_schema)
 
-    def add_rules(self, rules: Iterable[type[Rule] | Rule]) -> None:
+    def add_rules(self, *rules: type[Rule] | Rule) -> None:
         """Adds rules to the rule list. Rules will be instantiated separately."""
 
         for rule in rules:
@@ -56,7 +62,7 @@ class DatasetBuilder:
     @property
     def type_schema(self) -> DataTypeSchema:
         schema: DataTypeSchema = self.basic_schema.copy()
-        schema.update({col: dtype for producer in self.producers for col, dtype in producer.produces.items()})
+        schema.update(self.producers.type_schema)
         return schema
 
     def add_producer(self, producer: Producer):
@@ -115,7 +121,9 @@ class DatasetBuilder:
             producer
             for producer in self.producers
             if not set(producer.produces) - set(self.__df.columns)
-            and not self.__df.filter(pl.all_horizontal(pl.col(col).is_null() for col in producer.produces)).is_empty()
+            and not self.__df.filter(
+                pl.all_horizontal(pl.col(col).is_null() for col in producer.produces),
+            ).is_empty()
         }
 
     def unfinished_by_col(self, df: DataFrame, cols: Iterable[str] | None = None) -> DataFrame:
@@ -144,7 +152,7 @@ class DatasetBuilder:
             each group is given separately
         """
         if schema is None:
-            schema = combine_schema(self.producers)
+            schema = self.producers.schema
         # Split the data into groups based on null values in columns
         for nulls, group in df.groupby(*(pl.col(col).is_null() for col in df.columns)):
             truth_table = {

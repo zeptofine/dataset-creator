@@ -219,7 +219,7 @@ class Window(QWidget):
         self.builder = DatasetBuilder(Path("filedb.feather"))
 
         self.builder.add_producers(producers)
-        self.builder.add_rules(rules)
+        self.builder.add_rules(*rules)
         rprint(self.builder)
         print("built builder.")
         return self.builder
