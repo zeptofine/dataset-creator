@@ -22,8 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.datarules.base_rules import ItemData
-
+from ..configs import ItemData
 from ..datarules import base_rules, data_rules, image_rules
 from .frames import FlowItem
 

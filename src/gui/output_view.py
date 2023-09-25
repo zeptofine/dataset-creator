@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
 )
 
-from ..datarules.base_rules import Output, OutputData
+from ..configs import Output, OutputData
 from .err_dialog import catch_errors
 from .frames import FlowItem, FlowList
 from .input_view import InputView

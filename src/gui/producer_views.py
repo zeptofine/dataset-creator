@@ -1,29 +1,6 @@
 from __future__ import annotations
 
-from abc import abstractmethod
-
-# from PySide6.QtCore import QDate, QDateTime, QRect, Qt, QThread, QTime, Signal, Slot
-# from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import (
-    # QCheckBox,
-    # QDateTimeEdit,
-    # QFrame,
-    # QGridLayout,
-    # QGroupBox,
-    # QLineEdit,
-    # QListWidget,
-    # QListWidgetItem,
-    # QMenu,
-    # QPushButton,
-    # QScrollArea,
-    # QSizePolicy,
-    # QSlider,
-    # QSpinBox,
-    # QSplitter,
-    # QTextEdit,
-    # QToolButton,
-    # QVBoxLayout,
-    # QWidget,
     QComboBox,
     QLabel,
 )

@@ -12,7 +12,11 @@ import typer
 from typer import Option
 from typing_extensions import Annotated
 
-from src.datarules.base_rules import File, FilterData
+import src.datarules.data_rules as drules
+import src.datarules.image_rules as irules
+import src.image_filters
+from src.configs import FilterData, Input, MainConfig, Output
+from src.datarules.base_rules import File, Filter, Producer, Rule
 
 CPU_COUNT = int(cpu_count())
 app = typer.Typer()
@@ -73,10 +77,6 @@ def main(
     from rich.console import Console
     from rich.progress import Progress
 
-    import src.datarules.data_rules as drules
-    import src.datarules.filters as _
-    import src.datarules.image_rules as irules
-    from src.datarules.base_rules import FilterT, Input, MainConfig, Output, Producer, Rule
     from src.datarules.dataset_builder import DatasetBuilder, chunk_split
     from util.file_list import get_file_list
 
@@ -118,7 +118,7 @@ def main(
         outputs: list[Output] = [
             Output(
                 Path(folder["data"]["folder"]),
-                {FilterT.all_filters[filter_["name"]]: filter_["data"] for filter_ in folder["data"]["lst"]},
+                {Filter.all_filters[filter_["name"]]: filter_["data"] for filter_ in folder["data"]["lst"]},
                 folder["data"]["output_format"],
             )
             for folder in cfg["output"]
@@ -153,7 +153,7 @@ def main(
         count_t = p.add_task("Gathering", total=None)
         folder_t = p.add_task("from folder", total=len(inputs))
         for folder in inputs:
-            lst = []
+            lst: list[Path] = []
             for file in get_file_list(folder.path, *folder.expressions):
                 lst.append(file)
                 p.advance(count_t)
@@ -171,11 +171,11 @@ def main(
             for src, lst in images.items()
             for pth in lst
         }
-        total_images = len(resolved)
-        p.update(count_t, total=total_images, completed=total_images)
         diff: int = sum(map(len, images.values())) - len(resolved)
         if diff:
             p.log(f"removed {diff} conflicting symlinks")
+        total_images = len(resolved)
+        p.update(count_t, total=total_images, completed=total_images)
 
         db.add_new_paths(set(resolved))
         db_schema = db.type_schema
@@ -210,7 +210,7 @@ def main(
                 chunks = list(chunk_split(df, chunksize=pchunksize))
                 p.update(chunk_t, total=len(chunks), completed=0)
 
-                for (_, size), chunk in chunks:  # noqa: F402
+                for (_, size), chunk in chunks:
                     for schema in schemas:
                         chunk = chunk.with_columns(**schema)
                     chunk = chunk.select(db_schema)
@@ -239,8 +239,7 @@ def main(
             p.log(db.df)
 
         filter_t = p.add_task("filtering", total=1)
-        filtered = db.filter(set(map(str, resolved)))
-        files = [resolved[file] for file in filtered]
+        files: list[File] = [resolved[file] for file in db.filter(set(resolved))]
         p.update(filter_t, total=len(files), completed=len(files))
 
         if not check_for_images(files):

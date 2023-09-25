@@ -36,10 +36,10 @@ from PySide6.QtWidgets import (
 )
 from rich import print as rprint
 
-from ..datarules.base_rules import MainConfig
+from ..configs import ItemConfig, MainConfig
 from ..datarules.dataset_builder import DatasetBuilder
 from .err_dialog import catch_errors
-from .frames import FlowItem, FlowList, ItemConfig
+from .frames import FlowItem, FlowList
 from .input_view import InputView
 from .output_view import OutputView
 from .producer_views import (
@@ -166,6 +166,8 @@ class Window(QWidget):
             self.save_config()
         with self.cfg_path.open("r") as f:
             self.load_cfg(MainConfig(json.load(f)))
+
+        exit()
 
     def get_config(self) -> MainConfig:
         return {

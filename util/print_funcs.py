@@ -66,78 +66,11 @@ def thread_status(pid: int, item: str = "", extra: str = "", item_size: int | No
     print(("\n" * pid) + message + ("\033[A" * pid), end="\r")
 
 
-PRINT_MODES: dict[str, tuple[str, str]] = {"newline": ("", "\n"), "sameline": ("\033[2K", ""), "append": ("", "")}
-
-
-class Stepper:
-    def __init__(self, step=0, print_mode="newline", print_method: Callable[..., None] = print):
-        self.step: int = step
-        self.print_mode: tuple[str, str] = PRINT_MODES[print_mode]
-        self.printer: Callable[..., None] = print_method
-
-    def next(self, s=None, **kwargs):
-        self.step += 1
-        if s:
-            self._print(s, **kwargs)
-        return self
-
-    def print(self, *lines, **kwargs):
-        for line in [f" {self.step}:{s}" for s in lines]:
-            self._print(line, **kwargs)
-        return self
-
-    # override for print_modes
-    def _print(self, *args, **kwargs):
-        args = self.print_mode[0] + args[0], *args[1:]
-        self.printer(*args, end=self.print_mode[1], **kwargs)
-
-
-class RichStepper(Stepper):
-    def __init__(self, *args, loglevel=0, stepcolor="cyan", pstepcolor="blue", **kwargs):
-        super().__init__(*args, **kwargs)
-        self.printer = rprint
-        self.loglevel = loglevel
-        self.stepcolor = stepcolor
-        self.pstepcolor = pstepcolor
-
-    def set(self, n):
-        self.step = n
-        return self
-
-    def next(self, s=None, **kwargs):
-        self.step += 1
-        if s:
-            self._print(f"\n[{self.stepcolor}]{self.step}:[/{self.stepcolor}] {s}", **kwargs)
-        else:
-            self._print(f"\n[{self.stepcolor}]{self.step}:[/{self.stepcolor}]", **kwargs)
-        return self
-
-    def print(self, *lines, **_):
-        if isinstance(lines[0], int) or str(lines[0]).isdigit():
-            level = int(lines[0])
-            lines = lines[1:]
-        else:
-            level = 0
-        printed_output = {
-            0: "[bold yellow]INFO[/bold yellow]",
-            1: "[bold orange]WARNING[/bold orange]",
-            -1: "[bold grey]DEBUG[/bold grey]",
-            2: "[bold red]ERROR[/bold red]",
-            3: "[bold white]CRITICAL[/bold white]",
-        }.get(level, f"[{self.pstepcolor}]{level}:[/{self.pstepcolor}]")
-        prefix = f" [{self.pstepcolor}]{self.step}:[/{self.pstepcolor}]"
-        if self.loglevel <= level:
-            prefix += f"{printed_output}:"
-        for line in lines:
-            self._print(f"{prefix} {line}")
-        return self
-
-
 class Timer:
     def __init__(self, timestamp: int | None = None):
         self.time = timestamp or time.perf_counter()
 
-    def print(self, msg):
+    def log(self, msg):
         """print and resets time"""
         return self.poll(msg).reset()
 

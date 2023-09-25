@@ -12,7 +12,8 @@ import polars as pl
 from PIL import Image
 from polars import DataFrame, Expr, col
 
-from .base_rules import Column, Comparable, FastComparable, Producer, Rule, RuleData, SpecialItemData
+from ..configs.configtypes import SpecialItemData
+from .base_rules import Column, Comparable, FastComparable, Producer, Rule
 
 
 def whash_db4(img) -> imagehash.ImageHash:

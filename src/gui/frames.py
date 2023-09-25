@@ -23,7 +23,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..datarules.base_rules import ItemConfig, ItemData, Keyworded, SpecialItemData
+from ..configs.configtypes import ItemConfig, ItemData
+from ..configs.keyworded import Keyworded
 
 
 class FlowItem(QFrame):  # TODO: Better name lmao

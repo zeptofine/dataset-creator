@@ -7,7 +7,8 @@ from PySide6.QtWidgets import (
     QLabel,
 )
 
-from ..datarules import base_rules, data_rules, filters, image_rules
+from ..datarules import base_rules, data_rules, image_rules
+from ..image_filters import size_changers
 from .frames import FlowItem, FlowList
 
 
@@ -25,7 +26,7 @@ class ResizeFilterView(Filter):
     title = "Resize"
     needs_settings = True
 
-    bound_item = filters.resize
+    bound_item = size_changers.resize
 
     def configure_settings_group(self):
         self.scale = QDoubleSpinBox(self)
