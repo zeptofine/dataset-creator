@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import TypedDict
+from typing import TypeVar
 
 from PySide6.QtCore import QRect, Qt, Signal, Slot
 from PySide6.QtGui import QAction, QIcon, QMouseEvent
 from PySide6.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QFrame,
     QGridLayout,
     QGroupBox,
@@ -24,17 +23,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-
-class ItemConfig(TypedDict):
-    data: dict
-    enabled: bool
-    name: str
-    open: bool
+from ..datarules.base_rules import ItemConfig, ItemData, Keyworded, SpecialItemData
 
 
 class FlowItem(QFrame):  # TODO: Better name lmao
     title: str = ""
-    cfg_name: str
     desc: str = ""
     needs_settings: bool = False
     movable: bool = True
@@ -46,6 +39,8 @@ class FlowItem(QFrame):  # TODO: Better name lmao
     duplicate = Signal()
 
     increment = Signal()
+
+    bound_item: type[Keyworded] | Keyworded
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -152,15 +147,19 @@ class FlowItem(QFrame):  # TODO: Better name lmao
             self.descriptionwidget.setVisible(b)
         self.__opened = b
 
+    @classmethod
+    def cfg_name(cls):
+        return cls.bound_item.cfg_kwd()
+
     # Saving and creating methods
 
     @abstractmethod
-    def get_config(self) -> dict:
+    def get_config(self) -> ItemData:
         return {}
 
     @classmethod
     @abstractmethod
-    def from_config(cls, cfg: dict, parent=None):
+    def from_config(cls, cfg: ItemData, parent=None):
         return cls(parent=parent)
 
 
@@ -204,9 +203,9 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
         self._layout.addWidget(self.progressbar, 0, 1)
         self._layout.addWidget(self.scrollarea, 1, 0, 1, 2)
 
-    def register_item(self, item: type[FlowItem]):
-        self.addmenu.addAction(item.title, lambda: self.initialize_item(item))
-        self.registered_items[item.title or item.cfg_name] = item
+    def _register_item(self, item: type[FlowItem]):
+        self.additemtomenu(item)
+        self.registered_items[item.cfg_name()] = item
         if len(self.addmenu.actions()) == 1:
             self.addbutton.show()
             self.addbutton.clicked.connect(self.addmenu.actions()[0].trigger)
@@ -214,12 +213,15 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
             self.addbox.show()
             self.addbutton.hide()
 
+    def additemtomenu(self, item: type[FlowItem]):
+        self.addmenu.addAction(item.title, lambda: self.initialize_item(item))
+
     def initialize_item(self, item: type[FlowItem]):
         self.add_item(item(self))
 
-    def register_items(self, *items: type[FlowItem]):
+    def register_item(self, *items: type[FlowItem]):
         for item in items:
-            self.register_item(item)
+            self._register_item(item)
 
     def add_item(self, item: FlowItem, idx=None):
         if idx is None:
@@ -275,14 +277,14 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
         self.n.emit(self.progressbar.value() + 1)
 
     @Slot()
-    def get_config(self) -> list:
+    def get_config(self) -> list[ItemConfig]:
         return [
-            ItemConfig(
+            ItemConfig[ItemData](
                 data=item.get_config(),
                 enabled=item.enabled,
-                name=item.title or item.cfg_name,
+                name=item.cfg_name(),
                 open=item.opened,
-            )
+            )  # type: ignore
             for item in self.items
         ]
 

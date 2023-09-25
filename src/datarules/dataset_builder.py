@@ -27,6 +27,23 @@ def current_time() -> datetime:
 T = TypeVar("T")
 
 
+def chunk_split(
+    df: DataFrame,
+    chunksize: int,
+    col_name: str = "_idx",
+):
+    return (
+        ((idx, len(part)), part.drop(col_name))
+        for idx, part in df.with_row_count(col_name)
+        .with_columns(pl.col(col_name) // chunksize)
+        .groupby(col_name, maintain_order=True)
+    )
+
+
+def blacklist_schema(schema: list[ExprDict], blacklist: Collection) -> list[ExprDict]:
+    return [out for dct in schema if (out := {k: v for k, v in dct.items() if k not in blacklist})]
+
+
 class DatasetBuilder:
     def __init__(self, db_path: Path) -> None:
         super().__init__()
@@ -52,7 +69,7 @@ class DatasetBuilder:
 
     def add_rule(self, rule: type[Rule] | Rule):
         if isinstance(rule, type):
-            self.unready_rules[rule.config_keyword] = rule
+            self.unready_rules[rule.cfg_kwd()] = rule
         elif isinstance(rule, Rule):
             if rule not in self.rules:
                 self.rules.append(rule)
@@ -68,7 +85,7 @@ class DatasetBuilder:
     def add_producer(self, producer: Producer):
         self.producers.add(producer)
 
-    def add_producers(self, producers: Iterable[Producer]):
+    def add_producers(self, *producers: Producer):
         for producer in producers:
             self.add_producer(producer)
 
@@ -108,7 +125,7 @@ class DatasetBuilder:
             return True
         return False
 
-    def get_unfinished_producers(self) -> set[Producer]:
+    def get_unfinished_producers(self) -> ProducerSet:
         """
         gets producers that do not have their column requirements fulfilled.
 
@@ -117,14 +134,28 @@ class DatasetBuilder:
         set[Producer]
             unfinished producers.
         """
-        return {
+        return ProducerSet(
             producer
             for producer in self.producers
             if not set(producer.produces) - set(self.__df.columns)
             and not self.__df.filter(
                 pl.all_horizontal(pl.col(col).is_null() for col in producer.produces),
             ).is_empty()
-        }
+        )
+
+    def remove_unfinished_producers(self) -> ProducerSet:
+        """
+        Takes the completed producers out of the set
+
+        Returns
+        -------
+        ProducerSet
+            finished producers
+        """
+        new: ProducerSet = self.get_unfinished_producers()
+        old: ProducerSet = self.producers
+        self.producers = new
+        return ProducerSet(old - new)
 
     def unfinished_by_col(self, df: DataFrame, cols: Iterable[str] | None = None) -> DataFrame:
         if cols is None:
@@ -152,10 +183,10 @@ class DatasetBuilder:
             each group is given separately
         """
         if schema is None:
-            schema = self.producers.schema
+            schema = self.get_unfinished_producers().schema
         # Split the data into groups based on null values in columns
         for nulls, group in df.groupby(*(pl.col(col).is_null() for col in df.columns)):
-            truth_table = {
+            truth_table: set[str] = {
                 col
                 for col, truth in zip(  # type: ignore
                     df.columns,
@@ -185,7 +216,7 @@ class DatasetBuilder:
         unfinished: DataFrame = self.unfinished_by_col(updated_df)
         return unfinished
 
-    def filter(self, lst, sort_col="path") -> Iterable[str]:
+    def filter(self, lst, sort_col="path") -> Iterable[str]:  # noqa: A003
         assert sort_col in self.__df.columns, f"'{sort_col}' is not in {self.__df.columns}"
         if len(self.unready_rules):
             warnings.warn(
@@ -265,20 +296,3 @@ class DatasetBuilder:
         if in_place:
             self.__df = new_df
         return new_df
-
-
-def chunk_split(
-    df: DataFrame,
-    chunksize: int,
-    col_name: str = "_idx",
-):
-    return (
-        ((idx, len(part)), part.drop(col_name))
-        for idx, part in df.with_row_count(col_name)
-        .with_columns(pl.col(col_name) // chunksize)
-        .groupby(col_name, maintain_order=True)
-    )
-
-
-def blacklist_schema(schema: list[ExprDict], blacklist: Collection) -> list[ExprDict]:
-    return [out for dct in schema if (out := {k: v for k, v in dct.items() if k not in blacklist})]

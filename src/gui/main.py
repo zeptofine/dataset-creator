@@ -36,9 +36,10 @@ from PySide6.QtWidgets import (
 )
 from rich import print as rprint
 
+from ..datarules.base_rules import MainConfig
 from ..datarules.dataset_builder import DatasetBuilder
 from .err_dialog import catch_errors
-from .frames import FlowList, ItemConfig
+from .frames import FlowItem, FlowList, ItemConfig
 from .input_view import InputView
 from .output_view import OutputView
 from .producer_views import (
@@ -52,7 +53,6 @@ from .rule_views import (
     ChannelRuleView,
     ExistingRuleView,
     HashRuleView,
-    ResolvedRuleView,
     ResRuleView,
     RuleView,
     StatRuleView,
@@ -61,13 +61,6 @@ from .rule_views import (
 
 CPU_COUNT = os.cpu_count()
 PROGRAM_ORIGIN = Path(__file__).parent
-
-
-class MainConfig(TypedDict):
-    inputs: list[ItemConfig]
-    producers: list[ItemConfig]
-    rules: list[ItemConfig]
-    output: list[ItemConfig]
 
 
 class InputList(FlowList):
@@ -82,6 +75,21 @@ class InputList(FlowList):
 
 class ProducerList(FlowList):
     items: list[ProducerView]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__registered_by: dict[str, type[ProducerView]] = {}
+
+    def additemtomenu(self, item: type[ProducerView]):
+        self.addmenu.addAction(f"{item.title}: {set(item.bound_item.produces)}", lambda: self.initialize_item(item))
+
+    def _register_item(self, item: type[ProducerView]):
+        super()._register_item(item)
+        for produces in item.bound_item.produces:
+            self.__registered_by[produces] = item
+
+    def registered_by(self, s: str):
+        return self.__registered_by.get(s)
 
 
 class RuleList(FlowList):
@@ -113,23 +121,22 @@ class Window(QWidget):
         self.producers_rules.setOrientation(Qt.Orientation.Vertical)
 
         self.inputlist = InputList(self)
-        self.inputlist.register_items(InputView)
+        self.inputlist.register_item(InputView)
         self.inputlist.gathered.connect(self.collect_files)
         self.filedict = {}
 
         self.producerlist = ProducerList(self)
-        self.producerlist.register_items(
+        self.producerlist.register_item(
             FileInfoProducerView,
             ImShapeProducerView,
             HashProducerView,
         )
 
         self.rulelist = RuleList(self)
-        self.rulelist.register_items(
+        self.rulelist.register_item(
             StatRuleView,
             BlacklistWhitelistView,
             ExistingRuleView,
-            ResolvedRuleView,
             TotalLimitRuleView,
             ResRuleView,
             ChannelRuleView,
@@ -137,7 +144,7 @@ class Window(QWidget):
         )
 
         self.outputlist = FlowList(self)
-        self.outputlist.register_items(OutputView)
+        self.outputlist.register_item(OutputView)
 
         self.lists.addWidget(self.inputlist)
         self.producers_rules.addWidget(self.producerlist)
@@ -161,20 +168,20 @@ class Window(QWidget):
             self.load_cfg(MainConfig(json.load(f)))
 
     def get_config(self) -> MainConfig:
-        return MainConfig(
-            {
-                "inputs": self.inputlist.get_config(),
-                "output": self.outputlist.get_config(),
-                "producers": self.producerlist.get_config(),
-                "rules": self.rulelist.get_config(),
-            }
-        )
+        return {
+            "inputs": self.inputlist.get_config(),
+            "output": self.outputlist.get_config(),
+            "producers": self.producerlist.get_config(),
+            "rules": self.rulelist.get_config(),
+        }
 
     @catch_errors("Error saving")
     @Slot()
     def save_config(self):
         with self.cfg_path.open("w") as f:
-            json.dump(self.get_config(), f, indent=4)
+            cfg = self.get_config()
+            json.dump(cfg, f, indent=4)
+            print("saved", cfg)
 
     @catch_loading
     @Slot(dict)
@@ -216,9 +223,9 @@ class Window(QWidget):
         producers = self.producerlist.get()
         rules = self.rulelist.get()
 
-        self.builder = DatasetBuilder(Path("filedb.feather"))
+        self.builder = DatasetBuilder(Path("filedb.arrow"))
 
-        self.builder.add_producers(producers)
+        self.builder.add_producers(*producers)
         self.builder.add_rules(*rules)
         rprint(self.builder)
         print("built builder.")

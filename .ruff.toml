@@ -1,21 +1,21 @@
 line-length = 120
 
 extend-select = [
-    "ASYNC",
-    "UP",
-    "I",
-    "B",
-    "ICN",
-    "F",
-    "RET",
-    "SIM",
-    "PTH",
-    "TRY",
-    "NPY",
-    "PERF",
-    "RUF",
-    "PIE",
-    "C4",
+  "A",
+  "ASYNC",
+  "UP",
+  "I",
+  "B",
+  "ICN",
+  "F",
+  "RET",
+  "SIM",
+  "TRY",
+  "NPY",
+  "PERF",
+  "RUF",
+  "PIE",
+  "C4",
 ]
 fixable = ["ALL"]
 

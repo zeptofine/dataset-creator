@@ -26,7 +26,7 @@ def stat2dict(result: os.stat_result) -> dict:
 
 
 def stat(pth):
-    result = os.stat(pth)  # noqa: PTH116
+    result = os.stat(pth)
     return stat2dict(result)
 
 
@@ -57,12 +57,10 @@ def timestamp2datetime(mtime: int) -> datetime:
 
 
 def get_size(path: str):
-    return os.stat(path).st_size  # noqa: PTH116
+    return os.stat(path).st_size
 
 
 class StatRule(Rule):
-    config_keyword = "stats"
-
     def __init__(
         self,
         before: str | datetime = "2100",
@@ -89,8 +87,8 @@ class StatRule(Rule):
         self.comparer = FastComparable(expr)
 
     @classmethod
-    def from_cfg(cls, **kwargs) -> Self:
-        return cls(before=kwargs["before"], after=kwargs["after"])
+    def from_cfg(cls, cfg) -> Self:
+        return cls(before=cfg["before"], after=cfg["after"])
 
     @classmethod
     def get_cfg(cls) -> dict:
@@ -102,8 +100,6 @@ class StatRule(Rule):
 
 
 class BlacknWhitelistRule(Rule):
-    config_keyword = "blackwhitelists"
-
     def __init__(
         self,
         whitelist: list[str] | None = None,
@@ -147,8 +143,8 @@ class ExistingRule(Rule):
         return {"folders": []}
 
     @classmethod
-    def from_cfg(cls, **kwargs) -> Self:
-        return cls(folders=kwargs["folders"])
+    def from_cfg(cls, cfg) -> Self:
+        return cls(folders=cfg["folders"])
 
     def intersection(self, path):
         return self.recurse_func(path).with_suffix("") not in self.existing_list
@@ -161,8 +157,6 @@ class ExistingRule(Rule):
 
 
 class ResolvedRule(Rule):
-    config_keyword = "resolved"
-
     def __init__(self, use_full=False):
         super().__init__()
         self.use_full: bool = use_full
@@ -177,8 +171,6 @@ class ResolvedRule(Rule):
 
 
 class TotalLimitRule(Rule):
-    config_keyword = "limit"
-
     def __init__(self, total=1000):
         super().__init__()
         self.total = total

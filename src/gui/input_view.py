@@ -30,8 +30,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.gui.err_dialog import catch_errors
-
+from ..datarules.base_rules import Input, InputData
+from .err_dialog import catch_errors
 from .frames import FlowItem, FlowList
 from .output_filters import Filter
 
@@ -80,7 +80,6 @@ class GathererThread(QThread):
 
 
 class InputView(FlowItem):
-    cfg_name = "input"
     needs_settings = True
     movable = False
 
@@ -89,6 +88,8 @@ class InputView(FlowItem):
     flags = wglob.BRACE | wglob.SPLIT | wglob.EXTMATCH | wglob.IGNORECASE | wglob.GLOBSTAR
 
     gathered = Signal(dict)
+
+    bound_item = Input
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -175,16 +176,16 @@ class InputView(FlowItem):
     def on_gathered(self, lst):
         self.gathered.emit({self.text.text(): lst})
 
-    def get_config(self):
+    def get_config(self) -> InputData:
         return {
-            "file": self.text.text(),
+            "folder": self.text.text(),
             "expressions": self.globexprs.toPlainText().splitlines(),
         }
 
     @classmethod
-    def from_config(cls, cfg: dict, parent=None):
+    def from_config(cls, cfg: InputData, parent=None):
         self = cls(parent)
-        self.text.setText(cfg["file"])
+        self.text.setText(cfg["folder"])
         self.globexprs.setText("\n".join(cfg["expressions"]))
 
         return self

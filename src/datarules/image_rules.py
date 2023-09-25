@@ -5,14 +5,14 @@ from collections.abc import Callable
 from enum import Enum
 from functools import cache
 from types import MappingProxyType
-from typing import Annotated, Literal
+from typing import Literal, Self
 
 import imagehash
 import polars as pl
 from PIL import Image
 from polars import DataFrame, Expr, col
 
-from .base_rules import Column, Comparable, FastComparable, Producer, Rule
+from .base_rules import Column, Comparable, FastComparable, Producer, Rule, RuleData, SpecialItemData
 
 
 def whash_db4(img) -> imagehash.ImageHash:
@@ -50,15 +50,20 @@ class ImShapeProducer(Producer):
         ]
 
 
+class ResData(SpecialItemData):
+    min_res: int
+    max_res: int
+    crop: bool
+    scale: int
+
+
 class ResRule(Rule):
     """A filter checking the size of an image."""
 
-    config_keyword = "resolution"
-
     def __init__(
         self,
-        min=0,
-        max=2048,
+        min_res=0,
+        max_res=2048,
         crop: bool = False,
         scale=4,
     ) -> None:
@@ -70,20 +75,36 @@ class ResRule(Rule):
 
         if crop:
             self.comparer = FastComparable(
-                (pl.min_horizontal(col("width"), col("height")) // scale * scale >= min)
-                & (pl.max_horizontal(col("width"), col("height")) // scale * scale <= max)
+                (pl.min_horizontal(col("width"), col("height")) // scale * scale >= min_res)
+                & (pl.max_horizontal(col("width"), col("height")) // scale * scale <= max_res)
             )
         else:
             self.comparer = FastComparable(
-                (pl.min_horizontal(col("width"), col("height")) >= min)
-                & (pl.max_horizontal(col("width"), col("height")) <= max)
+                (pl.min_horizontal(col("width"), col("height")) >= min_res)
+                & (pl.max_horizontal(col("width"), col("height")) <= max_res)
             )
+
+    @classmethod
+    def get_cfg(cls) -> ResData:
+        return {
+            "min_res": 0,
+            "max_res": 2048,
+            "crop": False,
+            "scale": 4,
+        }
+
+    @classmethod
+    def from_cfg(cls, cfg: ResData) -> Self:
+        return cls(
+            min_res=cfg["min_res"],
+            max_res=cfg["max_res"],
+            crop=cfg["crop"],
+            scale=cfg["scale"],
+        )
 
 
 class ChannelRule(Rule):
     """Checks the number of channels in the image."""
-
-    config_keyword = "channels"
 
     def __init__(self, min_channels=1, max_channels=4) -> None:
         super().__init__()
@@ -92,7 +113,7 @@ class ChannelRule(Rule):
 
 
 def get_size(pth):
-    return os.stat(pth).st_size  # noqa: PTH116
+    return os.stat(pth).st_size
 
 
 _HASHERS: dict[str, Callable] = {
@@ -127,8 +148,8 @@ class HASHERS(str, Enum):
 class HashProducer(Producer):
     produces = MappingProxyType({"hash": str})
 
-    def __init__(self, hasher: HASHERS = HASHERS.AVERAGE):
-        self.hasher: Callable[[Image.Image], imagehash.ImageHash] = _HASHERS[hasher]
+    def __init__(self, hash_type: HASHERS = HASHERS.AVERAGE):
+        self.hasher: Callable[[Image.Image], imagehash.ImageHash] = _HASHERS[hash_type]
 
     def __call__(self):
         return [{"hash": col("path").apply(self._hash_img)}]
@@ -139,8 +160,6 @@ class HashProducer(Producer):
 
 
 class HashRule(Rule):
-    config_keyword = "hashing"
-
     def __init__(self, resolver: str | Literal["ignore_all"] = "ignore_all") -> None:
         super().__init__()
 

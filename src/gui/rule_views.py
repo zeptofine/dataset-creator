@@ -22,6 +22,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from src.datarules.base_rules import ItemData
+
 from ..datarules import base_rules, data_rules, image_rules
 from .frames import FlowItem
 
@@ -41,7 +43,7 @@ class StatRuleView(RuleView):
     desc = "only allow files created within a time frame."
 
     needs_settings = True
-
+    bound_item = data_rules.StatRule
     _datetime_format: str = "dd/MM/yyyy h:mm AP"
 
     def configure_settings_group(self):
@@ -89,6 +91,7 @@ class BlacklistWhitelistView(RuleView):
     desc = "Only allows paths that include strs in the whitelist and not in the blacklist"
 
     needs_settings = True
+    bound_item = data_rules.BlacknWhitelistRule
 
     def configure_settings_group(self):
         self.whitelist = QTextEdit(self)
@@ -136,6 +139,7 @@ class TotalLimitRuleView(RuleView):
     desc = "Limits the total number of files past this point"
 
     needs_settings = True
+    bound_item = data_rules.TotalLimitRule
 
     def configure_settings_group(self):
         self.limit_widget = QSpinBox(self)
@@ -160,36 +164,11 @@ class TotalLimitRuleView(RuleView):
         return self
 
 
-class ResolvedRuleView(RuleView):
-    title = "Resolved"
-
-    needs_settings = True
-
-    def configure_settings_group(self) -> None:
-        self.use_full = QCheckBox("use full", self)
-        self.groupgrid.addWidget(self.use_full, 0, 0)
-
-    def reset_settings_group(self):
-        self.use_full.setChecked(False)
-
-    def get(self):
-        super().get()
-        return data_rules.ResolvedRule(use_full=self.use_full.isChecked())
-
-    def get_config(self):
-        return {"use_full": self.use_full.isChecked()}
-
-    @classmethod
-    def from_config(cls, cfg: dict, parent=None):
-        self = cls(parent)
-        self.use_full.setChecked(cfg["use_full"])
-        return self
-
-
 class ExistingRuleView(RuleView):
     title = "Existing"
 
     needs_settings = True
+    bound_item = data_rules.ExistingRule
 
     def configure_settings_group(self):
         self.exists_in = QComboBox(self)
@@ -229,6 +208,7 @@ class ResRuleView(RuleView):
     title = "Resolution"
 
     needs_settings = True
+    bound_item = image_rules.ResRule
 
     def configure_settings_group(self):
         self.min = QSpinBox(self)
@@ -257,22 +237,25 @@ class ResRuleView(RuleView):
     def get(self):
         super().get()
         return image_rules.ResRule(
-            min=self.min.value(), max=self.max.value(), crop=self.crop.isChecked(), scale=self.scale.value()
+            min_res=self.min.value(),
+            max_res=self.max.value(),
+            crop=self.crop.isChecked(),
+            scale=self.scale.value(),
         )
 
-    def get_config(self):
+    def get_config(self) -> image_rules.ResData:
         return {
-            "min": self.min.value(),
-            "max": self.max.value(),
+            "min_res": self.min.value(),
+            "max_res": self.max.value(),
             "crop": self.crop.isChecked(),
             "scale": self.scale.value(),
         }
 
     @classmethod
-    def from_config(cls, cfg, parent=None):
+    def from_config(cls, cfg: image_rules.ResData, parent=None):
         self = cls(parent)
-        self.min.setValue(cfg["min"])
-        self.max.setValue(cfg["max"])
+        self.min.setValue(cfg["min_res"])
+        self.max.setValue(cfg["max_res"])
         self.crop.setChecked(cfg["crop"])
         self.scale.setValue(cfg["scale"])
         return self
@@ -282,6 +265,7 @@ class ChannelRuleView(RuleView):
     title = "Channels"
 
     needs_settings = True
+    bound_item = image_rules.ChannelRule
 
     def configure_settings_group(self):
         self.min = QSpinBox(self)
@@ -301,10 +285,17 @@ class ChannelRuleView(RuleView):
         super().get()
         return image_rules.ChannelRule(min_channels=self.min.value(), max_channels=self.max.value())
 
+    @classmethod
+    def from_config(cls, cfg: ItemData, parent=None):
+        self = cls(parent)
+        self.min.setValue(cfg["min_channels"])
+        self.max.setValue(cfg["max_channels"])
+        return self
+
     def get_config(self):
         return {
-            "min": self.min.value(),
-            "max": self.max.value(),
+            "min_channels": self.min.value(),
+            "max_channels": self.max.value(),
         }
 
 
@@ -313,6 +304,7 @@ class HashRuleView(RuleView):
     desc = "Uses imagehash functions to eliminate similar looking images"
 
     needs_settings = True
+    bound_item = image_rules.HashRule
 
     def configure_settings_group(self):
         self.ignore_all_btn = QCheckBox(self)

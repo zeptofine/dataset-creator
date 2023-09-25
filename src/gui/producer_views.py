@@ -36,39 +36,39 @@ class ProducerView(FlowItem):
     title = "Producer"
     movable = False
 
-    bound_producer: type[base_rules.Producer]
+    bound_item: type[base_rules.Producer]
 
     def setup_widget(self):
         super().setup_widget()
         if self.desc:
             self.desc += "\n"
-        self.desc += f"Produces: {set(self.bound_producer.produces)}"
+        self.desc += f"Produces: {set(self.bound_item.produces)}"
         self.descriptionwidget.setText(self.desc)
-        # return super().setup_widget()
 
 
 class FileInfoProducerView(ProducerView):
     title = "File Info Producer"
-    bound_producer = data_rules.FileInfoProducer
+
+    bound_item = data_rules.FileInfoProducer
 
     def get(self):
         super().get()
-        return self.bound_producer()
+        return self.bound_item()
 
 
 class ImShapeProducerView(ProducerView):
     title = "Image shape"
-    bound_producer = image_rules.ImShapeProducer
+    bound_item = image_rules.ImShapeProducer
 
     def get(self):
         super().get()
-        return self.bound_producer()
+        return self.bound_item()
 
 
 class HashProducerView(ProducerView):
     title = "Hash Producer"
     desc = "gets a hash for the contents of an image"
-    bound_producer: type[image_rules.HashProducer] = image_rules.HashProducer
+    bound_item: type[image_rules.HashProducer] = image_rules.HashProducer
     needs_settings = True
 
     def configure_settings_group(self):
@@ -80,15 +80,15 @@ class HashProducerView(ProducerView):
     def reset_settings_group(self):
         self.hash_type.setCurrentIndex(0)
 
-    def get_config(self) -> dict:
+    def get_config(self):
         return {"hash_type": self.hash_type.currentText()}
 
     @classmethod
-    def from_config(cls, cfg: dict, parent=None):
+    def from_config(cls, cfg, parent=None):
         self = cls(parent)
         self.hash_type.setCurrentText(cfg["hash_type"])
         return self
 
     def get(self):
         super().get()
-        return self.bound_producer(image_rules.HASHERS(self.hash_type.currentText()))
+        return self.bound_item(image_rules.HASHERS(self.hash_type.currentText()))
