@@ -78,7 +78,7 @@ def main(
     from rich.progress import Progress
 
     from src.datarules.dataset_builder import DatasetBuilder, chunk_split
-    from util.file_list import get_file_list
+    from src.file_list import get_file_list
 
     c = Console(record=True)
     with Progress(

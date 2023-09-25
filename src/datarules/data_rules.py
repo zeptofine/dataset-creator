@@ -4,13 +4,12 @@ import os
 from datetime import datetime
 from pathlib import Path
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Annotated, Self
+from typing import TYPE_CHECKING, Self
 
 from dateutil import parser as timeparser
 from polars import DataFrame, Datetime, col
 
-from util.file_list import get_file_list
-
+from ..file_list import get_file_list
 from .base_rules import Column, Comparable, FastComparable, Producer, Rule
 
 if TYPE_CHECKING:
