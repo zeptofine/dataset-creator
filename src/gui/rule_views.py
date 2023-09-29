@@ -156,46 +156,6 @@ class TotalLimitRuleView(RuleView):
         return self
 
 
-class ExistingRuleView(RuleView):
-    title = "Existing"
-
-    needs_settings = True
-    bound_item = data_rules.ExistingRule
-
-    def configure_settings_group(self):
-        self.exists_in = QComboBox(self)
-        self.exists_in.addItems(["all", "any"])
-        self.existing_list = QTextEdit(self)
-        self.groupgrid.addWidget(QLabel("Exists in: ", self), 0, 0)
-        self.groupgrid.addWidget(QLabel("of the folders", self), 0, 2)
-        self.groupgrid.addWidget(QLabel("Existing folders: ", self), 1, 0, 1, 3)
-        self.groupgrid.addWidget(self.exists_in, 0, 1)
-        self.groupgrid.addWidget(self.existing_list, 2, 0, 1, 3)
-
-    def reset_settings_group(self):
-        self.exists_in.setCurrentIndex(0)
-        self.existing_list.clear()
-
-    def get(self):
-        super().get()
-        return data_rules.ExistingRule(
-            folders=self.existing_list.toPlainText().splitlines(),
-        )
-
-    def get_config(self):
-        return {
-            "list": self.existing_list.toPlainText().splitlines(),
-            "exists_in": self.exists_in.currentText(),
-        }
-
-    @classmethod
-    def from_config(cls, cfg, parent=None):
-        self = cls(parent)
-        self.existing_list.setText("\n".join(cfg["list"]))
-        self.exists_in.setCurrentText(cfg["exists_in"])
-        return self
-
-
 class ResRuleView(RuleView):
     title = "Resolution"
 

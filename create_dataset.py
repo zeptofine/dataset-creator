@@ -118,7 +118,7 @@ def main(
         # generate `Output`s
         outputs: list[Output] = [
             Output(
-                Path(folder["data"]["folder"]),
+                Path(folder["data"]["path"]),
                 {Filter.all_filters[filter_["name"]]: filter_["data"] for filter_ in folder["data"]["lst"]},
                 folder["data"]["output_format"],
             )
@@ -163,11 +163,11 @@ def main(
         p.remove_task(folder_t)
         resolved: dict[str, File] = {
             str((src / pth).resolve()): File(
-                str(pth),
-                str(src),
-                str(pth.relative_to(src).parent),
-                pth.stem,
-                pth.suffix[pth.suffix[0] == "." :],
+                absolute_pth=str(pth),
+                src=str(src),
+                relative_path=str(pth.relative_to(src).parent),
+                file=pth.stem,
+                ext=pth.suffix[pth.suffix[0] == "." :],
             )
             for src, lst in images.items()
             for pth in lst
@@ -243,26 +243,30 @@ def main(
         files: list[File] = [resolved[file] for file in db.filter(set(resolved))]
         p.update(filter_t, total=len(files), completed=len(files))
 
+        # Generate FileScenarios
+        scenarios: list[FileScenario] = [
+            FileScenario(file, outs)
+            for file in p.track(files, description="generating scenarios")
+            if (  # remove finished files
+                outs := [
+                    scenario
+                    for output in outputs
+                    if not os.path.exists(
+                        (
+                            scenario := OutputScenario(
+                                str(output.path / Path(output.format_file(file))),
+                                output.filters,
+                            )
+                        ).path
+                    )
+                ]
+            )
+        ]
         if not check_for_images(files):
             return 0
         if simulate:
-            p.log(f"Simulated. {len(files)} images remain.")
+            p.log(f"Simulated. {len(scenarios)} images remain.")
             return 0
-
-        # Generate FileScenarios
-        scenarios: list[FileScenario] = [
-            FileScenario(
-                file,
-                [
-                    OutputScenario(
-                        str(output.path / Path(output.format_file(file))),
-                        output.filters,
-                    )
-                    for output in outputs
-                ],
-            )
-            for file in p.track(files, description="generating scenarios")
-        ]
         # # * convert files. Finally!
         try:
             with Pool(threads) as pool:

@@ -34,11 +34,11 @@ from ..configs.configtypes import InputData
 from ..datarules.base_rules import Input
 from .err_dialog import catch_errors
 from .frames import FlowItem, FlowList
-from .output_filters import Filter
+from .output_filters import FilterView
 
 
 class FilterList(FlowList):
-    items: list[Filter]
+    items: list[FilterView]
 
 
 DEFAULT_IMAGE_FORMATS = (

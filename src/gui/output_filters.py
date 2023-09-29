@@ -12,7 +12,7 @@ from ..image_filters import size_changers
 from .frames import FlowItem, FlowList
 
 
-class Filter(FlowItem):
+class FilterView(FlowItem):
     title = "Filter"
 
     bound_item: Callable
@@ -22,7 +22,7 @@ class Filter(FlowItem):
         return img
 
 
-class ResizeFilterView(Filter):
+class ResizeFilterView(FilterView):
     title = "Resize"
     needs_settings = True
 

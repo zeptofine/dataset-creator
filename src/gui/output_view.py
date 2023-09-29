@@ -18,11 +18,11 @@ from ..datarules.base_rules import Output
 from .err_dialog import catch_errors
 from .frames import FlowItem, FlowList
 from .input_view import InputView
-from .output_filters import Filter, ResizeFilterView
+from .output_filters import FilterView, ResizeFilterView
 
 
 class FilterList(FlowList):
-    items: list[Filter]
+    items: list[FilterView]
 
 
 class InvalidFormatException(Exception):
@@ -69,7 +69,7 @@ class OutputView(InputView):
 
     def get_config(self) -> OutputData:
         return {
-            "folder": self.text.text(),
+            "path": self.text.text(),
             "output_format": self.format_str.text() or self.format_str.placeholderText(),
             "lst": self.list.get_config(),
         }
@@ -77,7 +77,7 @@ class OutputView(InputView):
     @classmethod
     def from_config(cls, cfg: OutputData, parent=None):
         self = cls(parent)
-        self.text.setText(cfg["folder"])
+        self.text.setText(cfg["path"])
         self.format_str.setText(cfg["output_format"])
         self.list.add_from_cfg(cfg["lst"])
         return self

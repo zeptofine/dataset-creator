@@ -9,9 +9,7 @@ from typing import TYPE_CHECKING, Self
 from dateutil import parser as timeparser
 from polars import DataFrame, Datetime, col
 
-from src.configs.configtypes import SpecialItemData
-
-from ..file_list import get_file_list
+from ..configs.configtypes import SpecialItemData
 from .base_rules import Column, Comparable, FastComparable, Producer, Rule
 
 if TYPE_CHECKING:
@@ -129,32 +127,6 @@ class BlacknWhitelistRule(Rule):
     @classmethod
     def get_cfg(cls) -> BlacknWhitelistData:
         return {"whitelist": [], "blacklist": []}
-
-
-class ExistingRule(Rule):
-    def __init__(self, folders: list[str] | list[Path], recurse_func: Callable = lambda x: x) -> None:
-        super().__init__()
-        assert folders, "No folders given to check for existing files"
-        self.existing_list = ExistingRule._get_existing(*map(Path, folders))
-        self.recurse_func: Callable[[Path], Path] = recurse_func
-        self.comparer = FastComparable(col("path").apply(self.intersection))
-
-    @classmethod
-    def get_cfg(cls) -> dict:
-        return {"folders": []}
-
-    @classmethod
-    def from_cfg(cls, cfg) -> Self:
-        return cls(folders=cfg["folders"])
-
-    def intersection(self, path):
-        return self.recurse_func(path).with_suffix("") not in self.existing_list
-
-    @staticmethod
-    def _get_existing(*folders: Path) -> set:
-        return set.intersection(
-            *({file.relative_to(folder).with_suffix("") for file in get_file_list(folder, "*")} for folder in folders)
-        )
 
 
 class ResolvedRule(Rule):
