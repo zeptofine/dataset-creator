@@ -96,17 +96,13 @@ class BlacklistWhitelistView(RuleView):
         self.whitelist = QTextEdit(self)
         self.blacklist = QTextEdit(self)
 
-        self.whitelist_exclusive = QCheckBox("exclusive", self)
-        self.whitelist_exclusive.setToolTip("when enabled, only files that are valid to every single str is allowed")
         self.groupgrid.addWidget(QLabel("Whitelist: ", self), 0, 0)
         self.groupgrid.addWidget(QLabel("Blacklist: ", self), 2, 0)
-        self.groupgrid.addWidget(self.whitelist_exclusive, 0, 1, 1, 1)
         self.groupgrid.addWidget(self.whitelist, 1, 0, 1, 2)
         self.groupgrid.addWidget(self.blacklist, 3, 0, 1, 2)
 
     def reset_settings_group(self):
         self.whitelist.clear()
-        self.whitelist_exclusive.setChecked(False)
         self.blacklist.clear()
 
     def get(self):
@@ -114,21 +110,18 @@ class BlacklistWhitelistView(RuleView):
         return data_rules.BlacknWhitelistRule(
             self.whitelist.toPlainText().splitlines(),
             self.blacklist.toPlainText().splitlines(),
-            exclusive=self.whitelist_exclusive.isChecked(),
         )
 
-    def get_config(self):
+    def get_config(self) -> data_rules.BlacknWhitelistData:
         return {
             "whitelist": self.whitelist.toPlainText().splitlines(),
-            "whitelist_exclusive": self.whitelist_exclusive.isChecked(),
             "blacklist": self.blacklist.toPlainText().splitlines(),
         }
 
     @classmethod
-    def from_config(cls, cfg, parent=None):
+    def from_config(cls, cfg: data_rules.BlacknWhitelistData, parent=None):
         self = cls(parent)
         self.whitelist.setText("\n".join(cfg["whitelist"]))
-        self.whitelist_exclusive.setChecked(cfg["whitelist_exclusive"])
         self.blacklist.setText("\n".join(cfg["blacklist"]))
         return self
 

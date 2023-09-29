@@ -5,8 +5,13 @@ from PIL import Image
 from ..datarules.base_rules import Filter
 
 
-def resize(img: np.ndarray, scale: float) -> np.ndarray:
-    return cv2.resize(img, (int(img.shape[1] * scale), int(img.shape[0] * scale)))
+class Resize(Filter):
+    def run(self, img: np.ndarray, scale: float) -> np.ndarray:
+        """
+        Resize the image.
 
-
-Filter.register_filter(resize)
+        :param img: The image to resize.
+        :param scale: The scale to resize.
+        :return: The resized image.
+        """
+        return cv2.resize(img, (int(img.shape[1] * scale), int(img.shape[0] * scale)))

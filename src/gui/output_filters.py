@@ -26,7 +26,7 @@ class ResizeFilterView(Filter):
     title = "Resize"
     needs_settings = True
 
-    bound_item = size_changers.resize
+    bound_item = size_changers.Resize
 
     def configure_settings_group(self):
         self.scale = QDoubleSpinBox(self)

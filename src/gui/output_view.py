@@ -46,7 +46,7 @@ class OutputView(InputView):
 
     def configure_settings_group(self):
         self.format_str = QLineEdit(self)
-        self.format_str.setPlaceholderText("{relative_path}/{file}.{ext}")
+        self.format_str.setText("{relative_path}/{file}.{ext}")
 
         self.list = FilterList(self)
         self.list.register_item(ResizeFilterView)

@@ -4,6 +4,8 @@ from pathlib import Path
 from string import Formatter
 from typing import Any, Generic, TypedDict, TypeVar
 
+from src.datarules.base_rules import Filter
+
 from ..file import File
 from .keyworded import Keyworded
 
@@ -86,7 +88,7 @@ PLACEHOLDER_FORMAT_KWARGS = PLACEHOLDER_FORMAT_FILE.to_dict()
 @dataclass
 class Output(Keyworded):
     path: Path
-    filters: dict[Callable, FilterData]
+    filters: dict[Filter, FilterData]
     output_format: str
 
     def __init__(self, path, filters, output_format=DEFAULT_OUTPUT_FORMAT):

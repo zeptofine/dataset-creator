@@ -167,8 +167,6 @@ class Window(QWidget):
         with self.cfg_path.open("r") as f:
             self.load_cfg(MainConfig(json.load(f)))
 
-        exit()
-
     def get_config(self) -> MainConfig:
         return {
             "inputs": self.inputlist.get_config(),

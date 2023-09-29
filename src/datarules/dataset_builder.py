@@ -278,9 +278,7 @@ class DatasetBuilder:
         pass
 
     def __repr__(self) -> str:
-        attrlist: list[str] = [
-            f"{key}={val!r}" for key, val in self.__dict__.items() if all(k not in key for k in ("__"))
-        ]
+        attrlist: list[str] = [f"{key}={val!r}" for key, val in vars(self).items() if all(k not in key for k in ("__"))]
         return f"{self.__class__.__name__}({', '.join(attrlist)})"
 
     @overload

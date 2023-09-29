@@ -25,7 +25,7 @@ app = typer.Typer()
 @dataclass
 class OutputScenario:
     path: str
-    filters: dict[Callable, FilterData]
+    filters: dict[Filter, FilterData]
 
 
 @dataclass
@@ -46,13 +46,14 @@ def parse_scenario(sc: FileScenario):
     mtime: os.stat_result = os.stat(str(sc.file.absolute_pth))
     for output in sc.outputs:
         img = original
-        for filter_, args in output.filters.items():
-            img = filter_(img, **args)
+        for filter_, kwargs in output.filters.items():
+            img = filter_.run(img, **kwargs)
 
         Path(output.path).parent.mkdir(parents=True, exist_ok=True)
 
         cv2.imwrite(output.path, img)
         os.utime(output.path, (mtime.st_atime, mtime.st_mtime))
+    return sc
 
 
 @app.command()

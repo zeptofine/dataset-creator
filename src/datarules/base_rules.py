@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from abc import abstractmethod
 from collections import defaultdict
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -70,7 +71,7 @@ class Producer(Keyworded):
     def __repr__(self) -> str:
         attrlist: list[str] = [
             f"{key}=..." if hasattr(val, "__iter__") and not isinstance(val, str) else f"{key}={val}"
-            for key, val in self.__dict__.items()
+            for key, val in vars(self).items()
         ]
         return f"{self.__class__.__name__}({', '.join(attrlist)})"
 
@@ -109,7 +110,7 @@ class Rule(Keyworded):
         Rule.all_rules[cls.cfg_kwd()] = cls
 
     def __repr__(self) -> str:
-        attrlist: list[str] = [f"{key}={val}" for key, val in self.__dict__.items() if key not in repr_blacklist]
+        attrlist: list[str] = [f"{key}={val}" for key, val in vars(self).items() if key not in repr_blacklist]
         return f"{self.__class__.__name__}({', '.join(attrlist)})"
 
     def __str__(self) -> str:
@@ -119,7 +120,9 @@ class Rule(Keyworded):
 class Filter(Keyworded):
     all_filters: ClassVar[dict[str, Callable]] = {}
 
-    @classmethod
-    def register_filter(cls, *f: Callable):
-        for f_ in f:
-            cls.all_filters[f_.__name__] = f_
+    def __init_subclass__(cls):
+        Filter.all_filters[cls.cfg_kwd()] = cls.run
+
+    @abstractmethod
+    def run(self, *args, **kwargs):
+        raise NotImplementedError

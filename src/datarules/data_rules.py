@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING, Self
 from dateutil import parser as timeparser
 from polars import DataFrame, Datetime, col
 
+from src.configs.configtypes import SpecialItemData
+
 from ..file_list import get_file_list
 from .base_rules import Column, Comparable, FastComparable, Producer, Rule
 
@@ -98,35 +100,35 @@ class StatRule(Rule):
             super().__init__(f"{older} is older than {newer}")
 
 
+class BlacknWhitelistData(SpecialItemData):
+    whitelist: list[str]
+    blacklist: list[str]
+
+
 class BlacknWhitelistRule(Rule):
     def __init__(
         self,
         whitelist: list[str] | None = None,
         blacklist: list[str] | None = None,
-        exclusive: bool = False,
     ) -> None:
         super().__init__()
 
         self.whitelist: list[str] | None = whitelist
         self.blacklist: list[str] | None = blacklist
-        self.exclusive: bool = exclusive
 
         expr: Expr | bool = True
 
         if self.whitelist:
             for item in self.whitelist:
-                if self.exclusive:
-                    expr &= col("path").str.contains(item)
-                else:
-                    expr |= col("path").str.contains(item)
+                expr &= col("path").str.contains(item)
         if self.blacklist:
             for item in self.blacklist:
                 expr &= col("path").str.contains(item).is_not()
         self.comparer = FastComparable(expr)
 
     @classmethod
-    def get_cfg(cls):
-        return {"whitelist": [], "blacklist": [], "exclusive": False}
+    def get_cfg(cls) -> BlacknWhitelistData:
+        return {"whitelist": [], "blacklist": []}
 
 
 class ExistingRule(Rule):
