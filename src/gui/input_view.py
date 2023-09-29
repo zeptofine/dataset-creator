@@ -30,7 +30,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..configs.configtypes import Input, InputData
+from ..configs.configtypes import InputData
+from ..datarules.base_rules import Input
 from .err_dialog import catch_errors
 from .frames import FlowItem, FlowList
 from .output_filters import Filter

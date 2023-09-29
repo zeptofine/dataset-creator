@@ -13,7 +13,8 @@ from PySide6.QtWidgets import (
     QSizePolicy,
 )
 
-from ..configs import Output, OutputData
+from ..configs import OutputData
+from ..datarules.base_rules import Output
 from .err_dialog import catch_errors
 from .frames import FlowItem, FlowList
 from .input_view import InputView
@@ -81,11 +82,11 @@ class OutputView(InputView):
         self.list.add_from_cfg(cfg["lst"])
         return self
 
-    @Slot()
-    def select_folder(self):
-        filename = QFileDialog.getExistingDirectory(
-            self,
-            "Select output folder",
-            str(Path.home()),
-        )
-        self.text.setText(filename)
+    # @Slot()
+    # def select_folder(self):
+    #     filename = QFileDialog.getExistingDirectory(
+    #         self,
+    #         "Select output folder",
+    #         str(Path.home()),
+    #     )
+    #     self.text.setText(filename)

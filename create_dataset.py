@@ -15,8 +15,8 @@ from typing_extensions import Annotated
 import src.datarules.data_rules as drules
 import src.datarules.image_rules as irules
 import src.image_filters
-from src.configs import FilterData, Input, MainConfig, Output
-from src.datarules.base_rules import File, Filter, Producer, Rule
+from src.configs import FilterData, MainConfig
+from src.datarules.base_rules import File, Filter, Input, Output, Producer, Rule
 
 CPU_COUNT = int(cpu_count())
 app = typer.Typer()
