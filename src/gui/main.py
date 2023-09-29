@@ -51,7 +51,6 @@ from .producer_views import (
 from .rule_views import (
     BlacklistWhitelistView,
     ChannelRuleView,
-    ExistingRuleView,
     HashRuleView,
     ResRuleView,
     RuleView,
@@ -136,7 +135,6 @@ class Window(QWidget):
         self.rulelist.register_item(
             StatRuleView,
             BlacklistWhitelistView,
-            ExistingRuleView,
             TotalLimitRuleView,
             ResRuleView,
             ChannelRuleView,
