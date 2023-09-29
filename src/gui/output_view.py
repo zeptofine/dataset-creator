@@ -7,6 +7,7 @@ from typing import Any
 
 from PySide6.QtCore import Slot
 from PySide6.QtWidgets import (
+    QCheckBox,
     QFileDialog,
     QLabel,
     QLineEdit,
@@ -49,19 +50,23 @@ class OutputView(InputView):
         self.format_str = QLineEdit(self)
         self.format_str.setText("{relative_path}/{file}.{ext}")
 
+        self.overwrite = QCheckBox(self)
+        self.overwrite.setText("overwrite existing files")
         self.list = FilterList(self)
         self.list.register_item(ResizeFilterView)
         self.list.setMinimumHeight(400)
         self.list.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
 
         self.list.register_item()
-        self.groupgrid.addWidget(QLabel("format text: ", self), 1, 0, 1, 3)
-        self.groupgrid.addWidget(self.format_str, 2, 0, 1, 3)
-        self.groupgrid.addWidget(QLabel("Filters: ", self), 3, 0, 1, 3)
-        self.groupgrid.addWidget(self.list, 4, 0, 1, 3)
+        self.groupgrid.addWidget(self.overwrite, 1, 0, 1, 3)
+        self.groupgrid.addWidget(QLabel("format text: ", self), 2, 0, 1, 3)
+        self.groupgrid.addWidget(self.format_str, 3, 0, 1, 3)
+        self.groupgrid.addWidget(QLabel("Filters: ", self), 4, 0, 1, 3)
+        self.groupgrid.addWidget(self.list, 5, 0, 1, 3)
 
     def reset_settings_group(self):
         self.format_str.clear()
+        self.overwrite.setChecked(False)
         self.list.items.clear()
 
     def get(self) -> str:
@@ -72,6 +77,7 @@ class OutputView(InputView):
             "path": self.text.text(),
             "output_format": self.format_str.text() or self.format_str.placeholderText(),
             "lst": self.list.get_config(),
+            "overwrite": self.overwrite.isChecked(),
         }
 
     @classmethod
@@ -80,6 +86,7 @@ class OutputView(InputView):
         self.text.setText(cfg["path"])
         self.format_str.setText(cfg["output_format"])
         self.list.add_from_cfg(cfg["lst"])
+        self.overwrite.setChecked(cfg["overwrite"])
         return self
 
     # @Slot()

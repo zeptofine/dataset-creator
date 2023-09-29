@@ -86,7 +86,7 @@ def main(
         progress.TaskProgressColumn(),
         progress.BarColumn(bar_width=20),
         progress.TimeRemainingColumn(),
-        progress.TextColumn("[progress.description]{task.description}:"),
+        progress.TextColumn("[progress.description]{task.description}"),
         progress.MofNCompleteColumn(),
         progress.SpinnerColumn(),
         console=c,
@@ -120,6 +120,7 @@ def main(
             Output(
                 Path(folder["data"]["path"]),
                 {Filter.all_filters[filter_["name"]]: filter_["data"] for filter_ in folder["data"]["lst"]},
+                folder["data"]["overwrite"],
                 folder["data"]["output_format"],
             )
             for folder in cfg["output"]
@@ -249,16 +250,12 @@ def main(
             for file in p.track(files, description="generating scenarios")
             if (  # remove finished files
                 outs := [
-                    scenario
-                    for output in outputs
-                    if not os.path.exists(
-                        (
-                            scenario := OutputScenario(
-                                str(output.path / Path(output.format_file(file))),
-                                output.filters,
-                            )
-                        ).path
+                    OutputScenario(
+                        str(pth),
+                        output.filters,
                     )
+                    for output in outputs
+                    if not (pth := output.path / Path(output.format_file(file))).exists() or output.overwrite
                 ]
             )
         ]

@@ -161,12 +161,14 @@ class Output(Keyworded):
     path: Path
     filters: dict[Filter, FilterData]
     output_format: str
+    overwrite: bool
 
-    def __init__(self, path, filters, output_format=DEFAULT_OUTPUT_FORMAT):
+    def __init__(self, path, filters, overwrite=False, output_format=DEFAULT_OUTPUT_FORMAT):
         self.path = path
         # try to format. If it fails, it will raise InvalidFormatException
         outputformatter.format(output_format, **PLACEHOLDER_FORMAT_KWARGS)
         self.output_format = output_format
+        self.overwrite = overwrite
         self.filters = filters
 
     def format_file(self, file: File):

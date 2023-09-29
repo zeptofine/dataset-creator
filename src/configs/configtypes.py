@@ -31,6 +31,7 @@ class OutputData(SpecialItemData):
     path: str
     lst: list[ItemConfig[FilterData]]
     output_format: str
+    overwrite: bool
 
 
 class ProducerData(ItemData):
