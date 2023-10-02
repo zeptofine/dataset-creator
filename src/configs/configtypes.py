@@ -20,11 +20,10 @@ class SpecialItemData(TypedDict):
 class InputData(SpecialItemData):
     expressions: list[str]
     folder: str
-    ...
 
 
 class FilterData(SpecialItemData):
-    pass
+    ...
 
 
 class OutputData(SpecialItemData):

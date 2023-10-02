@@ -20,7 +20,6 @@ AllBlurAlgos = typing.get_args(BlurAlgorithms)
 
 
 class BlurData(FilterData):
-    ...
     algorithms: list[str]
     blur_range: list[int]
     scale: float
@@ -66,7 +65,6 @@ AllNoiseAlgos = typing.get_args(NoiseAlgorithms)
 
 
 class NoiseData(FilterData):
-    ...
     algorithms: list[str]
     intensity_range: list[int]
     scale: float

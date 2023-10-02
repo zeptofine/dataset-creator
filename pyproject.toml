@@ -20,6 +20,7 @@ wcmatch = "^8.5"
 typer = { extras = ["all"], version = "^0.9.0" }
 PySide6-Essentials = "^6.5.2"
 ujson = "^5.8.0"
+ffmpeg-python = "^0.2.0"
 
 
 [tool.poetry.group.dev.dependencies]
