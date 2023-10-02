@@ -6,4 +6,5 @@ TODO:
 
 - [x] make UI
 - [x] redo config setup
+- [ ] More filters
 - [ ] bind UI to the CLI methods
