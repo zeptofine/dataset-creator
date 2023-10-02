@@ -78,7 +78,7 @@ def main(
     from rich.console import Console
     from rich.progress import Progress
 
-    from src.datarules.dataset_builder import DatasetBuilder, chunk_split
+    from src.datarules.dataset_builder import ConfigHandler, DatasetBuilder, chunk_split
     from src.file_list import get_file_list
 
     c = Console(record=True)
@@ -105,33 +105,11 @@ def main(
                 return False
             return True
 
-        # generate `Input`s
-        inputs: list[Input] = [
-            Input(
-                Path(folder["data"]["folder"]),
-                folder["data"]["expressions"],
-            )
-            for folder in cfg["inputs"]
-        ]
-
-        # generate `Output`s
-        outputs: list[Output] = [
-            Output(
-                Path(folder["data"]["path"]),
-                {Filter.all_filters[filter_["name"]]: filter_["data"] for filter_ in folder["data"]["lst"]},
-                folder["data"]["overwrite"],
-                folder["data"]["output_format"],
-            )
-            for folder in cfg["output"]
-        ]
-        for output in outputs:
-            output.path.mkdir(parents=True, exist_ok=True)
-
-        # generate `Producer`s
-        producers: list[Producer] = [Producer.all_producers[p["name"]].from_cfg(p["data"]) for p in cfg["producers"]]
-
-        # generate `Rule`s
-        rules: list[Rule] = [Rule.all_rules[r["name"]].from_cfg(r["data"]) for r in cfg["rules"]]
+        db_cfg = ConfigHandler(cfg)
+        inputs: list[Input] = db_cfg.inputs
+        outputs = db_cfg.outputs
+        producers = db_cfg.producers
+        rules = db_cfg.rules
 
         db.add_rules(*rules)
         db.add_producers(*producers)
@@ -155,10 +133,10 @@ def main(
         folder_t = p.add_task("from folder", total=len(inputs))
         for folder in inputs:
             lst: list[Path] = []
-            for file in get_file_list(folder.path, *folder.expressions):
+            for file in get_file_list(folder.folder, *folder.expressions):
                 lst.append(file)
                 p.advance(count_t)
-            images[folder.path] = lst
+            images[folder.folder] = lst
             p.advance(folder_t)
         p.remove_task(folder_t)
         resolved: dict[str, File] = {
@@ -254,7 +232,7 @@ def main(
                         output.filters,
                     )
                     for output in outputs
-                    if not (pth := output.path / Path(output.format_file(file))).exists() or output.overwrite
+                    if not (pth := output.folder / Path(output.format_file(file))).exists() or output.overwrite
                 ]
             )
         ]

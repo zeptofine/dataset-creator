@@ -11,6 +11,8 @@ from typing import Any, ClassVar, Set
 
 from polars import DataFrame, DataType, Expr, PolarsDataType
 
+from src.configs.configtypes import InputData, OutputData
+
 from ..configs import FilterData, Keyworded
 from ..file import File
 
@@ -130,8 +132,12 @@ class Filter(Keyworded):
 
 @dataclass
 class Input(Keyworded):
-    path: Path
+    folder: Path
     expressions: list[str]
+
+    @classmethod
+    def from_cfg(cls, cfg: InputData):
+        return cls(Path(cfg["folder"]), cfg["expressions"])
 
 
 class InvalidFormatException(Exception):
@@ -158,13 +164,13 @@ PLACEHOLDER_FORMAT_KWARGS = PLACEHOLDER_FORMAT_FILE.to_dict()
 
 @dataclass
 class Output(Keyworded):
-    path: Path
+    folder: Path
     filters: dict[Filter, FilterData]
     output_format: str
     overwrite: bool
 
     def __init__(self, path, filters, overwrite=False, output_format=DEFAULT_OUTPUT_FORMAT):
-        self.path = path
+        self.folder = path
         # try to format. If it fails, it will raise InvalidFormatException
         outputformatter.format(output_format, **PLACEHOLDER_FORMAT_KWARGS)
         self.output_format = output_format
@@ -173,3 +179,12 @@ class Output(Keyworded):
 
     def format_file(self, file: File):
         return outputformatter.format(self.output_format, **file.to_dict())
+
+    @classmethod
+    def from_cfg(cls, cfg: OutputData):
+        return cls(
+            Path(cfg["folder"]),
+            {Filter.all_filters[filter_["name"]]: filter_["data"] for filter_ in cfg["lst"]},
+            cfg["overwrite"],
+            cfg["output_format"],
+        )

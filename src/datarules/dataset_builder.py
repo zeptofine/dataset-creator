@@ -6,14 +6,19 @@ from pathlib import Path
 from typing import Generator, Literal, TypeVar, overload
 
 import polars as pl
-from polars import DataFrame, Expr
+import ujson
+from polars import DataFrame, Expr, concat
 from polars.type_aliases import SchemaDefinition
 
+from ..configs import FilterData, MainConfig
 from .base_rules import (
     Comparable,
     DataTypeSchema,
     ExprDict,
     FastComparable,
+    Filter,
+    Input,
+    Output,
     Producer,
     ProducerSet,
     Rule,
@@ -294,3 +299,18 @@ class DatasetBuilder:
         if in_place:
             self.__df = new_df
         return new_df
+
+
+class ConfigHandler:
+    def __init__(self, cfg: MainConfig):
+        # generate `Input`s
+        self.inputs: list[Input] = [Input.from_cfg(folder["data"]) for folder in cfg["inputs"]]
+        # generate `Output`s
+        self.outputs: list[Output] = [Output.from_cfg(folder["data"]) for folder in cfg["output"]]
+        # generate `Producer`s
+        self.producers: list[Producer] = [
+            Producer.all_producers[p["name"]].from_cfg(p["data"]) for p in cfg["producers"]
+        ]
+
+        # generate `Rule`s
+        self.rules: list[Rule] = [Rule.all_rules[r["name"]].from_cfg(r["data"]) for r in cfg["rules"]]

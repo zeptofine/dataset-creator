@@ -78,7 +78,7 @@ class OutputView(InputView):
 
     def get_config(self) -> OutputData:
         return {
-            "path": self.text.text(),
+            "folder": self.text.text(),
             "output_format": self.format_str.text() or self.format_str.placeholderText(),
             "lst": self.list.get_config(),
             "overwrite": self.overwrite.isChecked(),
@@ -87,7 +87,7 @@ class OutputView(InputView):
     @classmethod
     def from_config(cls, cfg: OutputData, parent=None):
         self = cls(parent)
-        self.text.setText(cfg["path"])
+        self.text.setText(cfg["folder"])
         self.format_str.setText(cfg["output_format"])
         self.list.add_from_cfg(cfg["lst"])
         self.overwrite.setChecked(cfg["overwrite"])

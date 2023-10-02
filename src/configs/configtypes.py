@@ -27,7 +27,7 @@ class FilterData(SpecialItemData):
 
 
 class OutputData(SpecialItemData):
-    path: str
+    folder: str
     lst: list[ItemConfig[FilterData]]
     output_format: str
     overwrite: bool
