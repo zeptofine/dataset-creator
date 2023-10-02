@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from collections.abc import Collection
 from typing import TypeVar
 
 from PySide6.QtCore import QRect, Qt, Signal, Slot
@@ -12,6 +13,8 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMenu,
     QProgressBar,
     QScrollArea,
@@ -302,3 +305,24 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
         if include_not_enabled:
             return list(map(FlowItem.get, self.items))
         return [item.get() for item in self.items if item.enabled]
+
+
+class MiniCheckList(QFrame):
+    def __init__(self, items: Collection[str], *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        grid = QGridLayout(self)
+        grid.setVerticalSpacing(0)
+        self.setLayout(grid)
+
+        self.items: dict[str, QCheckBox] = {}
+        for idx, item in enumerate(items):
+            checkbox = QCheckBox(self)
+            checkbox.setText(item)
+            self.items[item] = checkbox
+            grid.addWidget(checkbox, idx, 0)
+
+    def get_config(self) -> dict[str, bool]:
+        return {s: item.isChecked() for s, item in self.items.items()}
+
+    def set_config(self, i: str, val: bool):
+        self.items[i].setChecked(val)

@@ -19,7 +19,7 @@ from ..datarules.base_rules import Output
 from .err_dialog import catch_errors
 from .frames import FlowItem, FlowList
 from .input_view import InputView
-from .output_filters import FilterView, ResizeFilterView
+from .output_filters import BlurFilterView, FilterView, NoiseFilterView, ResizeFilterView
 
 
 class FilterList(FlowList):
@@ -53,7 +53,11 @@ class OutputView(InputView):
         self.overwrite = QCheckBox(self)
         self.overwrite.setText("overwrite existing files")
         self.list = FilterList(self)
-        self.list.register_item(ResizeFilterView)
+        self.list.register_item(
+            ResizeFilterView,
+            BlurFilterView,
+            NoiseFilterView,
+        )
         self.list.setMinimumHeight(400)
         self.list.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
 

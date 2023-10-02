@@ -19,4 +19,4 @@ extend-select = [
 ]
 fixable = ["ALL"]
 
-extend-ignore = ["F401"]
+extend-ignore = ["F401", "E501"]

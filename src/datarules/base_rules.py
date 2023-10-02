@@ -118,10 +118,10 @@ class Rule(Keyworded):
 
 
 class Filter(Keyworded):
-    all_filters: ClassVar[dict[str, Callable]] = {}
+    all_filters: ClassVar[dict[str, type[Filter]]] = {}
 
     def __init_subclass__(cls):
-        Filter.all_filters[cls.cfg_kwd()] = cls.run
+        Filter.all_filters[cls.cfg_kwd()] = cls
 
     @abstractmethod
     def run(self, *args, **kwargs):

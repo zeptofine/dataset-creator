@@ -47,7 +47,7 @@ def parse_scenario(sc: FileScenario):
     for output in sc.outputs:
         img = original
         for filter_, kwargs in output.filters.items():
-            img = filter_.run(img, **kwargs)
+            img = filter_.run(img=img, **kwargs)
 
         Path(output.path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -102,7 +102,6 @@ def main(
 
         def check_for_images(lst: list) -> bool:
             if not lst:
-                p.log("No images found in image list")
                 return False
             return True
 
@@ -175,7 +174,7 @@ def main(
         }
         diff: int = sum(map(len, images.values())) - len(resolved)
         if diff:
-            p.log(f"removed {diff} conflicting symlinks")
+            p.log(f"removed an estimated {diff} conflicting symlinks")
         total_images = len(resolved)
         p.update(count_t, total=total_images, completed=total_images)
 
@@ -259,7 +258,8 @@ def main(
                 ]
             )
         ]
-        if not check_for_images(files):
+        if not check_for_images(scenarios):
+            p.log("Finished. No images remain.")
             return 0
         if simulate:
             p.log(f"Simulated. {len(scenarios)} images remain.")
