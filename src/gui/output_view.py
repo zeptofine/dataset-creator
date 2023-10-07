@@ -99,12 +99,3 @@ class OutputView(InputView):
         self.list.add_from_cfg(cfg["lst"])
         self.overwrite.setChecked(cfg["overwrite"])
         return self
-
-    # @Slot()
-    # def select_folder(self):
-    #     filename = QFileDialog.getExistingDirectory(
-    #         self,
-    #         "Select output folder",
-    #         str(Path.home()),
-    #     )
-    #     self.text.setText(filename)

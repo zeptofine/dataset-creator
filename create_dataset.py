@@ -21,13 +21,19 @@ from rich.progress import Progress
 from typer import Option
 from typing_extensions import Annotated
 
-import src.datarules.data_rules as drules
-import src.datarules.image_rules as irules
-import src.image_filters
-from src.configs import FilterData, MainConfig
-from src.datarules.base_rules import File, Filter, Input, Output, Producer, Rule
-from src.datarules.dataset_builder import ConfigHandler, DatasetBuilder, chunk_split
-from src.scenarios import FileScenario, OutputScenario
+from src import (
+    MainConfig,
+    File,
+    Input,
+    Output,
+    Producer,
+    Rule,
+    ConfigHandler,
+    DatasetBuilder,
+    chunk_split,
+    FileScenario,
+    OutputScenario,
+)
 
 CPU_COUNT = int(cpu_count())
 logging.basicConfig(level=logging.CRITICAL, format="%(message)s", datefmt="[%X]", handlers=[RichHandler()])
