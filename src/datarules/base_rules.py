@@ -12,6 +12,7 @@ from typing import Any, ClassVar, Set
 from polars import DataFrame, DataType, Expr, PolarsDataType
 
 from src.configs.configtypes import InputData, OutputData
+from src.file_list import get_file_list
 
 from ..configs import FilterData, Keyworded
 from ..file import File
@@ -139,6 +140,9 @@ class Input(Keyworded):
     @classmethod
     def from_cfg(cls, cfg: InputData):
         return cls(Path(cfg["folder"]), cfg["expressions"])
+
+    def run(self):
+        return get_file_list(self.folder, *self.expressions)
 
 
 class InvalidFormatException(Exception):

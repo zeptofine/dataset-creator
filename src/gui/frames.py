@@ -166,6 +166,9 @@ class FlowItem(QFrame):  # TODO: Better name lmao
     def from_config(cls, cfg: ItemData, parent=None):
         return cls(parent=parent)
 
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.cfg_name()})"
+
 
 class FlowList(QGroupBox):  # TODO: Better name lmao
     n = Signal(int)

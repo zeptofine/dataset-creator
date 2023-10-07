@@ -1,7 +1,8 @@
-from __future__ import annotations
+# from __future__ import annotations
 
+import logging
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from multiprocessing import Pool, cpu_count, freeze_support
@@ -15,6 +16,7 @@ import typer
 import ujson
 from polars import DataFrame, concat
 from rich.console import Console
+from rich.logging import RichHandler
 from rich.progress import Progress
 from typer import Option
 from typing_extensions import Annotated
@@ -25,56 +27,35 @@ import src.image_filters
 from src.configs import FilterData, MainConfig
 from src.datarules.base_rules import File, Filter, Input, Output, Producer, Rule
 from src.datarules.dataset_builder import ConfigHandler, DatasetBuilder, chunk_split
-from src.file_list import get_file_list
+from src.scenarios import FileScenario, OutputScenario
 
 CPU_COUNT = int(cpu_count())
-app = typer.Typer()
-
-
-@dataclass
-class OutputScenario:
-    path: str
-    filters: dict[Filter, FilterData]
-
-
-@dataclass
-class FileScenario:
-    file: File
-    outputs: list[OutputScenario]
+logging.basicConfig(level=logging.CRITICAL, format="%(message)s", datefmt="[%X]", handlers=[RichHandler()])
+app = typer.Typer(pretty_exceptions_show_locals=True, pretty_exceptions_short=True)
+log = logging.getLogger()
 
 
 def read_image(path: str) -> np.ndarray:
     return cv2.imread(path, cv2.IMREAD_UNCHANGED)
 
 
-def generate_scenarios(p: Progress, files: list[File], outputs: list[Output]) -> Generator[FileScenario, None, None]:
-    return (
-        FileScenario(file, outs)
-        for file in p.track(files, description="generating scenarios")
-        if (  # remove finished files
-            outs := [
-                OutputScenario(str(pth), output.filters)
-                for output in outputs
-                if not (pth := output.folder / Path(output.format_file(file))).exists() or output.overwrite
-            ]
-        )
-    )
+def get_outputs(file, outputs: Iterable[Output]):
+    return [
+        OutputScenario(str(pth), output.filters)
+        for output in outputs
+        if not (pth := output.folder / Path(output.format_file(file))).exists() or output.overwrite
+    ]
 
 
-def parse_scenario(sc: FileScenario):
-    img: np.ndarray
-    original: np.ndarray
+def parse_files(files: Iterable[File], outputs: list[Output]) -> Generator[FileScenario, None, None]:
+    for file in files:
+        if out_s := get_outputs(file, outputs):
+            yield FileScenario(file, out_s)
 
-    original = read_image(str(sc.file.absolute_pth))
-    mtime: os.stat_result = os.stat(str(sc.file.absolute_pth))
-    for output in sc.outputs:
-        img = original
-        for filter_, kwargs in output.filters.items():
-            img = filter_.run(img=img, **kwargs)
-        Path(output.path).parent.mkdir(parents=True, exist_ok=True)
-        cv2.imwrite(output.path, img)
-        os.utime(output.path, (mtime.st_atime, mtime.st_mtime))
-    return sc
+
+def gather_images(inputs: Iterable[Input]) -> Generator[tuple[Path, list[Path]], None, None]:
+    for input_ in inputs:
+        yield input_.folder, list(input_.run())
 
 
 @app.command()
@@ -83,13 +64,29 @@ def main(
     database_path: Annotated[Path, Option(help="Where the database is placed")] = Path("filedb.arrow"),
     threads: Annotated[int, Option(help="multiprocessing threads")] = CPU_COUNT * 3 // 4,
     chunksize: Annotated[int, Option(help="imap chunksize")] = 5,
-    pchunksize: Annotated[int, Option("-p", help="chunksize when populating the df")] = 100,
-    pinterval: Annotated[int, Option("-s", help="save interval in secs when populating the df")] = 60,
+    population_chunksize: Annotated[int, Option("-p", help="chunksize when populating the df")] = 100,
+    population_interval: Annotated[int, Option("-s", help="save interval in secs when populating the df")] = 60,
     simulate: Annotated[bool, Option(help="stops before conversion")] = False,
     verbose: Annotated[bool, Option(help="prints converted files")] = False,
     sort_by: Annotated[str, Option(help="Which database column to sort by")] = "path",
 ) -> int:
     """Takes a crap ton of images and creates dataset pairs"""
+    if not config_path.exists():
+        log.error(f"{config_path} does not exist. create it in the gui and restart this program.")
+        return 0
+
+    with config_path.open("r") as f:
+        cfg: MainConfig = ujson.load(f)
+
+    db = DatasetBuilder(db_path=Path(database_path))
+
+    db_cfg = ConfigHandler(cfg)
+    inputs: list[Input] = db_cfg.inputs
+    outputs: list[Output] = db_cfg.outputs
+    producers: list[Producer] = db_cfg.producers
+    rules: list[Rule] = db_cfg.rules
+    db.add_rules(*rules)
+    db.add_producers(*producers)
 
     c = Console(record=True)
     with Progress(
@@ -101,29 +98,6 @@ def main(
         progress.SpinnerColumn(),
         console=c,
     ) as p:
-        if not config_path.exists():
-            p.log(f"{config_path} does not exist. create it in the gui and restart this program.")
-            return 0
-
-        with config_path.open("r") as f:
-            cfg: MainConfig = ujson.load(f)
-
-        db = DatasetBuilder(db_path=Path(database_path))
-
-        def check_for_images(lst: list) -> bool:
-            if not lst:
-                return False
-            return True
-
-        db_cfg = ConfigHandler(cfg)
-        inputs: list[Input] = db_cfg.inputs
-        outputs = db_cfg.outputs
-        producers = db_cfg.producers
-        rules = db_cfg.rules
-
-        db.add_rules(*rules)
-        db.add_producers(*producers)
-
         if verbose:
             p.log(
                 "inputs:",
@@ -140,31 +114,17 @@ def main(
         # Gather images
         images: dict[Path, list[Path]] = {}
         count_t = p.add_task("Gathering", total=None)
-        folder_t = p.add_task("from folder", total=len(inputs))
-        for folder in inputs:
-            lst: list[Path] = []
-            for file in get_file_list(folder.folder, *folder.expressions):
-                lst.append(file)
-                p.advance(count_t)
-            images[folder.folder] = lst
-            p.advance(folder_t)
-        p.remove_task(folder_t)
+        for folder, lst in gather_images(inputs):
+            images[folder] = lst
+            p.update(count_t, advance=len(lst))
+
         resolved: dict[str, File] = {
-            str((src / pth).resolve()): File(
-                absolute_pth=str(pth),
-                src=str(src),
-                relative_path=str(pth.relative_to(src).parent),
-                file=pth.stem,
-                ext=pth.suffix[pth.suffix[0] == "." :],
-            )
-            for src, lst in images.items()
-            for pth in lst
+            str((src / pth).resolve()): File.from_src(src, pth) for src, lst in images.items() for pth in lst
         }
-        diff: int = sum(map(len, images.values())) - len(resolved)
-        if diff:
+        if diff := sum(map(len, images.values())) - len(resolved):
             p.log(f"removed an estimated {diff} conflicting symlinks")
-        total_images = len(resolved)
-        p.update(count_t, total=total_images, completed=total_images)
+
+        p.update(count_t, total=len(resolved), completed=len(resolved))
 
         total_t = p.add_task("populating df", total=None)
         db.add_new_paths(set(resolved))
@@ -176,7 +136,7 @@ def main(
                 p.log(f"Skipping finished producers: {finished}")
 
             def trigger_save(save_timer: datetime, collected: list[DataFrame]) -> tuple[datetime, list[DataFrame]]:
-                if ((new_time := datetime.now()) - save_timer).total_seconds() > pinterval:
+                if ((new_time := datetime.now()) - save_timer).total_seconds() > population_interval:
                     data: DataFrame = concat(collected, how="diagonal")
                     db.update(data)
                     db.save_df()
@@ -196,7 +156,7 @@ def main(
                 if verbose:
                     p.log(df)
                     p.log(schemas)
-                chunks = list(chunk_split(df, chunksize=pchunksize))
+                chunks = list(chunk_split(df, chunksize=population_chunksize))
                 p.update(chunk_t, total=len(chunks), completed=0)
 
                 for (_, size), chunk in chunks:
@@ -231,26 +191,25 @@ def main(
         files: list[File] = [resolved[file] for file in db.filter(set(resolved))]
         p.update(filter_t, total=len(files), completed=len(files))
 
-        scenarios = list(generate_scenarios(p, files, outputs))
+        scenarios = list(parse_files(p.track(files, description="parsing scenarios"), outputs))
 
-        if not check_for_images(scenarios):
+        if not scenarios:
             p.log("Finished. No images remain.")
             return 0
         if simulate:
             p.log(f"Simulated. {len(scenarios)} images remain.")
             return 0
-        # # * convert files. Finally!
+
         try:
             with Pool(threads) as pool:
-                pool_t = p.add_task("parsing scenarios", total=len(scenarios))
-                for file in pool.imap(parse_scenario, scenarios, chunksize=chunksize):
+                execute_t = p.add_task("executing scenarios", total=len(scenarios))
+                for file in pool.imap(FileScenario.run, scenarios, chunksize=chunksize):
                     if verbose:
                         p.log(f"finished: {file}")
-                    p.advance(pool_t)
+                    p.advance(execute_t)
         except KeyboardInterrupt:
             print(-1, "KeyboardInterrupt")
             return 1
-
         return 0
 
 

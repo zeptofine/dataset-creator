@@ -176,8 +176,8 @@ class Window(QWidget):
     @catch_errors("Error saving")
     @Slot()
     def save_config(self):
+        cfg = self.get_config()
         with self.cfg_path.open("w") as f:
-            cfg = self.get_config()
             json.dump(cfg, f, indent=4)
             print("saved", cfg)
 
@@ -192,7 +192,6 @@ class Window(QWidget):
         self.producerlist.add_from_cfg(cfg["producers"])
         self.rulelist.add_from_cfg(cfg["rules"])
         self.outputlist.add_from_cfg(cfg["output"])
-        pass
 
     @catch_gathering
     @Slot()

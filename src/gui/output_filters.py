@@ -130,6 +130,9 @@ class NoiseFilterView(FilterView):
         self.intensity_range_y.setValue(16)
 
     def get_config(self) -> destroyers.NoiseData:
+        algos = [algo for algo, enabled in self.algorithms.get_config().items() if enabled]
+        if not algos:
+            raise EmptyAlgorithmsError(self)
         return {
             "algorithms": [algo for algo, enabled in self.algorithms.get_config().items() if enabled],
             "intensity_range": [self.intensity_range_x.value(), self.intensity_range_y.value()],
@@ -147,3 +150,100 @@ class NoiseFilterView(FilterView):
         self.intensity_range_y.setValue(r_y)
 
         return self
+
+
+class CompressionFilterView(FilterView):
+    title = "Compression"
+    needs_settings = True
+
+    bound_item = destroyers.Compression
+
+    def configure_settings_group(self):
+        self.algorithms = MiniCheckList(destroyers.AllCompressionAlgos, self)
+        self.groupgrid.addWidget(self.algorithms, 0, 0, 1, 3)
+
+        # jpeg quality
+        self.j_range_min = QSpinBox(self)
+        self.j_range_max = QSpinBox(self)
+        self.j_range_max.setMaximum(100)
+        self.j_range_min.valueChanged.connect(self.j_range_max.setMinimum)
+        self.j_range_max.valueChanged.connect(self.j_range_min.setMaximum)
+        self.groupgrid.addWidget(QLabel("JPEG quality range:", self), 1, 0)
+        self.groupgrid.addWidget(self.j_range_min, 1, 1)
+        self.groupgrid.addWidget(self.j_range_max, 1, 2)
+        # webp quality
+        self.w_range_min = QSpinBox(self)
+        self.w_range_max = QSpinBox(self)
+        self.w_range_max.setMaximum(100)
+        self.w_range_min.valueChanged.connect(self.w_range_max.setMinimum)
+        self.w_range_max.valueChanged.connect(self.w_range_min.setMaximum)
+        self.groupgrid.addWidget(QLabel("WebP quality range:", self), 2, 0)
+        self.groupgrid.addWidget(self.w_range_min, 2, 1)
+        self.groupgrid.addWidget(self.w_range_max, 2, 2)
+        # h264 crf
+        self.h264_range_min = QSpinBox(self)
+        self.h264_range_max = QSpinBox(self)
+        self.h264_range_max.setMaximum(100)
+        self.h264_range_min.valueChanged.connect(self.h264_range_max.setMinimum)
+        self.h264_range_max.valueChanged.connect(self.h264_range_min.setMaximum)
+        self.groupgrid.addWidget(QLabel("H264 CRF range:", self), 3, 0)
+        self.groupgrid.addWidget(self.h264_range_min, 3, 1)
+        self.groupgrid.addWidget(self.h264_range_max, 3, 2)
+        # hevc crf
+        self.hevc_range_min = QSpinBox(self)
+        self.hevc_range_max = QSpinBox(self)
+        self.hevc_range_min.setMaximum(100)
+        self.hevc_range_min.valueChanged.connect(self.hevc_range_max.setMinimum)
+        self.hevc_range_max.valueChanged.connect(self.hevc_range_min.setMaximum)
+        self.groupgrid.addWidget(QLabel("HEVC CRF range:", self), 4, 0)
+        self.groupgrid.addWidget(self.hevc_range_min, 4, 1)
+        self.groupgrid.addWidget(self.hevc_range_max, 4, 2)
+        # mpeg bitrate
+        self.mpeg_bitrate = QSpinBox(self)
+        self.mpeg_bitrate.setMaximum(1_000_000_000)  # idek what this is in gb
+        self.groupgrid.addWidget(QLabel("MPEG bitrate:", self), 5, 0)
+        self.groupgrid.addWidget(self.mpeg_bitrate, 5, 1, 1, 2)
+        # mpeg2 bitrate
+        self.mpeg2_bitrate = QSpinBox(self)
+        self.mpeg2_bitrate.setMaximum(1_000_000_000)
+        self.groupgrid.addWidget(QLabel("MPEG2 bitrate:", self), 6, 0)
+        self.groupgrid.addWidget(self.mpeg2_bitrate, 6, 1, 1, 2)
+
+    def reset_settings_group(self):
+        self.j_range_min.setValue(0)
+        self.j_range_max.setValue(100)
+        self.w_range_min.setValue(1)
+        self.w_range_max.setValue(100)
+        self.h264_range_min.setValue(20)
+        self.h264_range_max.setValue(28)
+        self.hevc_range_min.setValue(25)
+        self.hevc_range_max.setValue(33)
+
+    def get_config(self) -> destroyers.CompressionData:
+        algos = [algo for algo, enabled in self.algorithms.get_config().items() if enabled]
+        if not algos:
+            raise EmptyAlgorithmsError(self)
+        return {
+            "algorithms": [algo for algo, enabled in self.algorithms.get_config().items() if enabled],
+            "jpeg_quality_range": [self.j_range_min.value(), self.j_range_max.value()],
+            "webp_quality_range": [self.w_range_min.value(), self.w_range_max.value()],
+            "h264_crf_range": [self.h264_range_min.value(), self.h264_range_max.value()],
+            "hevc_crf_range": [self.hevc_range_min.value(), self.hevc_range_max.value()],
+            "mpeg_bitrate": self.mpeg_bitrate.value(),
+            "mpeg2_bitrate": self.mpeg2_bitrate.value(),
+        }
+
+    @classmethod
+    def from_config(cls, cfg, parent=None):
+        self = cls(parent)
+        for item in cfg["algorithms"]:
+            self.algorithms.set_config(item, True)
+
+        return self
+
+
+class EmptyAlgorithmsError(Exception):
+    """Raised when no algorithms are enabled"""
+
+    def __init__(self, f: FilterView):
+        super().__init__(f"No algorithms enabled in {f}")

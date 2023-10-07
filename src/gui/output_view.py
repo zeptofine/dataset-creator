@@ -19,7 +19,13 @@ from ..datarules.base_rules import Output
 from .err_dialog import catch_errors
 from .frames import FlowItem, FlowList
 from .input_view import InputView
-from .output_filters import BlurFilterView, FilterView, NoiseFilterView, ResizeFilterView
+from .output_filters import (
+    BlurFilterView,
+    CompressionFilterView,
+    FilterView,
+    NoiseFilterView,
+    ResizeFilterView,
+)
 
 
 class FilterList(FlowList):
@@ -57,6 +63,7 @@ class OutputView(InputView):
             ResizeFilterView,
             BlurFilterView,
             NoiseFilterView,
+            CompressionFilterView,
         )
         self.list.setMinimumHeight(400)
         self.list.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)

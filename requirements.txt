@@ -1,4 +1,3 @@
-cfg_param_wrapper>=1.0.1
 imagehash
 imagesize
 numpy
