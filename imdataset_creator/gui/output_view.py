@@ -1,17 +1,18 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from pathlib import Path
 from string import Formatter
 from typing import Any
 
-from PySide6.QtCore import Slot
+from PySide6.QtCore import Qt, QSize
+from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QFileDialog,
     QLabel,
     QLineEdit,
     QSizePolicy,
+    QSizeGrip,
 )
 
 from ..configs import OutputData
@@ -52,27 +53,32 @@ output_formatter = SafeFormatter()
 class OutputView(InputView):
     bound_item = Output
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setMouseTracking(True)
+        self.setMinimumHeight(400)
+        self.previous_position = None
+
     def configure_settings_group(self):
         self.format_str = QLineEdit(self)
 
         self.overwrite = QCheckBox(self)
         self.overwrite.setText("overwrite existing files")
+
         self.list = FilterList(self)
+        self.list.set_text("Filters")
         self.list.register_item(
             ResizeFilterView,
             BlurFilterView,
             NoiseFilterView,
             CompressionFilterView,
         )
-        self.list.setMinimumHeight(400)
-        self.list.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
 
         self.list.register_item()
         self.groupgrid.addWidget(self.overwrite, 1, 0, 1, 3)
         self.groupgrid.addWidget(QLabel("format text: ", self), 2, 0, 1, 3)
         self.groupgrid.addWidget(self.format_str, 3, 0, 1, 3)
-        self.groupgrid.addWidget(QLabel("Filters: ", self), 4, 0, 1, 3)
-        self.groupgrid.addWidget(self.list, 5, 0, 1, 3)
+        self.groupgrid.addWidget(self.list, 4, 0, 1, 3)
 
     def reset_settings_group(self):
         self.format_str.setText("{relative_path}/{file}.{ext}")
@@ -98,3 +104,18 @@ class OutputView(InputView):
         self.list.add_from_cfg(cfg["lst"])
         self.overwrite.setChecked(cfg["overwrite"])
         return self
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        if event.buttons() == Qt.MouseButton.LeftButton:
+            if self.previous_position is not None:
+                poschange = event.position() - self.previous_position
+                newsize = QSize(self.size().width(), int(self.size().height() + poschange.y()))
+                print(newsize)
+                self.resize(newsize)
+
+        self.previous_position = event.position()
+        return super().mouseMoveEvent(event)
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        self.previous_position = event.position()
+        return super().mousePressEvent(event)
