@@ -8,7 +8,7 @@ from pathlib import Path
 from PySide6 import QtWidgets
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtGui import QAction, QKeySequence, QShortcut
-from PySide6.QtWidgets import QFileDialog, QMainWindow, QSplitter, QStatusBar, QToolBar, QWidget
+from PySide6.QtWidgets import QFileDialog, QMainWindow, QSplitter, QStatusBar, QToolBar, QWidget, QMenu
 from rich import print as rprint
 
 from ..configs import MainConfig
@@ -31,6 +31,16 @@ from .rule_views import (
 CPU_COUNT = os.cpu_count()
 PROGRAM_ORIGIN = Path(__file__).parent
 RECENT_FILES_PATH = PROGRAM_ORIGIN / ".recent_files"
+
+
+def get_recent_files():
+    if RECENT_FILES_PATH.exists():
+        return RECENT_FILES_PATH.read_text().splitlines()
+    return []
+
+
+def save_recent_files(files):
+    RECENT_FILES_PATH.write_text("\n".join(files))
 
 
 class InputList(FlowList):
@@ -144,8 +154,13 @@ class Window(QMainWindow):
         filemenu.addAction(save_as_action)
         filemenu.addAction(reload_action)
 
+        self.recents_menu = QMenu("Open Recent", self)
+        self.recent_files = []
+        filemenu.addMenu(self.recents_menu)
+
         editmenu = menu.addMenu("Edit")
         editmenu.addAction(clear_action)
+
         # (get_producers := QAction("get producers", self)).triggered.connect(self.gather_producers)
         # (get_rules := QAction("get rules", self)).triggered.connect(self.gather_rules)
         # (get_builder := QAction("get builder", self)).triggered.connect(self.create_builder)
@@ -188,15 +203,20 @@ class Window(QMainWindow):
     def load_config(self):
         with self.cfg_path.open("r") as f:
             self.from_cfg(MainConfig(json.load(f)))
+            self.update_recents()
 
     @Slot()
-    def open_config(self):
-        file = QFileDialog.getOpenFileName(
-            self,
-            "Select cfg path",
-            str(self.cfg_path.parent),
-        )[0]
+    def open_config(self, s: str = ""):
+        if not s:
+            file = QFileDialog.getOpenFileName(
+                self,
+                "Select cfg path",
+                str(self.cfg_path.parent),
+            )[0]
+        else:
+            file = s
         if file:
+            print(f"Opening {file}")
             self.cfg_path = Path(file)
             self.load_config()
 
@@ -206,6 +226,20 @@ class Window(QMainWindow):
         self.producerlist.empty()
         self.rulelist.empty()
         self.outputlist.empty()
+
+    @Slot()
+    def update_recents(self):
+        recents = get_recent_files()
+        if (txt := str(self.cfg_path.resolve())) not in recents:
+            recents.insert(0, txt)
+        else:
+            recents.remove(txt)
+            recents.insert(0, txt)
+        save_recent_files(recents[:10])
+
+        self.recents_menu.clear()
+        for file in recents:
+            self.recents_menu.addAction(file).triggered.connect(lambda: self.open_config(file))
 
     @catch_loading
     @Slot(dict)
@@ -267,6 +301,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--cfg_path")
     args = parser.parse_args()
+
+    # check all recent files exist
+
+    save_recent_files([file for file in get_recent_files() if os.path.exists(file)])
+
     app = QtWidgets.QApplication([])
     central_window = Window(Path(args.cfg_path)) if args.cfg_path else Window()
     central_window.show()
