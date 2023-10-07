@@ -134,9 +134,6 @@ class Window(QMainWindow):
         self.lists.addWidget(self.producers_rules)
         self.lists.addWidget(self.outputlist)
 
-        # self.toolbar = QToolBar(self)
-        # self.addToolBar(self.toolbar)
-
         (save_action := QAction("Save", self)).triggered.connect(self.save_config)
         (save_as_action := QAction("Save As...", self)).triggered.connect(self.save_config_as)
         (open_action := QAction("Open...", self)).triggered.connect(self.open_config)
@@ -161,12 +158,9 @@ class Window(QMainWindow):
         editmenu = menu.addMenu("Edit")
         editmenu.addAction(clear_action)
 
-        # (get_producers := QAction("get producers", self)).triggered.connect(self.gather_producers)
-        # (get_rules := QAction("get rules", self)).triggered.connect(self.gather_rules)
         # (get_builder := QAction("get builder", self)).triggered.connect(self.create_builder)
-        # (get_files := QAction("get files", self)).triggered.connect(self.gather_files)
         # (run_builder := QAction("run builder", self)).triggered.connect(self.run_builder)
-        # self.addActions([get_producers, get_rules, get_builder, get_files, run_builder])
+
         if self.cfg_path.exists():
             self.load_config()
 
@@ -249,22 +243,6 @@ class Window(QMainWindow):
         self.producerlist.add_from_cfg(cfg["producers"])
         self.rulelist.add_from_cfg(cfg["rules"])
         self.outputlist.add_from_cfg(cfg["output"])
-
-    @catch_gathering
-    @Slot()
-    def gather_producers(self):
-        rprint(self.producerlist.get())
-
-    @catch_gathering
-    @Slot()
-    def gather_rules(self):
-        rprint(self.rulelist.get())
-
-    @catch_gathering
-    @Slot()
-    def gather_files(self):
-        self.filedict.clear()
-        self.inputlist.get()
 
     @Slot(dict)
     def collect_files(self, dct):
