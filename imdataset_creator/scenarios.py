@@ -5,8 +5,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from src.configs import FilterData
-from src.datarules.base_rules import File, Filter
+from .configs import FilterData
+from .datarules.base_rules import File, Filter
 
 # IDK Wtf to call these things other than scenarios
 

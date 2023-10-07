@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import Enum, EnumType
 from typing import Self
 
-from src.configs.configtypes import ItemData, SpecialItemData
+from .configtypes import ItemData, SpecialItemData
 
 
 class Keyworded:
