@@ -130,17 +130,19 @@ class Window(QMainWindow):
         (save_action := QAction("Save", self)).triggered.connect(self.save_config)
         (save_as_action := QAction("Save As...", self)).triggered.connect(self.save_config_as)
         (open_action := QAction("Open...", self)).triggered.connect(self.open_config)
+        (reload_action := QAction("Open...", self)).triggered.connect(self.load_config)
         (clear_action := QAction("clear", self)).triggered.connect(self.clear)
         save_action.setShortcut(QKeySequence("Ctrl+S"))
         save_as_action.setShortcut(QKeySequence("Ctrl+Shift+S"))
         open_action.setShortcut(QKeySequence("Ctrl+O"))
-
+        reload_action.setShortcut(QKeySequence("Ctrl+R"))
         menu = self.menuBar()
 
         filemenu = menu.addMenu("File")
         filemenu.addAction(open_action)
         filemenu.addAction(save_action)
         filemenu.addAction(save_as_action)
+        filemenu.addAction(reload_action)
 
         editmenu = menu.addMenu("Edit")
         editmenu.addAction(clear_action)
