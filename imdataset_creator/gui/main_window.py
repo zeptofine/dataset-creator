@@ -130,7 +130,7 @@ class Window(QMainWindow):
         (save_action := QAction("Save", self)).triggered.connect(self.save_config)
         (save_as_action := QAction("Save As...", self)).triggered.connect(self.save_config_as)
         (open_action := QAction("Open...", self)).triggered.connect(self.open_config)
-        (reload_action := QAction("Open...", self)).triggered.connect(self.load_config)
+        (reload_action := QAction("Reload", self)).triggered.connect(self.load_config)
         (clear_action := QAction("clear", self)).triggered.connect(self.clear)
         save_action.setShortcut(QKeySequence("Ctrl+S"))
         save_as_action.setShortcut(QKeySequence("Ctrl+Shift+S"))
@@ -152,6 +152,8 @@ class Window(QMainWindow):
         # (get_files := QAction("get files", self)).triggered.connect(self.gather_files)
         # (run_builder := QAction("run builder", self)).triggered.connect(self.run_builder)
         # self.addActions([get_producers, get_rules, get_builder, get_files, run_builder])
+        if self.cfg_path.exists():
+            self.load_config()
 
     def get_config(self) -> MainConfig:
         return {

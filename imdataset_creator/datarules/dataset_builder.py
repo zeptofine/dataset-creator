@@ -212,8 +212,6 @@ class DatasetBuilder:
     def get_unfinished(
         self,
     ) -> DataFrame:
-        assert self.producers, "No producers specified"
-
         # check if producers are completely finished
         type_schema: DataTypeSchema = self.type_schema
         self.comply_to_schema(type_schema, in_place=True)
