@@ -36,7 +36,7 @@ from . import (
 )
 
 CPU_COUNT = int(cpu_count())
-logging.basicConfig(level=logging.CRITICAL, format="%(message)s", datefmt="[%X]", handlers=[RichHandler()])
+logging.basicConfig(level=logging.INFO, format="%(message)s", datefmt="[%X]", handlers=[RichHandler()])
 app = typer.Typer(pretty_exceptions_show_locals=True, pretty_exceptions_short=True)
 log = logging.getLogger()
 
@@ -78,7 +78,9 @@ def main(
 ) -> int:
     """Takes a crap ton of images and creates dataset pairs"""
     if not config_path.exists():
-        log.error(f"{config_path} does not exist. create it in the gui and restart this program.")
+        log.error(
+            f"{config_path} does not exist. create it in the gui (imdataset-creator-gui or gui.py) and restart this program."
+        )
         return 0
 
     with config_path.open("r") as f:
