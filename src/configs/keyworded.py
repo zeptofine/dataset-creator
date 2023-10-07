@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from enum import Enum, EnumType
 from typing import Self
 
+from src.configs.configtypes import ItemData, SpecialItemData
+
 
 class Keyworded:
     @classmethod
@@ -15,7 +17,7 @@ class Keyworded:
         return cls(**cfg)
 
     @classmethod
-    def get_cfg(cls) -> dict:
+    def get_cfg(cls) -> ItemData | SpecialItemData:
         cfg = {}
         for key, val in list(inspect.signature(cls.__init__).parameters.items())[1:]:
             if issubclass(type(val.default), Enum):

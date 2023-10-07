@@ -3,12 +3,19 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from multiprocessing import Pool, cpu_count, freeze_support
 from pathlib import Path
+from typing import Generator
 
 import cv2
 import numpy as np
+import rich.progress as progress
 import typer
+import ujson
+from polars import DataFrame, concat
+from rich.console import Console
+from rich.progress import Progress
 from typer import Option
 from typing_extensions import Annotated
 
@@ -17,6 +24,8 @@ import src.datarules.image_rules as irules
 import src.image_filters
 from src.configs import FilterData, MainConfig
 from src.datarules.base_rules import File, Filter, Input, Output, Producer, Rule
+from src.datarules.dataset_builder import ConfigHandler, DatasetBuilder, chunk_split
+from src.file_list import get_file_list
 
 CPU_COUNT = int(cpu_count())
 app = typer.Typer()
@@ -38,6 +47,20 @@ def read_image(path: str) -> np.ndarray:
     return cv2.imread(path, cv2.IMREAD_UNCHANGED)
 
 
+def generate_scenarios(p: Progress, files: list[File], outputs: list[Output]) -> Generator[FileScenario, None, None]:
+    return (
+        FileScenario(file, outs)
+        for file in p.track(files, description="generating scenarios")
+        if (  # remove finished files
+            outs := [
+                OutputScenario(str(pth), output.filters)
+                for output in outputs
+                if not (pth := output.folder / Path(output.format_file(file))).exists() or output.overwrite
+            ]
+        )
+    )
+
+
 def parse_scenario(sc: FileScenario):
     img: np.ndarray
     original: np.ndarray
@@ -48,9 +71,7 @@ def parse_scenario(sc: FileScenario):
         img = original
         for filter_, kwargs in output.filters.items():
             img = filter_.run(img=img, **kwargs)
-
         Path(output.path).parent.mkdir(parents=True, exist_ok=True)
-
         cv2.imwrite(output.path, img)
         os.utime(output.path, (mtime.st_atime, mtime.st_mtime))
     return sc
@@ -69,17 +90,6 @@ def main(
     sort_by: Annotated[str, Option(help="Which database column to sort by")] = "path",
 ) -> int:
     """Takes a crap ton of images and creates dataset pairs"""
-
-    from datetime import datetime
-
-    import rich.progress as progress
-    import ujson
-    from polars import DataFrame, concat
-    from rich.console import Console
-    from rich.progress import Progress
-
-    from src.datarules.dataset_builder import ConfigHandler, DatasetBuilder, chunk_split
-    from src.file_list import get_file_list
 
     c = Console(record=True)
     with Progress(
@@ -156,11 +166,11 @@ def main(
         total_images = len(resolved)
         p.update(count_t, total=total_images, completed=total_images)
 
+        total_t = p.add_task("populating df", total=None)
         db.add_new_paths(set(resolved))
         db_schema = db.type_schema
         db.comply_to_schema(db_schema)
         unfinished: DataFrame = db.get_unfinished()
-        total_t = p.add_task("populating df", total=None)
         if not unfinished.is_empty():
             if finished := db.remove_unfinished_producers():
                 p.log(f"Skipping finished producers: {finished}")
@@ -221,21 +231,8 @@ def main(
         files: list[File] = [resolved[file] for file in db.filter(set(resolved))]
         p.update(filter_t, total=len(files), completed=len(files))
 
-        # Generate FileScenarios
-        scenarios: list[FileScenario] = [
-            FileScenario(file, outs)
-            for file in p.track(files, description="generating scenarios")
-            if (  # remove finished files
-                outs := [
-                    OutputScenario(
-                        str(pth),
-                        output.filters,
-                    )
-                    for output in outputs
-                    if not (pth := output.folder / Path(output.format_file(file))).exists() or output.overwrite
-                ]
-            )
-        ]
+        scenarios = list(generate_scenarios(p, files, outputs))
+
         if not check_for_images(scenarios):
             p.log("Finished. No images remain.")
             return 0

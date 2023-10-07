@@ -11,9 +11,9 @@ class File:
 
     def to_dict(self):
         return {
-            "absolute_pth": str(self.absolute_pth),
-            "src": str(self.src),
-            "relative_path": str(self.relative_path),
+            "absolute_pth": self.absolute_pth,
+            "src": self.src,
+            "relative_path": self.relative_path,
             "file": self.file,
             "ext": self.ext,
         }

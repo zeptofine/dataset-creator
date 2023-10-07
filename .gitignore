@@ -69,4 +69,3 @@ venv.bak/
 
 filedb.arrow
 config.json
-poetry.lock

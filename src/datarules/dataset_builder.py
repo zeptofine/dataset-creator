@@ -275,8 +275,7 @@ class DatasetBuilder:
         def __init__(self, reqs: Iterable[str]):
             super().__init__(f"Possibly missing columns: {reqs}")
 
-    def __enter__(self, *args, **kwargs):
-        self.__init__(*args, **kwargs)
+    def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_value, exc_traceback):

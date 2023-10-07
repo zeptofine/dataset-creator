@@ -16,7 +16,8 @@ from src.configs.configtypes import InputData, OutputData
 from ..configs import FilterData, Keyworded
 from ..file import File
 
-PartialDataFrame = FullDataFrame = DataFrame
+PartialDataFrame = DataFrame
+FullDataFrame = DataFrame
 DataTypeSchema = dict[str, DataType | type]
 ExprDict = dict[str, Expr | bool]
 ProducerResult = list[ExprDict]
