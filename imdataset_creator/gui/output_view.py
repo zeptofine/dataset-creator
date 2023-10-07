@@ -54,7 +54,6 @@ class OutputView(InputView):
 
     def configure_settings_group(self):
         self.format_str = QLineEdit(self)
-        self.format_str.setText("{relative_path}/{file}.{ext}")
 
         self.overwrite = QCheckBox(self)
         self.overwrite.setText("overwrite existing files")
@@ -76,7 +75,7 @@ class OutputView(InputView):
         self.groupgrid.addWidget(self.list, 5, 0, 1, 3)
 
     def reset_settings_group(self):
-        self.format_str.clear()
+        self.format_str.setText("{relative_path}/{file}.{ext}")
         self.overwrite.setChecked(False)
         self.list.items.clear()
 
