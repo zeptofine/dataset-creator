@@ -1,3 +1,1 @@
-from imdataset_creator.main import app
-
-app()
+import imdataset_creator.__main__
