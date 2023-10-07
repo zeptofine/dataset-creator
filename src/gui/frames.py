@@ -184,6 +184,7 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
         self.scrollarea.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Sunken)
         self.scrollwidget = QWidget(self)
 
+        self.nametext = QLabel(self)
         self.box = QVBoxLayout(self.scrollwidget)
         self.scrollwidget.setLayout(self.box)
         self.scrollwidget.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Maximum)
@@ -207,8 +208,12 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
 
         self._layout.addWidget(self.addbox, 0, 0)
         self._layout.addWidget(self.addbutton, 0, 0)
-        self._layout.addWidget(self.progressbar, 0, 1)
-        self._layout.addWidget(self.scrollarea, 1, 0, 1, 2)
+        self._layout.addWidget(self.nametext, 0, 1)
+        self._layout.addWidget(self.progressbar, 0, 2)
+        self._layout.addWidget(self.scrollarea, 1, 0, 1, 3)
+
+    def set_text(self, s: str):
+        self.nametext.setText(s)
 
     def _register_item(self, item: type[FlowItem]):
         self.additemtomenu(item)

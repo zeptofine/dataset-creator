@@ -120,11 +120,13 @@ class Window(QWidget):
         self.producers_rules.setOrientation(Qt.Orientation.Vertical)
 
         self.inputlist = InputList(self)
+        self.inputlist.set_text("Inputs")
         self.inputlist.register_item(InputView)
         self.inputlist.gathered.connect(self.collect_files)
         self.filedict = {}
 
         self.producerlist = ProducerList(self)
+        self.producerlist.set_text("Producers")
         self.producerlist.register_item(
             FileInfoProducerView,
             ImShapeProducerView,
@@ -132,6 +134,7 @@ class Window(QWidget):
         )
 
         self.rulelist = RuleList(self)
+        self.rulelist.set_text("Rules")
         self.rulelist.register_item(
             StatRuleView,
             BlacklistWhitelistView,
@@ -142,6 +145,7 @@ class Window(QWidget):
         )
 
         self.outputlist = FlowList(self)
+        self.outputlist.set_text("Outputs")
         self.outputlist.register_item(OutputView)
 
         self.lists.addWidget(self.inputlist)
@@ -151,12 +155,12 @@ class Window(QWidget):
         self.lists.addWidget(self.outputlist)
 
         self.save_shortcut = QShortcut(QKeySequence("Ctrl+S"), self, self.save_config)
-        (get_producers := QAction("get producers", self)).triggered.connect(self.gather_producers)
-        (get_rules := QAction("get rules", self)).triggered.connect(self.gather_rules)
-        (get_builder := QAction("get builder", self)).triggered.connect(self.create_builder)
-        (get_files := QAction("get files", self)).triggered.connect(self.gather_files)
-        (run_builder := QAction("run builder", self)).triggered.connect(self.run_builder)
-        self.addActions([get_producers, get_rules, get_builder, get_files, run_builder])
+        # (get_producers := QAction("get producers", self)).triggered.connect(self.gather_producers)
+        # (get_rules := QAction("get rules", self)).triggered.connect(self.gather_rules)
+        # (get_builder := QAction("get builder", self)).triggered.connect(self.create_builder)
+        # (get_files := QAction("get files", self)).triggered.connect(self.gather_files)
+        # (run_builder := QAction("run builder", self)).triggered.connect(self.run_builder)
+        # self.addActions([get_producers, get_rules, get_builder, get_files, run_builder])
 
         self._layout.addWidget(self.lists, 0, 0, 1, 10)
 
