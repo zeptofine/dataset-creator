@@ -41,7 +41,6 @@ class FlowItem(QFrame):  # TODO: Better name lmao
     position_changed = Signal()
     closed = Signal()
     duplicate = Signal()
-    resized = Signal(QSize)
 
     increment = Signal()
 
@@ -249,7 +248,6 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
         item.closed.connect(lambda: self.remove_item(item))
         item.duplicate.connect(lambda: self.duplicate_item(item))
         item.increment.connect(self.increment_pbar)
-        item.resized.connect(self.updateGeometry)
 
     def remove_item(self, item: FlowItem):
         item.setGeometry(QRect(0, 0, 0, 0))

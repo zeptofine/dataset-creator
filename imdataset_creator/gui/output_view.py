@@ -110,7 +110,6 @@ class OutputView(InputView):
             if self.previous_position is not None:
                 poschange = event.position() - self.previous_position
                 newsize = QSize(self.size().width(), int(self.size().height() + poschange.y()))
-                print(newsize)
                 self.setMinimumSize(newsize)
 
         self.previous_position = event.position()
