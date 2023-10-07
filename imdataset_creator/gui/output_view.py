@@ -111,7 +111,7 @@ class OutputView(InputView):
                 poschange = event.position() - self.previous_position
                 newsize = QSize(self.size().width(), int(self.size().height() + poschange.y()))
                 print(newsize)
-                self.resize(newsize)
+                self.setMinimumSize(newsize)
 
         self.previous_position = event.position()
         return super().mouseMoveEvent(event)
