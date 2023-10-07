@@ -3,19 +3,12 @@
 import json
 import os
 import sys
-
-# import time
-# from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import TypedDict
 
 from PySide6 import QtWidgets
-from PySide6.QtCore import Qt, Signal, Slot  # QThread,,
-from PySide6.QtGui import QAction, QIcon, QKeySequence, QShortcut
-from PySide6.QtWidgets import (
-    QSplitter,
-    QWidget,
-)
+from PySide6.QtCore import Qt, Signal, Slot
+from PySide6.QtGui import QAction, QKeySequence, QShortcut
+from PySide6.QtWidgets import QFileDialog, QMainWindow, QSplitter, QStatusBar, QToolBar, QWidget
 from rich import print as rprint
 
 from ..configs import MainConfig
@@ -24,12 +17,7 @@ from .err_dialog import catch_errors
 from .frames import FlowList
 from .input_view import InputView
 from .output_view import OutputView
-from .producer_views import (
-    FileInfoProducerView,
-    HashProducerView,
-    ImShapeProducerView,
-    ProducerView,
-)
+from .producer_views import FileInfoProducerView, HashProducerView, ImShapeProducerView, ProducerView
 from .rule_views import (
     BlacklistWhitelistView,
     ChannelRuleView,
@@ -42,6 +30,7 @@ from .rule_views import (
 
 CPU_COUNT = os.cpu_count()
 PROGRAM_ORIGIN = Path(__file__).parent
+RECENT_FILES_PATH = PROGRAM_ORIGIN / ".recent_files"
 
 
 class InputList(FlowList):
@@ -86,18 +75,17 @@ catch_gathering = catch_errors("gathering failed")
 catch_building = catch_errors("building failed")
 
 
-class Window(QWidget):
+class Window(QMainWindow):
     def __init__(self, cfg_path=Path("config.json")):
         super().__init__()
         self.setWindowTitle("dataset-creator")
         self.resize(1200, 500)
         self.setMinimumSize(400, 300)
-        self._layout = QtWidgets.QGridLayout(self)
-        self.setLayout(self._layout)
         self.cfg_path = cfg_path
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.ActionsContextMenu)
 
         self.lists = QSplitter(self)
+        self.setCentralWidget(self.lists)
         self.producers_rules = QSplitter(self)
         self.producers_rules.setOrientation(Qt.Orientation.Vertical)
 
@@ -136,20 +124,32 @@ class Window(QWidget):
         self.lists.addWidget(self.producers_rules)
         self.lists.addWidget(self.outputlist)
 
-        self.save_shortcut = QShortcut(QKeySequence("Ctrl+S"), self, self.save_config)
+        # self.toolbar = QToolBar(self)
+        # self.addToolBar(self.toolbar)
+
+        (save_action := QAction("Save", self)).triggered.connect(self.save_config)
+        (save_as_action := QAction("Save As...", self)).triggered.connect(self.save_config_as)
+        (open_action := QAction("Open...", self)).triggered.connect(self.open_config)
+        (clear_action := QAction("clear", self)).triggered.connect(self.clear)
+        save_action.setShortcut(QKeySequence("Ctrl+S"))
+        save_as_action.setShortcut(QKeySequence("Ctrl+Shift+S"))
+        open_action.setShortcut(QKeySequence("Ctrl+O"))
+
+        menu = self.menuBar()
+
+        filemenu = menu.addMenu("File")
+        filemenu.addAction(open_action)
+        filemenu.addAction(save_action)
+        filemenu.addAction(save_as_action)
+
+        editmenu = menu.addMenu("Edit")
+        editmenu.addAction(clear_action)
         # (get_producers := QAction("get producers", self)).triggered.connect(self.gather_producers)
         # (get_rules := QAction("get rules", self)).triggered.connect(self.gather_rules)
         # (get_builder := QAction("get builder", self)).triggered.connect(self.create_builder)
         # (get_files := QAction("get files", self)).triggered.connect(self.gather_files)
         # (run_builder := QAction("run builder", self)).triggered.connect(self.run_builder)
         # self.addActions([get_producers, get_rules, get_builder, get_files, run_builder])
-
-        self._layout.addWidget(self.lists, 0, 0, 1, 10)
-
-        if not cfg_path.exists():
-            self.save_config()
-        with self.cfg_path.open("r") as f:
-            self.load_cfg(MainConfig(json.load(f)))
 
     def get_config(self) -> MainConfig:
         return {
@@ -167,13 +167,46 @@ class Window(QWidget):
             json.dump(cfg, f, indent=4)
             print("saved", cfg)
 
-    @catch_loading
-    @Slot(dict)
-    def load_cfg(self, cfg: MainConfig):
+    @catch_errors("Error saving")
+    @Slot()
+    def save_config_as(self):
+        file = QFileDialog.getSaveFileName(
+            self,
+            "Select cfg path",
+            str(self.cfg_path),
+            "JSON files (*.json)",
+        )[0]
+        if file:
+            self.cfg_path = Path(file)
+            self.save_config()
+
+    @Slot()
+    def load_config(self):
+        with self.cfg_path.open("r") as f:
+            self.from_cfg(MainConfig(json.load(f)))
+
+    @Slot()
+    def open_config(self):
+        file = QFileDialog.getOpenFileName(
+            self,
+            "Select cfg path",
+            str(self.cfg_path.parent),
+        )[0]
+        if file:
+            self.cfg_path = Path(file)
+            self.load_config()
+
+    @Slot()
+    def clear(self):
         self.inputlist.empty()
         self.producerlist.empty()
         self.rulelist.empty()
         self.outputlist.empty()
+
+    @catch_loading
+    @Slot(dict)
+    def from_cfg(self, cfg: MainConfig):
+        self.clear()
         self.inputlist.add_from_cfg(cfg["inputs"])
         self.producerlist.add_from_cfg(cfg["producers"])
         self.rulelist.add_from_cfg(cfg["rules"])
