@@ -104,17 +104,3 @@ class OutputView(InputView):
         self.list.add_from_cfg(cfg["lst"])
         self.overwrite.setChecked(cfg["overwrite"])
         return self
-
-    def mouseMoveEvent(self, event: QMouseEvent) -> None:
-        if event.buttons() == Qt.MouseButton.LeftButton:
-            if self.previous_position is not None:
-                poschange = event.position() - self.previous_position
-                newsize = QSize(self.size().width(), int(self.size().height() + poschange.y()))
-                self.setMinimumSize(newsize)
-
-        self.previous_position = event.position()
-        return super().mouseMoveEvent(event)
-
-    def mousePressEvent(self, event: QMouseEvent) -> None:
-        self.previous_position = event.position()
-        return super().mousePressEvent(event)

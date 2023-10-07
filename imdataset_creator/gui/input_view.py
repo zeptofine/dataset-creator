@@ -2,28 +2,16 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from re import S
 
-import cv2
 import wcmatch.glob as wglob
 from PySide6.QtCore import QRect, QThread, Signal, Slot
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QAbstractItemView,
-    QCheckBox,
-    QComboBox,
     QFileDialog,
-    QFrame,
-    QHBoxLayout,
     QLabel,
     QLineEdit,
     QListView,
-    QMenu,
-    QPushButton,
-    QScrollArea,
-    QSizePolicy,
-    QSlider,
-    QSpinBox,
     QTextEdit,
     QToolButton,
     QTreeView,

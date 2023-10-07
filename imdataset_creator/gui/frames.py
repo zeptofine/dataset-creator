@@ -59,6 +59,8 @@ class FlowItem(QFrame):  # TODO: Better name lmao
         revert_action.triggered.connect(self.reset_settings_group)
         self.addActions([collapse_action, duplicate_action, revert_action])
 
+        self._minimumsize = self.size()
+
         self.setup_widget()
         self.configure_settings_group()
         self.reset_settings_group()
@@ -149,6 +151,11 @@ class FlowItem(QFrame):  # TODO: Better name lmao
             self.group.setVisible(b)
         if self.desc:
             self.descriptionwidget.setVisible(b)
+        if not b:
+            self._minimumsize = self.minimumSize()
+            self.setMinimumSize(0, 0)
+        else:
+            self.setMinimumSize(self._minimumsize)
         self.__opened = b
 
     @classmethod
@@ -165,6 +172,20 @@ class FlowItem(QFrame):  # TODO: Better name lmao
     @abstractmethod
     def from_config(cls, cfg: ItemData, parent=None):
         return cls(parent=parent)
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        if event.buttons() == Qt.MouseButton.LeftButton and self.opened:
+            if self.previous_position is not None:
+                poschange = event.position() - self.previous_position
+                newsize = QSize(self.size().width(), int(self.size().height() + poschange.y()))
+                self.setMinimumSize(newsize)
+
+        self.previous_position = event.position()
+        return super().mouseMoveEvent(event)
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        self.previous_position = event.position()
+        return super().mousePressEvent(event)
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.cfg_name()})"
