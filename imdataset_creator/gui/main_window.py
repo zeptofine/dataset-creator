@@ -178,7 +178,7 @@ class Window(QMainWindow):
         cfg = self.get_config()
         with self.cfg_path.open("w") as f:
             json.dump(cfg, f, indent=4)
-            print("saved", cfg)
+            rprint("saved", cfg)
 
     @catch_errors("Error saving")
     @Slot()

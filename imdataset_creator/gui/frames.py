@@ -4,8 +4,8 @@ from abc import abstractmethod
 from collections.abc import Collection
 from typing import TypeVar
 
-from PySide6.QtCore import QRect, Qt, Signal, Slot, QSize
-from PySide6.QtGui import QAction, QIcon, QMouseEvent
+from PySide6.QtCore import QRect, QSize, Qt, Signal, Slot
+from PySide6.QtGui import QAction, QCursor, QIcon, QMouseEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QFrame,
@@ -76,6 +76,8 @@ class FlowItem(QFrame):  # TODO: Better name lmao
 
         self.group = QGroupBox()
         self.descriptionwidget = QLabel(self.desc, self)
+        self.setCursor(QCursor(Qt.CursorShape.SizeVerCursor))
+
         self.descriptionwidget.hide()
         self.descriptionwidget.setWordWrap(True)
 
@@ -178,8 +180,7 @@ class FlowItem(QFrame):  # TODO: Better name lmao
             if self.previous_position is not None:
                 poschange = event.position() - self.previous_position
                 newsize = QSize(self.size().width(), int(self.size().height() + poschange.y()))
-                self.setMinimumSize(newsize)
-
+                self.setMinimumHeight(newsize.height())
         self.previous_position = event.position()
         return super().mouseMoveEvent(event)
 
