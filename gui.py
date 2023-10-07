@@ -1,4 +1,1 @@
-from imdataset_creator.gui.main_window import main
-
-
-main()
+import imdataset_creator.gui.__main__
