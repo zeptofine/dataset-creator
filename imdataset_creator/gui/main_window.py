@@ -1,5 +1,4 @@
 #!/usr/bin/python
-from __future__ import annotations
 
 import json
 import os
@@ -14,32 +13,15 @@ from PySide6 import QtWidgets
 from PySide6.QtCore import Qt, Signal, Slot  # QThread,,
 from PySide6.QtGui import QAction, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
-    # QPushButton,
-    QDialog,
-    QDialogButtonBox,
-    # QCheckBox,
-    # QComboBox,
-    # QDialog,
-    QFileDialog,
-    QLabel,
-    QLineEdit,
-    # QGridLayout,
-    # QGroupBox,
-    QProgressBar,
-    # QScrollArea,
-    # QSlider,
     QSplitter,
-    # QTextEdit,
-    QToolButton,
-    QVBoxLayout,
     QWidget,
 )
 from rich import print as rprint
 
-from ..configs import ItemConfig, MainConfig
+from ..configs import MainConfig
 from ..datarules.dataset_builder import DatasetBuilder
 from .err_dialog import catch_errors
-from .frames import FlowItem, FlowList
+from .frames import FlowList
 from .input_view import InputView
 from .output_view import OutputView
 from .producer_views import (

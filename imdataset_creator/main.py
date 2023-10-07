@@ -21,7 +21,7 @@ from rich.progress import Progress
 from typer import Option
 from typing_extensions import Annotated
 
-from imdataset_creator import (
+from . import (
     MainConfig,
     File,
     Input,

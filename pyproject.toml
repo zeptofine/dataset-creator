@@ -2,9 +2,11 @@
 authors = ["zeptofine <zeptofine@gmail.com>"]
 description = ""
 name = "dataset-creator"
+packages = [
+  {include = "imdataset_creator"},
+]
 readme = "README.md"
 version = "0.1.0"
-
 [tool.poetry.dependencies]
 ImageHash = "^4.3.1"
 Pillow = "^10.0.1"
