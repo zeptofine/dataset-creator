@@ -72,8 +72,6 @@ class InputView(FlowItem):
 
     text: QLineEdit
 
-    flags = wglob.BRACE | wglob.SPLIT | wglob.EXTMATCH | wglob.IGNORECASE | wglob.GLOBSTAR
-
     gathered = Signal(dict)
 
     bound_item = Input
