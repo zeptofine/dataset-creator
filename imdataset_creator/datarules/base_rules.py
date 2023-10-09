@@ -9,11 +9,11 @@ from string import Formatter
 from types import MappingProxyType
 from typing import Any, ClassVar, Set
 
+import wcmatch.glob as wglob
 from polars import DataFrame, DataType, Expr, PolarsDataType
 
-from ..configs.configtypes import InputData, OutputData
-from ..file_list import get_file_list
 from ..configs import FilterData, Keyworded
+from ..configs.configtypes import InputData, OutputData
 from ..file import File
 
 PartialDataFrame = DataFrame
@@ -131,6 +131,9 @@ class Filter(Keyworded):
         raise NotImplementedError
 
 
+flags = wglob.BRACE | wglob.SPLIT | wglob.EXTMATCH | wglob.IGNORECASE | wglob.GLOBSTAR
+
+
 @dataclass
 class Input(Keyworded):
     folder: Path
@@ -141,7 +144,8 @@ class Input(Keyworded):
         return cls(Path(cfg["folder"]), cfg["expressions"])
 
     def run(self):
-        return get_file_list(self.folder, *self.expressions)
+        for file in wglob.iglob(self.expressions, flags=flags, root_dir=self.folder):
+            yield self.folder / file
 
 
 class InvalidFormatException(Exception):

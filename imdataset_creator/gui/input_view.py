@@ -41,29 +41,27 @@ DEFAULT_IMAGE_FORMATS = (
 
 
 class GathererThread(QThread):
-    source: Path
-    expressions: list[str]
-    flags: int
+    input: Input
 
     count = Signal(int)
     total = Signal(int)
     files = Signal(list)
 
     def run(self):
-        print(f"Starting search in: '{self.source}' with expressions: {self.expressions}")
+        print(f"Starting search in: '{self.input.folder}' with expressions: {self.input.expressions}")
         filelist = []
 
         count = 0
         self.count.emit(0)
         emit_timer = time.time()
-        for file in wglob.iglob(self.expressions, flags=self.flags, root_dir=self.source):
+        for file in self.input.run():
             count += 1
             if (newtime := time.time()) > emit_timer + 0.2:
                 self.count.emit(count)
                 emit_timer = newtime
             filelist.append(file)
 
-        print(f"Gathered {count} files from '{self.source}'")
+        print(f"Gathered {count} files from '{self.input.folder}'")
         self.count.emit(count)
         self.files.emit(filelist)
 
@@ -121,8 +119,6 @@ class InputView(FlowItem):
         self.gatherer.finished.connect(self.on_finished)
         self.gatherer.finished.connect(self.increment.emit)
 
-        self.gatherer.flags = self.flags
-
         self.gather_button.setText("gather")
         self.gather_button.clicked.connect(self.get)
 
@@ -157,8 +153,7 @@ class InputView(FlowItem):
         if not self.text.text():
             raise NotADirectoryError(self.text.text())
 
-        self.gatherer.source = Path(self.text.text())
-        self.gatherer.expressions = self.globexprs.toPlainText().splitlines()
+        self.gatherer.input = Input(Path(self.text.text()), self.globexprs.toPlainText().splitlines())
         self.gatherer.start()
 
     @Slot(dict)
