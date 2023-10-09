@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Generator, Literal, TypeVar, overload
 
 import polars as pl
-import ujson
 from polars import DataFrame, Expr, concat
 from polars.type_aliases import SchemaDefinition
 

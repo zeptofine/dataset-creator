@@ -1,5 +1,6 @@
 # from __future__ import annotations
 
+import json
 import logging
 import os
 from collections.abc import Callable, Iterable
@@ -13,7 +14,6 @@ import cv2
 import numpy as np
 import rich.progress as progress
 import typer
-import ujson
 from polars import DataFrame, concat
 from rich.console import Console
 from rich.logging import RichHandler
@@ -22,17 +22,17 @@ from typer import Option
 from typing_extensions import Annotated
 
 from . import (
-    MainConfig,
-    File,
-    Input,
-    Output,
-    Producer,
-    Rule,
     ConfigHandler,
     DatasetBuilder,
-    chunk_split,
+    File,
     FileScenario,
+    Input,
+    MainConfig,
+    Output,
     OutputScenario,
+    Producer,
+    Rule,
+    chunk_split,
 )
 
 CPU_COUNT = int(cpu_count())
@@ -84,7 +84,7 @@ def main(
         return 0
 
     with config_path.open("r") as f:
-        cfg: MainConfig = ujson.load(f)
+        cfg: MainConfig = json.load(f)
 
     db = DatasetBuilder(db_path=Path(database_path))
 
