@@ -1,8 +1,5 @@
-# from __future__ import annotations
-
 import json
 import logging
-import os
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime
@@ -15,6 +12,7 @@ import numpy as np
 import rich.progress as progress
 import typer
 from polars import DataFrame, concat
+from rich import print as rprint
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.progress import Progress
@@ -45,7 +43,7 @@ def read_image(path: str) -> np.ndarray:
     return cv2.imread(path, cv2.IMREAD_UNCHANGED)
 
 
-def get_outputs(file, outputs: Iterable[Output]):
+def get_outputs(file, outputs: Iterable[Output]) -> list[OutputScenario]:
     return [
         OutputScenario(str(pth), output.filters)
         for output in outputs
@@ -78,8 +76,10 @@ def main(
 ) -> int:
     """Takes a crap ton of images and creates dataset pairs"""
     if not config_path.exists():
-        log.error(
-            f"{config_path} does not exist. create it in the gui (imdataset-creator-gui or gui.py) and restart this program."
+        rprint(
+            f"{config_path} does not exist."
+            " create it in the gui ([italic]imdataset-creator-gui[/italic]"
+            " or [italic]python -m imdataset-creator.gui[/italic]) and restart this program."
         )
         return 0
 
@@ -121,14 +121,15 @@ def main(
 
         # Gather images
         images: dict[Path, list[Path]] = {}
+        resolved: dict[str, File] = {}
         count_t = p.add_task("Gathering", total=None)
         for folder, lst in gather_images(inputs):
             images[folder] = lst
+            for pth in lst:
+                resolved[str((folder / pth).resolve())] = File.from_src(folder, pth)
+
             p.update(count_t, advance=len(lst))
 
-        resolved: dict[str, File] = {
-            str((src / pth).resolve()): File.from_src(src, pth) for src, lst in images.items() for pth in lst
-        }
         if diff := sum(map(len, images.values())) - len(resolved):
             p.log(f"removed an estimated {diff} conflicting symlinks")
 
@@ -195,9 +196,12 @@ def main(
         if verbose:
             p.log(db.df)
 
-        filter_t = p.add_task("filtering", total=1)
-        files: list[File] = [resolved[file] for file in db.filter(set(resolved))]
-        p.update(filter_t, total=len(files), completed=len(files))
+        if rules:
+            filter_t = p.add_task("filtering", total=1)
+            files: list[File] = [resolved[file] for file in db.filter(set(resolved))]
+            p.update(filter_t, total=len(files), completed=len(files))
+        else:
+            files: list[File] = [resolved[file] for file in resolved]
 
         scenarios = list(parse_files(p.track(files, description="parsing scenarios"), outputs))
 

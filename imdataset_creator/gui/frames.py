@@ -60,6 +60,7 @@ class FlowItem(QFrame):  # TODO: Better name lmao
         self.addActions([collapse_action, duplicate_action, revert_action])
 
         self._minimumsize = self.size()
+        self.previous_position = None
 
         self.setup_widget()
         self.configure_settings_group()
@@ -76,7 +77,6 @@ class FlowItem(QFrame):  # TODO: Better name lmao
 
         self.group = QGroupBox()
         self.descriptionwidget = QLabel(self.desc, self)
-        self.setCursor(QCursor(Qt.CursorShape.SizeVerCursor))
 
         self.descriptionwidget.hide()
         self.descriptionwidget.setWordWrap(True)

@@ -66,7 +66,7 @@ class DatasetBuilder:
             self.__df = DataFrame(schema=self.basic_schema)
 
     def add_rules(self, *rules: type[Rule] | Rule) -> None:
-        """Adds rules to the rule list. Rules will be instantiated separately."""
+        """Adds rules to the rule list. Rules can be instantiated separately."""
 
         for rule in rules:
             self.add_rule(rule)
@@ -116,7 +116,7 @@ class DatasetBuilder:
 
         Parameters
         ----------
-        pths : set[os.PathLike]
+        pths : set[str]
             The paths to add to the dataframe.
 
         Returns
@@ -163,7 +163,7 @@ class DatasetBuilder:
 
     def unfinished_by_col(self, df: DataFrame, cols: Iterable[str] | None = None) -> DataFrame:
         if cols is None:
-            cols = {*self.type_schema} & set(df.columns)
+            cols = set(self.type_schema) & set(df.columns)
         return df.filter(pl.any_horizontal(pl.col(col).is_null() for col in cols))
 
     def split_files_via_nulls(
@@ -279,7 +279,9 @@ class DatasetBuilder:
         pass
 
     def __repr__(self) -> str:
-        attrlist: list[str] = [f"{key}={val!r}" for key, val in vars(self).items() if all(k not in key for k in ("__"))]
+        attrlist: list[str] = [
+            f"{key}={val!r}" for key, val in vars(self).items() if all(k not in key for k in ("__",))
+        ]
         return f"{self.__class__.__name__}({', '.join(attrlist)})"
 
     @overload

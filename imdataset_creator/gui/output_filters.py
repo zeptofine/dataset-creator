@@ -2,12 +2,9 @@ from abc import abstractmethod
 from typing import Callable
 
 import numpy as np
-from PySide6.QtWidgets import (
-    QDoubleSpinBox,
-    QLabel,
-    QSpinBox,
-)
+from PySide6.QtWidgets import QDoubleSpinBox, QLabel, QSpinBox
 
+from PySide6.QtCore import QRect, QSize, Qt, Signal, Slot
 from ..datarules import base_rules, data_rules, image_rules
 from ..datarules.base_rules import Filter
 from ..image_filters import destroyers, resizer
@@ -18,6 +15,10 @@ class FilterView(FlowItem):
     title = "Filter"
 
     bound_item: type[Filter]
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMinimumSize(QSize(self.size().width(), 200))
 
     def get(self):
         super().get()
