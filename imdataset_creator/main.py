@@ -182,10 +182,10 @@ def main(
                 p.advance(null_t)
             p.update(null_t, total=cnt, completed=cnt)
 
-            concatted: DataFrame = concat(collected, how="diagonal")
+            concatenated: DataFrame = concat(collected, how="diagonal")
             # This breaks with datatypes like Array(3, pl.UInt32). Not sure why.
             # `pyo3_runtime.PanicException: implementation error, cannot get ref Array(Null, 0) from Array(UInt32, 3)`
-            db.update(concatted)
+            db.update(concatenated)
             db.save_df()
 
             p.remove_task(chunk_t)

@@ -72,11 +72,11 @@ class Producer(Keyworded):
         raise NotImplementedError
 
     def __repr__(self) -> str:
-        attrlist: list[str] = [
+        attr_list: list[str] = [
             f"{key}=..." if hasattr(val, "__iter__") and not isinstance(val, str) else f"{key}={val}"
             for key, val in vars(self).items()
         ]
-        return f"{self.__class__.__name__}({', '.join(attrlist)})"
+        return f"{self.__class__.__name__}({', '.join(attr_list)})"
 
 
 class ProducerSet(Set[Producer]):
@@ -89,8 +89,8 @@ class ProducerSet(Set[Producer]):
         dct = defaultdict(list)
         for producer in self:
             exprs: ProducerResult = producer()
-            for idx, exprdct in enumerate(exprs):
-                dct[idx].append(exprdct)
+            for idx, expr_dict in enumerate(exprs):
+                dct[idx].append(expr_dict)
         return [self._combine_schema(sequence) for sequence in dct.values()]
 
     @property
@@ -113,8 +113,8 @@ class Rule(Keyworded):
         Rule.all_rules[cls.cfg_kwd()] = cls
 
     def __repr__(self) -> str:
-        attrlist: list[str] = [f"{key}={val}" for key, val in vars(self).items() if key not in repr_blacklist]
-        return f"{self.__class__.__name__}({', '.join(attrlist)})"
+        attr_list: list[str] = [f"{key}={val}" for key, val in vars(self).items() if key not in repr_blacklist]
+        return f"{self.__class__.__name__}({', '.join(attr_list)})"
 
     def __str__(self) -> str:
         return self.__class__.__name__
@@ -162,7 +162,7 @@ class SafeFormatter(Formatter):
         return super().get_field(field_name, args, kwargs)
 
 
-outputformatter = SafeFormatter()
+output_formatter = SafeFormatter()
 
 
 DEFAULT_OUTPUT_FORMAT = "{relative_path}/{file}.{ext}"
@@ -180,13 +180,13 @@ class Output(Keyworded):
     def __init__(self, path, filters, overwrite=False, output_format=DEFAULT_OUTPUT_FORMAT):
         self.folder = path
         # try to format. If it fails, it will raise InvalidFormatException
-        outputformatter.format(output_format, **PLACEHOLDER_FORMAT_KWARGS)
+        output_formatter.format(output_format, **PLACEHOLDER_FORMAT_KWARGS)
         self.output_format = output_format
         self.overwrite = overwrite
         self.filters = filters
 
     def format_file(self, file: File):
-        return outputformatter.format(self.output_format, **file.to_dict())
+        return output_formatter.format(self.output_format, **file.to_dict())
 
     @classmethod
     def from_cfg(cls, cfg: OutputData):

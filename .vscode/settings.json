@@ -15,5 +15,23 @@
   ],
   "black-formatter.args": [
     "--line-length=120"
+  ],
+  "cSpell.words": [
+    "chunksize",
+    "configtypes",
+    "dataframe",
+    "dtype",
+    "dunders",
+    "EXTMATCH",
+    "filedb",
+    "GLOBSTAR",
+    "imdataset",
+    "IMREAD",
+    "Keyworded",
+    "ndarray",
+    "rprint",
+    "typer",
+    "wcmatch",
+    "wglob"
   ]
 }
