@@ -55,8 +55,7 @@ class FlowItem(QFrame):  # TODO: Better name lmao
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.ActionsContextMenu)
         (collapse_action := QAction("collapse", self)).triggered.connect(self.toggle_group)
         (duplicate_action := QAction("duplicate", self)).triggered.connect(self.duplicate.emit)
-        revert_action = QAction("revert to defaults", self)
-        revert_action.triggered.connect(self.reset_settings_group)
+        (revert_action := QAction("revert to defaults", self)).triggered.connect(self.reset_settings_group)
         self.addActions([collapse_action, duplicate_action, revert_action])
 
         self._minimumsize = self.size()

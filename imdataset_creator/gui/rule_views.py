@@ -29,6 +29,19 @@ from .frames import FlowItem
 
 class RuleView(FlowItem):
     title = "Rule"
+    bound_item: type[base_rules.Rule]
+
+    def setup_widget(self, *args, **kwargs):
+        super().setup_widget(*args, **kwargs)
+        if requires := self.bound_item().requires:
+            if self.desc:
+                self.desc += "\n"
+            self.desc += "requires: "
+            self.desc += str(
+                requires.name if isinstance(requires, base_rules.Column) else set(col.name for col in requires)
+            )
+
+            self.descriptionwidget.setText(self.desc)
 
     @abstractmethod
     def get(self):
