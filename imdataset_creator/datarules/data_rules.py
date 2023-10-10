@@ -62,8 +62,8 @@ def get_size(path: str):
 class StatRule(Rule):
     def __init__(
         self,
-        before: str | datetime = "2100",
-        after: str | datetime = "1980",
+        before: str | datetime | None = "2100",
+        after: str | datetime | None = None,
     ) -> None:
         super().__init__()
         self.requires = Column("mtime", Datetime("ms"))

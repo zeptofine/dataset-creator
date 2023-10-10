@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QVBoxLayout,
 )
+import traceback
 
 
 class ErrorDialog(QDialog):
@@ -19,10 +20,13 @@ class ErrorDialog(QDialog):
         QBtn = QDialogButtonBox.StandardButton.Ok
         self.buttonBox = QDialogButtonBox(QBtn)
         self.buttonBox.accepted.connect(self.accept)
-        if prompt is None:
-            self.layout().addWidget(QLabel(f"{exc.__class__.__name__}: {exc}", self))
-        else:
-            self.layout().addWidget(QLabel(f"{prompt}: {exc.__class__.__name__}({exc})", self))
+        exc_text = "".join(traceback.format_exception(exc))
+        label_text = (
+            f"{exc.__class__.__name__}: {exc_text}"
+            if prompt is None
+            else f"{prompt}: {exc.__class__.__name__}({exc_text})"
+        )
+        self.layout().addWidget(QLabel(label_text, self))
         self.layout().addWidget(self.buttonBox)
 
 
@@ -32,9 +36,9 @@ def catch_errors(msg):
             try:
                 return func(*args, **kwargs)
             except Exception as e:
-                print(e)
                 dlg = ErrorDialog(e, msg)
                 dlg.exec_()
+                raise e
 
         return wrapper
 

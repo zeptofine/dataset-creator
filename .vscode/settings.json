@@ -34,6 +34,7 @@
     "ndarray",
     "pbar",
     "rprint",
+    "timeparser",
     "typer",
     "wcmatch",
     "wglob"
