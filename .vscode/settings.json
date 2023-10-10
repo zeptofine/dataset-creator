@@ -28,6 +28,7 @@
     "GLOBSTAR",
     "imdataset",
     "IMREAD",
+    "imwrite",
     "Keyworded",
     "lmao",
     "ndarray",
