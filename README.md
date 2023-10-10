@@ -46,6 +46,17 @@ Rules are used to filter out unwanted files. For example, one of them restricts 
 
 When a Rule needs a producer, the rule should tell you what it needs in its description. Pick the appropriate Producer in the Producers.
 
+As of writing this, there are 6 rules:
+
+- Time Range: only allows files created within a time frame.
+- Blacklist and whitelist: Only allow paths that include `str`s in the whitelist and not in the blacklist
+- Total count: Only allow a certain number of files
+- Resolution: Only allow files with a resolution within a certain range
+- Channels: Only allow files with a certain number of channels
+- Hash: Uses ImageHash hashes to eliminate similar looking images.
+
+The order of these rules in the list is important, as they will be executed in order from top to bottom.
+
 **!Neither Producers or Rules need to be defined for inputs/outputs to work!**
 
 ### Outputs & Filters
@@ -55,6 +66,8 @@ When a Rule needs a producer, the rule should tell you what it needs in its desc
 Outputs have a folder, which is used to send created images, and the format_text is used to define files new paths. The `overwrite existing files` checkbox defines whether you overwrite existing files in the output folder if they already exist.
 
 The `Filters` list show functions that will be applied to images going through this step. They can apply noise, compression, etc. to images.
+
+### Every list item can be dragged and resized to help viewing them
 
 ## Running
 
