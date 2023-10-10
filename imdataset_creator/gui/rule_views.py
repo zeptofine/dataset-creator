@@ -59,42 +59,64 @@ class StatRuleView(RuleView):
     _datetime_format: str = "dd/MM/yyyy h:mm AP"
 
     def configure_settings_group(self):
+        self.use_after = QCheckBox(self)
+        self.use_before = QCheckBox(self)
         self.after_widget = QDateTimeEdit(self)
         self.before_widget = QDateTimeEdit(self)
         self.after_widget.setCalendarPopup(True)
         self.before_widget.setCalendarPopup(True)
         self.after_widget.setDisplayFormat(self._datetime_format)
         self.before_widget.setDisplayFormat(self._datetime_format)
+        self.use_after.stateChanged.connect(self.after_widget.setEnabled)
+        self.use_before.stateChanged.connect(self.before_widget.setEnabled)
         format_label = QLabel(self._datetime_format, self)
         format_label.setEnabled(False)
-        self.group_grid.addWidget(format_label, 0, 1)
+        self.group_grid.addWidget(format_label, 0, 2, 1, 2)
         self.group_grid.addWidget(QLabel("After: ", self), 1, 0)
         self.group_grid.addWidget(QLabel("Before: ", self), 2, 0)
-        self.group_grid.addWidget(self.after_widget, 1, 1, 1, 2)
-        self.group_grid.addWidget(self.before_widget, 2, 1, 1, 2)
+        self.group_grid.addWidget(self.use_after, 1, 1, 1, 1)
+        self.group_grid.addWidget(self.use_before, 2, 1, 1, 1)
+        self.group_grid.addWidget(self.after_widget, 1, 2, 1, 2)
+        self.group_grid.addWidget(self.before_widget, 2, 2, 1, 2)
 
     def get(self):
         super().get()
+        if not (self.use_before.isChecked() or self.use_after.isChecked()):
+            raise ValueError("At least one of the before or after must be selected")
         return data_rules.StatRule(
-            self.before_widget.dateTime().toString(self._datetime_format),
-            self.after_widget.dateTime().toString(self._datetime_format),
+            self.before_widget.dateTime().toString(self._datetime_format) if self.use_before.isChecked() else None,
+            self.after_widget.dateTime().toString(self._datetime_format) if self.use_after.isChecked() else None,
         )
 
     def reset_settings_group(self):
+        self.use_after.setChecked(False)
+        self.use_before.setChecked(True)
         self.after_widget.setDateTime(QDateTime(QDate(1970, 1, 1), QTime(0, 0, 0)))
+        self.after_widget.setEnabled(False)
         self.before_widget.setDateTime(QDateTime.currentDateTime())
+        self.before_widget.setEnabled(True)
 
     def get_config(self):
+        if not (self.use_before.isChecked() or self.use_after.isChecked()):
+            raise ValueError("At least one of the before or after must be selected")
         return {
-            "after": self.after_widget.dateTime().toString(self._datetime_format),
-            "before": self.before_widget.dateTime().toString(self._datetime_format),
+            "after": self.after_widget.dateTime().toString(self._datetime_format)
+            if self.use_after.isChecked()
+            else None,
+            "before": self.before_widget.dateTime().toString(self._datetime_format)
+            if self.use_before.isChecked()
+            else None,
         }
 
     @classmethod
     def from_config(cls, cfg, parent=None):
         self = cls(parent)
-        self.after_widget.setDateTime(QDateTime.fromString(cfg["after"], cls._datetime_format))
-        self.before_widget.setDateTime(QDateTime.fromString(cfg["before"], cls._datetime_format))
+        if cfg["after"] is not None:
+            self.use_after.setChecked(True)
+            self.after_widget.setDateTime(QDateTime.fromString(cfg["after"], cls._datetime_format))
+        if cfg["before"] is not None:
+            self.use_before.setChecked(True)
+            self.before_widget.setDateTime(QDateTime.fromString(cfg["before"], cls._datetime_format))
         return self
 
 
