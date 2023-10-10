@@ -213,12 +213,14 @@ def main(
             return 0
 
         try:
+            start_t = datetime.now()
             with Pool(min(threads, len(scenarios))) as pool:
                 execute_t = p.add_task("executing scenarios", total=len(scenarios))
                 for file in pool.imap(FileScenario.run, scenarios, chunksize=chunksize):
                     if verbose:
                         p.log(f"finished: {file}")
                     p.advance(execute_t)
+            p.log(f"Finished in {datetime.now() - start_t}")
         except KeyboardInterrupt:
             print(-1, "KeyboardInterrupt")
             return 1
