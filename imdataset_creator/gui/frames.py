@@ -58,7 +58,7 @@ class FlowItem(QFrame):  # TODO: Better name lmao
         (revert_action := QAction("revert to defaults", self)).triggered.connect(self.reset_settings_group)
         self.addActions([collapse_action, duplicate_action, revert_action])
 
-        self._minimumsize = self.size()
+        self._minimum_size = self.size()
         self.previous_position = None
 
         self.setup_widget()
@@ -75,19 +75,19 @@ class FlowItem(QFrame):  # TODO: Better name lmao
             self._layout.addWidget(widget, 0, idx)
 
         self.group = QGroupBox()
-        self.descriptionwidget = QLabel(self.desc, self)
+        self.description_widget = QLabel(self.desc, self)
 
-        self.descriptionwidget.hide()
-        self.descriptionwidget.setWordWrap(True)
+        self.description_widget.hide()
+        self.description_widget.setWordWrap(True)
 
-        self.groupgrid = QGridLayout()
+        self.group_grid = QGridLayout()
         self.group.hide()
-        self.group.setLayout(self.groupgrid)
-        self._layout.addWidget(self.descriptionwidget, 1, 0, 1, len(top_bar))
+        self.group.setLayout(self.group_grid)
+        self._layout.addWidget(self.description_widget, 1, 0, 1, len(top_bar))
         self._layout.addWidget(self.group, 2, 0, 1, len(top_bar))
 
     def _top_bar(self) -> list[QWidget]:
-        widgets = []
+        widgets: list[QWidget] = []
         self.checkbox = QCheckBox()
         self.checkbox.setChecked(True)
         if self.title:
@@ -95,21 +95,21 @@ class FlowItem(QFrame):  # TODO: Better name lmao
         widgets.append(self.checkbox)
 
         if self.movable:
-            self.uparrow = QToolButton()
-            self.downarrow = QToolButton()
-            self.uparrow.setText("↑")
-            self.downarrow.setText("↓")
-            self.uparrow.clicked.connect(self.position_changed)
-            self.uparrow.clicked.connect(self.move_up)
-            self.downarrow.clicked.connect(self.position_changed)
-            self.downarrow.clicked.connect(self.move_down)
-            widgets.append(self.uparrow)
-            widgets.append(self.downarrow)
+            self.up_arrow = QToolButton()
+            self.down_arrow = QToolButton()
+            self.up_arrow.setText("↑")
+            self.down_arrow.setText("↓")
+            self.up_arrow.clicked.connect(self.position_changed)
+            self.up_arrow.clicked.connect(self.move_up)
+            self.down_arrow.clicked.connect(self.position_changed)
+            self.down_arrow.clicked.connect(self.move_down)
+            widgets.append(self.up_arrow)
+            widgets.append(self.down_arrow)
 
-        self.closebutton = QToolButton()
-        self.closebutton.setText("X")
-        self.closebutton.clicked.connect(self.closed)
-        widgets.append(self.closebutton)
+        self.close_button = QToolButton()
+        self.close_button.setText("X")
+        self.close_button.clicked.connect(self.closed)
+        widgets.append(self.close_button)
 
         return widgets
 
@@ -151,12 +151,12 @@ class FlowItem(QFrame):  # TODO: Better name lmao
         if self.needs_settings:
             self.group.setVisible(b)
         if self.desc:
-            self.descriptionwidget.setVisible(b)
+            self.description_widget.setVisible(b)
         if not b:
-            self._minimumsize = self.minimumSize()
+            self._minimum_size = self.minimumSize()
             self.setMinimumSize(0, 0)
         else:
-            self.setMinimumSize(self._minimumsize)
+            self.setMinimumSize(self._minimum_size)
         self.__opened = b
 
     @classmethod
@@ -177,9 +177,9 @@ class FlowItem(QFrame):  # TODO: Better name lmao
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         if event.buttons() == Qt.MouseButton.LeftButton and self.opened:
             if self.previous_position is not None:
-                poschange = event.position() - self.previous_position
-                newsize = QSize(self.size().width(), int(self.size().height() + poschange.y()))
-                self.setMinimumHeight(newsize.height())
+                pos_change = event.position() - self.previous_position
+                new_size = QSize(self.size().width(), int(self.size().height() + pos_change.y()))
+                self.setMinimumHeight(new_size.height())
         self.previous_position = event.position()
         return super().mouseMoveEvent(event)
 
@@ -201,54 +201,54 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
         self.items: list[FlowItem] = []
         self.registered_items: dict[str, type[FlowItem]] = {}
         self.setLayout(self._layout)
-        self.scrollarea = QScrollArea(self)
-        self.scrollarea.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Sunken)
-        self.scrollwidget = QWidget(self)
+        self.scroll_area = QScrollArea(self)
+        self.scroll_area.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Sunken)
+        self.scroll_widget = QWidget(self)
 
-        self.nametext = QLabel(self)
-        self.box = QVBoxLayout(self.scrollwidget)
-        self.scrollwidget.setLayout(self.box)
+        self.name_text = QLabel(self)
+        self.box = QVBoxLayout(self.scroll_widget)
+        self.scroll_widget.setLayout(self.box)
 
-        self.scrollwidget.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Maximum)
-        self.scrollarea.setWidgetResizable(True)
-        self.scrollarea.setWidget(self.scrollwidget)
-        self.addbox = QToolButton(self)
-        self.addbox.setText("+")
-        self.addbox.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self.addbox.hide()
-        self.addbutton = QToolButton(self)
-        self.addbutton.setText("+")
-        self.addbutton.hide()
+        self.scroll_widget.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Maximum)
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setWidget(self.scroll_widget)
+        self.add_box = QToolButton(self)
+        self.add_box.setText("+")
+        self.add_box.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.add_box.hide()
+        self.add_button = QToolButton(self)
+        self.add_button.setText("+")
+        self.add_button.hide()
         self.progressbar = QProgressBar(self)
         self.progressbar.setFormat("%p%  %v/%m")
 
         self.total.connect(self.progressbar.setMaximum)
         self.n.connect(self.progressbar.setValue)
 
-        self.addmenu = QMenu(self)
-        self.addbox.setMenu(self.addmenu)
+        self.add_menu = QMenu(self)
+        self.add_box.setMenu(self.add_menu)
 
-        self._layout.addWidget(self.addbox, 0, 0)
-        self._layout.addWidget(self.addbutton, 0, 0)
-        self._layout.addWidget(self.nametext, 0, 1)
+        self._layout.addWidget(self.add_box, 0, 0)
+        self._layout.addWidget(self.add_button, 0, 0)
+        self._layout.addWidget(self.name_text, 0, 1)
         self._layout.addWidget(self.progressbar, 0, 2)
-        self._layout.addWidget(self.scrollarea, 1, 0, 1, 3)
+        self._layout.addWidget(self.scroll_area, 1, 0, 1, 3)
 
     def set_text(self, s: str):
-        self.nametext.setText(s)
+        self.name_text.setText(s)
 
     def _register_item(self, item: type[FlowItem]):
-        self.additemtomenu(item)
+        self.add_item_to_menu(item)
         self.registered_items[item.cfg_name()] = item
-        if len(self.addmenu.actions()) == 1:
-            self.addbutton.show()
-            self.addbutton.clicked.connect(self.addmenu.actions()[0].trigger)
-        elif not self.addbox.isVisible():
-            self.addbox.show()
-            self.addbutton.hide()
+        if len(self.add_menu.actions()) == 1:
+            self.add_button.show()
+            self.add_button.clicked.connect(self.add_menu.actions()[0].trigger)
+        elif not self.add_box.isVisible():
+            self.add_box.show()
+            self.add_button.hide()
 
-    def additemtomenu(self, item: type[FlowItem]):
-        self.addmenu.addAction(item.title, lambda: self.initialize_item(item))
+    def add_item_to_menu(self, item: type[FlowItem]):
+        self.add_menu.addAction(item.title, lambda: self.initialize_item(item))
 
     def initialize_item(self, item: type[FlowItem]):
         self.add_item(item(self))
@@ -289,11 +289,11 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
         index: int = self.box.indexOf(item)
         if index == -1:
             return
-        newindex = min(max(index + direction, 0), self.box.count())
+        new_index = min(max(index + direction, 0), self.box.count())
 
         self.box.removeWidget(item)
-        self.box.insertWidget(newindex, item)
-        self.items.insert(newindex, self.items.pop(index))
+        self.box.insertWidget(new_index, item)
+        self.items.insert(new_index, self.items.pop(index))
 
     def duplicate_item(self, item: FlowItem):
         """duplicates an item"""

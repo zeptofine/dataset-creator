@@ -36,8 +36,8 @@ class ResizeFilterView(FilterView):
         self.scale.setMinimum(1)
         self.scale.setMaximum(1_000)
 
-        self.groupgrid.addWidget(QLabel("Scale:", self), 0, 0)
-        self.groupgrid.addWidget(self.scale, 0, 1)
+        self.group_grid.addWidget(QLabel("Scale:", self), 0, 0)
+        self.group_grid.addWidget(self.scale, 0, 1)
 
     def reset_settings_group(self):
         self.scale.setValue(100)
@@ -69,12 +69,12 @@ class BlurFilterView(FilterView):
         self.blur_range_y = QSpinBox(self)
         self.blur_range_y.setMinimum(0)
 
-        self.groupgrid.addWidget(self.algorithms, 0, 0, 1, 2)
-        self.groupgrid.addWidget(QLabel("Scale:", self), 1, 0)
-        self.groupgrid.addWidget(self.scale, 1, 1)
-        self.groupgrid.addWidget(QLabel("Blur Range:", self), 2, 0)
-        self.groupgrid.addWidget(self.blur_range_x, 2, 1)
-        self.groupgrid.addWidget(self.blur_range_y, 3, 1)
+        self.group_grid.addWidget(self.algorithms, 0, 0, 1, 2)
+        self.group_grid.addWidget(QLabel("Scale:", self), 1, 0)
+        self.group_grid.addWidget(self.scale, 1, 1)
+        self.group_grid.addWidget(QLabel("Blur Range:", self), 2, 0)
+        self.group_grid.addWidget(self.blur_range_x, 2, 1)
+        self.group_grid.addWidget(self.blur_range_y, 3, 1)
 
     def reset_settings_group(self):
         self.scale.setValue(25)
@@ -82,11 +82,13 @@ class BlurFilterView(FilterView):
         self.blur_range_y.setValue(16)
 
     def get_config(self) -> destroyers.BlurData:
-        return {
-            "algorithms": [algo for algo, enabled in self.algorithms.get_config().items() if enabled],
-            "blur_range": [self.blur_range_x.value(), self.blur_range_y.value()],
-            "scale": self.scale.value() / 100,
-        }
+        return destroyers.BlurData(
+            {
+                "algorithms": [algo for algo, enabled in self.algorithms.get_config().items() if enabled],
+                "blur_range": [self.blur_range_x.value(), self.blur_range_y.value()],
+                "scale": self.scale.value() / 100,
+            }
+        )
 
     @classmethod
     def from_config(cls, cfg, parent=None):
@@ -118,12 +120,12 @@ class NoiseFilterView(FilterView):
         self.intensity_range_y = QSpinBox(self)
         self.intensity_range_y.setMinimum(0)
 
-        self.groupgrid.addWidget(self.algorithms, 0, 0, 1, 2)
-        self.groupgrid.addWidget(QLabel("Scale:", self), 1, 0)
-        self.groupgrid.addWidget(self.scale, 1, 1)
-        self.groupgrid.addWidget(QLabel("Intensity Range:", self), 2, 0)
-        self.groupgrid.addWidget(self.intensity_range_x, 2, 1)
-        self.groupgrid.addWidget(self.intensity_range_y, 3, 1)
+        self.group_grid.addWidget(self.algorithms, 0, 0, 1, 2)
+        self.group_grid.addWidget(QLabel("Scale:", self), 1, 0)
+        self.group_grid.addWidget(self.scale, 1, 1)
+        self.group_grid.addWidget(QLabel("Intensity Range:", self), 2, 0)
+        self.group_grid.addWidget(self.intensity_range_x, 2, 1)
+        self.group_grid.addWidget(self.intensity_range_y, 3, 1)
 
     def reset_settings_group(self):
         self.scale.setValue(25)
@@ -161,7 +163,7 @@ class CompressionFilterView(FilterView):
 
     def configure_settings_group(self):
         self.algorithms = MiniCheckList(destroyers.AllCompressionAlgos, self)
-        self.groupgrid.addWidget(self.algorithms, 0, 0, 1, 3)
+        self.group_grid.addWidget(self.algorithms, 0, 0, 1, 3)
 
         # jpeg quality
         self.j_range_min = QSpinBox(self)
@@ -169,46 +171,46 @@ class CompressionFilterView(FilterView):
         self.j_range_max.setMaximum(100)
         self.j_range_min.valueChanged.connect(self.j_range_max.setMinimum)
         self.j_range_max.valueChanged.connect(self.j_range_min.setMaximum)
-        self.groupgrid.addWidget(QLabel("JPEG quality range:", self), 1, 0)
-        self.groupgrid.addWidget(self.j_range_min, 1, 1)
-        self.groupgrid.addWidget(self.j_range_max, 1, 2)
+        self.group_grid.addWidget(QLabel("JPEG quality range:", self), 1, 0)
+        self.group_grid.addWidget(self.j_range_min, 1, 1)
+        self.group_grid.addWidget(self.j_range_max, 1, 2)
         # webp quality
         self.w_range_min = QSpinBox(self)
         self.w_range_max = QSpinBox(self)
         self.w_range_max.setMaximum(100)
         self.w_range_min.valueChanged.connect(self.w_range_max.setMinimum)
         self.w_range_max.valueChanged.connect(self.w_range_min.setMaximum)
-        self.groupgrid.addWidget(QLabel("WebP quality range:", self), 2, 0)
-        self.groupgrid.addWidget(self.w_range_min, 2, 1)
-        self.groupgrid.addWidget(self.w_range_max, 2, 2)
+        self.group_grid.addWidget(QLabel("WebP quality range:", self), 2, 0)
+        self.group_grid.addWidget(self.w_range_min, 2, 1)
+        self.group_grid.addWidget(self.w_range_max, 2, 2)
         # h264 crf
         self.h264_range_min = QSpinBox(self)
         self.h264_range_max = QSpinBox(self)
         self.h264_range_max.setMaximum(100)
         self.h264_range_min.valueChanged.connect(self.h264_range_max.setMinimum)
         self.h264_range_max.valueChanged.connect(self.h264_range_min.setMaximum)
-        self.groupgrid.addWidget(QLabel("H264 CRF range:", self), 3, 0)
-        self.groupgrid.addWidget(self.h264_range_min, 3, 1)
-        self.groupgrid.addWidget(self.h264_range_max, 3, 2)
+        self.group_grid.addWidget(QLabel("H264 CRF range:", self), 3, 0)
+        self.group_grid.addWidget(self.h264_range_min, 3, 1)
+        self.group_grid.addWidget(self.h264_range_max, 3, 2)
         # hevc crf
         self.hevc_range_min = QSpinBox(self)
         self.hevc_range_max = QSpinBox(self)
         self.hevc_range_min.setMaximum(100)
         self.hevc_range_min.valueChanged.connect(self.hevc_range_max.setMinimum)
         self.hevc_range_max.valueChanged.connect(self.hevc_range_min.setMaximum)
-        self.groupgrid.addWidget(QLabel("HEVC CRF range:", self), 4, 0)
-        self.groupgrid.addWidget(self.hevc_range_min, 4, 1)
-        self.groupgrid.addWidget(self.hevc_range_max, 4, 2)
+        self.group_grid.addWidget(QLabel("HEVC CRF range:", self), 4, 0)
+        self.group_grid.addWidget(self.hevc_range_min, 4, 1)
+        self.group_grid.addWidget(self.hevc_range_max, 4, 2)
         # mpeg bitrate
         self.mpeg_bitrate = QSpinBox(self)
         self.mpeg_bitrate.setMaximum(1_000_000_000)  # idek what this is in gb
-        self.groupgrid.addWidget(QLabel("MPEG bitrate:", self), 5, 0)
-        self.groupgrid.addWidget(self.mpeg_bitrate, 5, 1, 1, 2)
+        self.group_grid.addWidget(QLabel("MPEG bitrate:", self), 5, 0)
+        self.group_grid.addWidget(self.mpeg_bitrate, 5, 1, 1, 2)
         # mpeg2 bitrate
         self.mpeg2_bitrate = QSpinBox(self)
         self.mpeg2_bitrate.setMaximum(1_000_000_000)
-        self.groupgrid.addWidget(QLabel("MPEG2 bitrate:", self), 6, 0)
-        self.groupgrid.addWidget(self.mpeg2_bitrate, 6, 1, 1, 2)
+        self.group_grid.addWidget(QLabel("MPEG2 bitrate:", self), 6, 0)
+        self.group_grid.addWidget(self.mpeg2_bitrate, 6, 1, 1, 2)
 
     def reset_settings_group(self):
         self.j_range_min.setValue(0)

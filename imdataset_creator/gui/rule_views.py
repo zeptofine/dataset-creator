@@ -41,7 +41,7 @@ class RuleView(FlowItem):
                 requires.name if isinstance(requires, base_rules.Column) else set(col.name for col in requires)
             )
 
-            self.descriptionwidget.setText(self.desc)
+            self.description_widget.setText(self.desc)
 
     @abstractmethod
     def get(self):
@@ -67,11 +67,11 @@ class StatRuleView(RuleView):
         self.before_widget.setDisplayFormat(self._datetime_format)
         format_label = QLabel(self._datetime_format, self)
         format_label.setEnabled(False)
-        self.groupgrid.addWidget(format_label, 0, 1)
-        self.groupgrid.addWidget(QLabel("After: ", self), 1, 0)
-        self.groupgrid.addWidget(QLabel("Before: ", self), 2, 0)
-        self.groupgrid.addWidget(self.after_widget, 1, 1, 1, 2)
-        self.groupgrid.addWidget(self.before_widget, 2, 1, 1, 2)
+        self.group_grid.addWidget(format_label, 0, 1)
+        self.group_grid.addWidget(QLabel("After: ", self), 1, 0)
+        self.group_grid.addWidget(QLabel("Before: ", self), 2, 0)
+        self.group_grid.addWidget(self.after_widget, 1, 1, 1, 2)
+        self.group_grid.addWidget(self.before_widget, 2, 1, 1, 2)
 
     def get(self):
         super().get()
@@ -103,16 +103,16 @@ class BlacklistWhitelistView(RuleView):
     desc = "Only allows paths that include strs in the whitelist and not in the blacklist"
 
     needs_settings = True
-    bound_item = data_rules.BlacknWhitelistRule
+    bound_item = data_rules.BlackWhitelistRule
 
     def configure_settings_group(self):
         self.whitelist = QTextEdit(self)
         self.blacklist = QTextEdit(self)
 
-        self.groupgrid.addWidget(QLabel("Whitelist: ", self), 0, 0)
-        self.groupgrid.addWidget(QLabel("Blacklist: ", self), 2, 0)
-        self.groupgrid.addWidget(self.whitelist, 1, 0, 1, 2)
-        self.groupgrid.addWidget(self.blacklist, 3, 0, 1, 2)
+        self.group_grid.addWidget(QLabel("Whitelist: ", self), 0, 0)
+        self.group_grid.addWidget(QLabel("Blacklist: ", self), 2, 0)
+        self.group_grid.addWidget(self.whitelist, 1, 0, 1, 2)
+        self.group_grid.addWidget(self.blacklist, 3, 0, 1, 2)
 
     def reset_settings_group(self):
         self.whitelist.clear()
@@ -120,19 +120,21 @@ class BlacklistWhitelistView(RuleView):
 
     def get(self):
         super().get()
-        return data_rules.BlacknWhitelistRule(
+        return data_rules.BlackWhitelistRule(
             self.whitelist.toPlainText().splitlines(),
             self.blacklist.toPlainText().splitlines(),
         )
 
-    def get_config(self) -> data_rules.BlacknWhitelistData:
-        return {
-            "whitelist": self.whitelist.toPlainText().splitlines(),
-            "blacklist": self.blacklist.toPlainText().splitlines(),
-        }
+    def get_config(self) -> data_rules.BlackWhitelistData:
+        return data_rules.BlackWhitelistData(
+            {
+                "whitelist": self.whitelist.toPlainText().splitlines(),
+                "blacklist": self.blacklist.toPlainText().splitlines(),
+            }
+        )
 
     @classmethod
-    def from_config(cls, cfg: data_rules.BlacknWhitelistData, parent=None):
+    def from_config(cls, cfg: data_rules.BlackWhitelistData, parent=None):
         self = cls(parent)
         self.whitelist.setText("\n".join(cfg["whitelist"]))
         self.blacklist.setText("\n".join(cfg["blacklist"]))
@@ -149,8 +151,8 @@ class TotalLimitRuleView(RuleView):
     def configure_settings_group(self):
         self.limit_widget = QSpinBox(self)
         self.limit_widget.setRange(0, 1000000000)
-        self.groupgrid.addWidget(QLabel("Limit: ", self), 0, 0)
-        self.groupgrid.addWidget(self.limit_widget, 0, 1)
+        self.group_grid.addWidget(QLabel("Limit: ", self), 0, 0)
+        self.group_grid.addWidget(self.limit_widget, 0, 1)
 
     def reset_settings_group(self):
         self.limit_widget.setValue(0)
@@ -185,13 +187,13 @@ class ResRuleView(RuleView):
         self.min.setMaximum(1_000_000_000)
         self.max.setMaximum(1_000_000_000)
         self.scale.setRange(1, 128)  # I think this is valid
-        self.groupgrid.addWidget(QLabel("Min / Max: ", self), 0, 0)
-        self.groupgrid.addWidget(self.min, 1, 0)
-        self.groupgrid.addWidget(self.max, 1, 1)
-        self.groupgrid.addWidget(QLabel("Try to crop: ", self), 2, 0)
-        self.groupgrid.addWidget(self.crop, 2, 1)
-        self.groupgrid.addWidget(QLabel("Scale: ", self), 3, 0)
-        self.groupgrid.addWidget(self.scale, 3, 1)
+        self.group_grid.addWidget(QLabel("Min / Max: ", self), 0, 0)
+        self.group_grid.addWidget(self.min, 1, 0)
+        self.group_grid.addWidget(self.max, 1, 1)
+        self.group_grid.addWidget(QLabel("Try to crop: ", self), 2, 0)
+        self.group_grid.addWidget(self.crop, 2, 1)
+        self.group_grid.addWidget(QLabel("Scale: ", self), 3, 0)
+        self.group_grid.addWidget(self.scale, 3, 1)
 
     def reset_settings_group(self):
         self.min.setValue(0)
@@ -238,9 +240,9 @@ class ChannelRuleView(RuleView):
         self.min.setMinimum(1)
         self.min.valueChanged.connect(self.max.setMinimum)
         self.max.setMinimum(1)
-        self.groupgrid.addWidget(QLabel("Min / Max: ", self), 0, 0)
-        self.groupgrid.addWidget(self.min, 0, 1)
-        self.groupgrid.addWidget(self.max, 0, 2)
+        self.group_grid.addWidget(QLabel("Min / Max: ", self), 0, 0)
+        self.group_grid.addWidget(self.min, 0, 1)
+        self.group_grid.addWidget(self.max, 0, 2)
 
     def reset_settings_group(self):
         self.min.setValue(1)
@@ -276,10 +278,10 @@ class HashRuleView(RuleView):
         self.resolver = QLineEdit(self)
         self.resolver.setText("mtime")
         self.ignore_all_btn.toggled.connect(self.toggle_resolver)
-        self.groupgrid.addWidget(QLabel("Ignore all with conflicts: ", self), 0, 0)
-        self.groupgrid.addWidget(self.ignore_all_btn, 0, 1)
-        self.groupgrid.addWidget(QLabel("Conflict resolver column: ", self), 1, 0)
-        self.groupgrid.addWidget(self.resolver, 2, 0, 1, 2)
+        self.group_grid.addWidget(QLabel("Ignore all with conflicts: ", self), 0, 0)
+        self.group_grid.addWidget(self.ignore_all_btn, 0, 1)
+        self.group_grid.addWidget(QLabel("Conflict resolver column: ", self), 1, 0)
+        self.group_grid.addWidget(self.resolver, 2, 0, 1, 2)
 
     def get(self):
         super().get()

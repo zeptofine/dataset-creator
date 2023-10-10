@@ -48,7 +48,7 @@ class InputList(FlowList):
 
     gathered = Signal(dict)
 
-    def add_item(self, item: InputView, *args, **kwargs):
+    def add_item(self, item, *args, **kwargs):
         item.gathered.connect(self.gathered.emit)
         return super().add_item(item, *args, **kwargs)
 
@@ -60,8 +60,8 @@ class ProducerList(FlowList):
         super().__init__(*args, **kwargs)
         self.__registered_by: dict[str, type[ProducerView]] = {}
 
-    def additemtomenu(self, item: type[ProducerView]):
-        self.addmenu.addAction(f"{item.title}: {set(item.bound_item.produces)}", lambda: self.initialize_item(item))
+    def add_item_to_menu(self, item: type[ProducerView]):
+        self.add_menu.addAction(f"{item.title}: {set(item.bound_item.produces)}", lambda: self.initialize_item(item))
 
     def _register_item(self, item: type[ProducerView]):
         super()._register_item(item)
@@ -99,23 +99,23 @@ class Window(QMainWindow):
         self.producers_rules = QSplitter(self)
         self.producers_rules.setOrientation(Qt.Orientation.Vertical)
 
-        self.inputlist = InputList(self)
-        self.inputlist.set_text("Inputs")
-        self.inputlist.register_item(InputView)
-        self.inputlist.gathered.connect(self.collect_files)
-        self.filedict = {}
+        self.input_list = InputList(self)
+        self.input_list.set_text("Inputs")
+        self.input_list.register_item(InputView)
+        self.input_list.gathered.connect(self.collect_files)
+        self.file_dict = {}
 
-        self.producerlist = ProducerList(self)
-        self.producerlist.set_text("Producers")
-        self.producerlist.register_item(
+        self.producer_list = ProducerList(self)
+        self.producer_list.set_text("Producers")
+        self.producer_list.register_item(
             FileInfoProducerView,
             ImShapeProducerView,
             HashProducerView,
         )
 
-        self.rulelist = RuleList(self)
-        self.rulelist.set_text("Rules")
-        self.rulelist.register_item(
+        self.rule_list = RuleList(self)
+        self.rule_list.set_text("Rules")
+        self.rule_list.register_item(
             StatRuleView,
             BlacklistWhitelistView,
             TotalLimitRuleView,
@@ -124,15 +124,15 @@ class Window(QMainWindow):
             HashRuleView,
         )
 
-        self.outputlist = FlowList(self)
-        self.outputlist.set_text("Outputs")
-        self.outputlist.register_item(OutputView)
+        self.output_list = FlowList(self)
+        self.output_list.set_text("Outputs")
+        self.output_list.register_item(OutputView)
 
-        self.lists.addWidget(self.inputlist)
-        self.producers_rules.addWidget(self.producerlist)
-        self.producers_rules.addWidget(self.rulelist)
+        self.lists.addWidget(self.input_list)
+        self.producers_rules.addWidget(self.producer_list)
+        self.producers_rules.addWidget(self.rule_list)
         self.lists.addWidget(self.producers_rules)
-        self.lists.addWidget(self.outputlist)
+        self.lists.addWidget(self.output_list)
 
         (save_action := QAction("Save", self)).triggered.connect(self.save_config)
         (save_as_action := QAction("Save As...", self)).triggered.connect(self.save_config_as)
@@ -145,18 +145,18 @@ class Window(QMainWindow):
         reload_action.setShortcut(QKeySequence("Ctrl+R"))
         menu = self.menuBar()
 
-        filemenu = menu.addMenu("File")
-        filemenu.addAction(open_action)
-        filemenu.addAction(save_action)
-        filemenu.addAction(save_as_action)
-        filemenu.addAction(reload_action)
+        file_menu = menu.addMenu("File")
+        file_menu.addAction(open_action)
+        file_menu.addAction(save_action)
+        file_menu.addAction(save_as_action)
+        file_menu.addAction(reload_action)
 
-        self.recents_menu = QMenu("Open Recent", self)
+        self.recent_menu = QMenu("Open Recent", self)
         self.recent_files = []
-        filemenu.addMenu(self.recents_menu)
+        file_menu.addMenu(self.recent_menu)
 
-        editmenu = menu.addMenu("Edit")
-        editmenu.addAction(clear_action)
+        edit_menu = menu.addMenu("Edit")
+        edit_menu.addAction(clear_action)
 
         # (get_builder := QAction("get builder", self)).triggered.connect(self.create_builder)
         # (run_builder := QAction("run builder", self)).triggered.connect(self.run_builder)
@@ -166,10 +166,10 @@ class Window(QMainWindow):
 
     def get_config(self) -> MainConfig:
         return {
-            "inputs": self.inputlist.get_config(),
-            "output": self.outputlist.get_config(),
-            "producers": self.producerlist.get_config(),
-            "rules": self.rulelist.get_config(),
+            "inputs": self.input_list.get_config(),
+            "output": self.output_list.get_config(),
+            "producers": self.producer_list.get_config(),
+            "rules": self.rule_list.get_config(),
         }
 
     @catch_errors("Error saving")
@@ -197,7 +197,7 @@ class Window(QMainWindow):
     def load_config(self):
         with self.cfg_path.open("r") as f:
             self.from_cfg(MainConfig(json.load(f)))
-            self.update_recents()
+            self.update_recent()
 
     @Slot()
     def open_config(self, s: str = ""):
@@ -216,44 +216,44 @@ class Window(QMainWindow):
 
     @Slot()
     def clear(self):
-        self.inputlist.empty()
-        self.producerlist.empty()
-        self.rulelist.empty()
-        self.outputlist.empty()
+        self.input_list.empty()
+        self.producer_list.empty()
+        self.rule_list.empty()
+        self.output_list.empty()
 
     @Slot()
-    def update_recents(self):
-        recents = get_recent_files()
-        if (txt := str(self.cfg_path.resolve())) not in recents:
-            recents.insert(0, txt)
+    def update_recent(self):
+        recent = get_recent_files()
+        if (txt := str(self.cfg_path.resolve())) not in recent:
+            recent.insert(0, txt)
         else:
-            recents.remove(txt)
-            recents.insert(0, txt)
-        save_recent_files(recents[:10])
+            recent.remove(txt)
+            recent.insert(0, txt)
+        save_recent_files(recent[:10])
 
-        self.recents_menu.clear()
-        for file in recents:
-            self.recents_menu.addAction(file).triggered.connect(lambda: self.open_config(file))
+        self.recent_menu.clear()
+        for file in recent:
+            self.recent_menu.addAction(file).triggered.connect(lambda: self.open_config(file))
 
     @catch_loading
     @Slot(dict)
     def from_cfg(self, cfg: MainConfig):
         self.clear()
-        self.inputlist.add_from_cfg(cfg["inputs"])
-        self.producerlist.add_from_cfg(cfg["producers"])
-        self.rulelist.add_from_cfg(cfg["rules"])
-        self.outputlist.add_from_cfg(cfg["output"])
+        self.input_list.add_from_cfg(cfg["inputs"])
+        self.producer_list.add_from_cfg(cfg["producers"])
+        self.rule_list.add_from_cfg(cfg["rules"])
+        self.output_list.add_from_cfg(cfg["output"])
 
     @Slot(dict)
     def collect_files(self, dct):
-        self.filedict.update(dct)
+        self.file_dict.update(dct)
 
     @catch_building
     @Slot()
     def create_builder(self):
         print("building builder...")
-        producers = self.producerlist.get()
-        rules = self.rulelist.get()
+        producers = self.producer_list.get()
+        rules = self.rule_list.get()
 
         self.builder = DatasetBuilder(Path("filedb.arrow"))
 
@@ -265,8 +265,8 @@ class Window(QMainWindow):
 
     @Slot()
     def run_builder(self):
-        pathdict: dict[Path, list[Path]] = {Path(src): list(map(Path, dst)) for src, dst in self.filedict.items()}
-        all_files = {str(src / file) for src, lst in pathdict.items() for file in lst}
+        path_dict: dict[Path, list[Path]] = {Path(src): list(map(Path, dst)) for src, dst in self.file_dict.items()}
+        all_files = {str(src / file) for src, lst in path_dict.items() for file in lst}
 
         self.builder.add_new_paths(all_files)
 

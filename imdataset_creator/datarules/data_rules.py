@@ -98,12 +98,12 @@ class StatRule(Rule):
             super().__init__(f"{older} is older than {newer}")
 
 
-class BlacknWhitelistData(SpecialItemData):
+class BlackWhitelistData(SpecialItemData):
     whitelist: list[str]
     blacklist: list[str]
 
 
-class BlacknWhitelistRule(Rule):
+class BlackWhitelistRule(Rule):
     def __init__(
         self,
         whitelist: list[str] | None = None,
@@ -125,7 +125,7 @@ class BlacknWhitelistRule(Rule):
         self.comparer = FastComparable(expr)
 
     @classmethod
-    def get_cfg(cls) -> BlacknWhitelistData:
+    def get_cfg(cls) -> BlackWhitelistData:
         return {"whitelist": [], "blacklist": []}
 
 

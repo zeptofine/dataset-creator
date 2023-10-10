@@ -20,7 +20,7 @@ class ProducerView(FlowItem):
         if self.desc:
             self.desc += "\n"
         self.desc += f"Produces: {set(self.bound_item.produces)}"
-        self.descriptionwidget.setText(self.desc)
+        self.description_widget.setText(self.desc)
 
 
 class FileInfoProducerView(ProducerView):
@@ -51,8 +51,8 @@ class HashProducerView(ProducerView):
     def configure_settings_group(self):
         self.hash_type = QComboBox()
         self.hash_type.addItems([*image_rules.HASHERS])
-        self.groupgrid.addWidget(QLabel("Hash type: ", self), 0, 0)
-        self.groupgrid.addWidget(self.hash_type, 0, 1)
+        self.group_grid.addWidget(QLabel("Hash type: ", self), 0, 0)
+        self.group_grid.addWidget(self.hash_type, 0, 1)
 
     def reset_settings_group(self):
         self.hash_type.setCurrentIndex(0)

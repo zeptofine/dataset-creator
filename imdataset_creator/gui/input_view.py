@@ -89,10 +89,10 @@ class InputView(FlowItem):
         self.fileselect.setText("...")
         self.fileselect.setIcon(QIcon.fromTheme("folder-open"))
         self.fileselect.clicked.connect(self.select_folder)
-        self.groupgrid.setGeometry(QRect(0, 0, 800, 800))
-        self.groupgrid.addWidget(QLabel("Folder: ", self), 0, 0)
-        self.groupgrid.addWidget(self.text, 0, 1)
-        self.groupgrid.addWidget(self.fileselect, 0, 2)
+        self.group_grid.setGeometry(QRect(0, 0, 800, 800))
+        self.group_grid.addWidget(QLabel("Folder: ", self), 0, 0)
+        self.group_grid.addWidget(self.text, 0, 1)
+        self.group_grid.addWidget(self.fileselect, 0, 2)
 
         self.filedialog = QFileDialog(self)
         self.filedialog.setFileMode(QFileDialog.FileMode.Directory)
@@ -120,9 +120,9 @@ class InputView(FlowItem):
         self.gather_button.setText("gather")
         self.gather_button.clicked.connect(self.get)
 
-        self.groupgrid.addWidget(QLabel("Search patterns:", self), 1, 0, 1, 3)
-        self.groupgrid.addWidget(self.globexprs, 2, 0, 1, 3)
-        self.groupgrid.addWidget(self.gather_button, 3, 0, 1, 1)
+        self.group_grid.addWidget(QLabel("Search patterns:", self), 1, 0, 1, 3)
+        self.group_grid.addWidget(self.globexprs, 2, 0, 1, 3)
+        self.group_grid.addWidget(self.gather_button, 3, 0, 1, 1)
 
     def _top_bar(self) -> list[QWidget]:
         top: list[QWidget] = super()._top_bar()

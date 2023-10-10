@@ -75,10 +75,10 @@ class OutputView(InputView):
         )
 
         self.list.register_item()
-        self.groupgrid.addWidget(self.overwrite, 1, 0, 1, 3)
-        self.groupgrid.addWidget(QLabel("format text: ", self), 2, 0, 1, 3)
-        self.groupgrid.addWidget(self.format_str, 3, 0, 1, 3)
-        self.groupgrid.addWidget(self.list, 4, 0, 1, 3)
+        self.group_grid.addWidget(self.overwrite, 1, 0, 1, 3)
+        self.group_grid.addWidget(QLabel("format text: ", self), 2, 0, 1, 3)
+        self.group_grid.addWidget(self.format_str, 3, 0, 1, 3)
+        self.group_grid.addWidget(self.list, 4, 0, 1, 3)
 
     def reset_settings_group(self):
         self.format_str.setText("{relative_path}/{file}.{ext}")
