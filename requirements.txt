@@ -12,5 +12,5 @@ ffmpeg-python
 
 # GUI requirements
 wcmatch
-typer[all]
+typer
 pyside6-essentials
