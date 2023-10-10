@@ -8,6 +8,7 @@ pyarrow
 python-dateutil
 rich
 tqdm
+ffmpeg-python
 
 # GUI requirements
 wcmatch
