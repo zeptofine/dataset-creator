@@ -213,7 +213,7 @@ def main(
             return 0
 
         try:
-            with Pool(threads) as pool:
+            with Pool(min(threads, len(scenarios))) as pool:
                 execute_t = p.add_task("executing scenarios", total=len(scenarios))
                 for file in pool.imap(FileScenario.run, scenarios, chunksize=chunksize):
                     if verbose:
