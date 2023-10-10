@@ -17,7 +17,7 @@ cd dataset-creator
 pip install -e .
 ```
 
-inside.
+inside. Atm This basically just uses pyproject.toml to install the dependencies. you can use the requirements.txt most of the time.
 
 ## GUI
 
