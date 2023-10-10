@@ -19,7 +19,7 @@ pip install -e .
 
 inside. Atm This basically just uses pyproject.toml (and Poetry) to install the dependencies. you can use the requirements.txt most of the time.
 
-## GUI
+## GUI Configuration
 
 This gui is (currently) used to configure the actions of the
 [imdataset_creator](imdataset_creator) main.
