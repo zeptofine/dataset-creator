@@ -64,27 +64,14 @@ To run the program, run `python -m imdataset_creator` (or if you installed it, `
 
 ```rich
 --config-path                              PATH     Where the dataset config is placed [default: config.json]
-                                                    This is the config you create using the GUI.
-
 --database-path                            PATH     Where the database is placed [default: filedb.arrow]
-                                                    The database that the Producer save to.
-
 --threads                                  INTEGER  multiprocessing threads [default: 9]
-                                                    The number of separate processes to make in the execution step.
 --chunksize                                INTEGER  imap chunksize [default: 5]
-                                                    This can make a small performance difference. I personally don't see it much
-
-                      -p                   INTEGER  chunksize when populating the df [default: 100]
-                                                    This affects the efficiency of df population. Try to keep this high.
-
+--population-chunksize                     INTEGER  chunksize when populating the df [default: 100]
+--population-interval                      INTEGER  save interval in secs when populating the df [default: 60]
 --simulate                --no-simulate             stops before conversion [default: no-simulate]
-                                                    This is mainly for debugging. this exits right before execution.
-                                                    
 --verbose                 --no-verbose              prints converted files [default: no-verbose]
-
-                      -s                   INTEGER  save interval in secs when populating the df [default: 60]
-                                                    How often to autosave. By default, it autosaves every minute when it can
-
+--sort-by                                  TEXT     Which database column to sort by [default: path]
 --help                                              Show this message and exit.
 ```
 

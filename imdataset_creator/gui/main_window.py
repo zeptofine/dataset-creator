@@ -48,7 +48,7 @@ class InputList(FlowList):
 
     gathered = Signal(dict)
 
-    def add_item(self, item, *args, **kwargs):
+    def add_item(self, item: InputView, *args, **kwargs):
         item.gathered.connect(self.gathered.emit)
         return super().add_item(item, *args, **kwargs)
 
