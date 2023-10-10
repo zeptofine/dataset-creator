@@ -88,9 +88,9 @@ catch_building = catch_errors("building failed")
 class Window(QMainWindow):
     def __init__(self, cfg_path=Path("config.json")):
         super().__init__()
-        self.setWindowTitle("dataset-creator")
         self.resize(1200, 500)
         self.setMinimumSize(400, 300)
+        self._cfg_path: Path
         self.cfg_path = cfg_path
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.ActionsContextMenu)
 
@@ -199,6 +199,15 @@ class Window(QMainWindow):
             self.from_cfg(MainConfig(json.load(f)))
             self.update_recent()
 
+    @property
+    def cfg_path(self) -> Path:
+        return self._cfg_path
+
+    @cfg_path.setter
+    def cfg_path(self, s):
+        self._cfg_path = s
+        self.setWindowTitle(f"{self.cfg_path} | dataset-creator")
+
     @Slot()
     def open_config(self, s: str = ""):
         if not s:
@@ -224,7 +233,7 @@ class Window(QMainWindow):
     @Slot()
     def update_recent(self):
         recent = get_recent_files()
-        if (txt := str(self.cfg_path.resolve())) not in recent:
+        if (txt := str(self._cfg_path.resolve())) not in recent:
             recent.insert(0, txt)
         else:
             recent.remove(txt)
