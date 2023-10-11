@@ -1,13 +1,9 @@
-from abc import abstractmethod
-from typing import Callable
-
-import numpy as np
 from PySide6.QtCore import QSize
-from PySide6.QtWidgets import QDoubleSpinBox, QLabel, QSpinBox, QWidget
+from PySide6.QtWidgets import QDoubleSpinBox, QLabel, QSpinBox
 
 from ..datarules.base_rules import Filter
 from ..image_filters import destroyers, resizer
-from .frames import FlowItem, FlowList, MiniCheckList, tooltip
+from .frames import FlowItem, MiniCheckList, tooltip
 
 
 class FilterView(FlowItem):
@@ -96,9 +92,12 @@ class BlurFilterView(FilterView):
         self.blur_range_y.setValue(16)
 
     def get_config(self) -> destroyers.BlurData:
+        algos = [algo for algo, enabled in self.algorithms.get_config().items() if enabled]
+        if not algos:
+            raise EmptyAlgorithmsError(self)
         return destroyers.BlurData(
             {
-                "algorithms": [algo for algo, enabled in self.algorithms.get_config().items() if enabled],
+                "algorithms": algos,
                 "blur_range": [self.blur_range_x.value(), self.blur_range_y.value()],
                 "scale": self.scale.value() / 100,
             }
@@ -155,7 +154,7 @@ class NoiseFilterView(FilterView):
             raise EmptyAlgorithmsError(self)
         return destroyers.NoiseData(
             {
-                "algorithms": [algo for algo, enabled in self.algorithms.get_config().items() if enabled],
+                "algorithms": algos,
                 "intensity_range": [self.intensity_range_x.value(), self.intensity_range_y.value()],
                 "scale": self.scale.value() / 100,
             }
