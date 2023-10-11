@@ -2,14 +2,13 @@ import logging
 import subprocess
 import typing
 from math import sqrt
-from random import choice, randint, shuffle
+from random import choice, randint
 from typing import Literal
 
 import cv2
 import ffmpeg
 import numpy as np
 from numpy import ndarray
-from PIL import Image
 
 from ..configs.configtypes import FilterData
 from ..datarules.base_rules import Filter

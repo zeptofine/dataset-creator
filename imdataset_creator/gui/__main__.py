@@ -1,4 +1,4 @@
-# this is one of those words that look wierd when you hear it alot
+# this is one of those words that look weird when you hear it a lot
 from .main_window import main
 
 main()

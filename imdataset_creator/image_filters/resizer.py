@@ -1,10 +1,8 @@
-from enum import Enum
 from random import choice
 from typing import Literal
 
 import cv2
 import numpy as np
-from PIL import Image
 
 from ..datarules.base_rules import Filter
 

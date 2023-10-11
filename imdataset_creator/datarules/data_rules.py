@@ -4,18 +4,13 @@ import os
 from datetime import datetime
 from pathlib import Path
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Self
+from typing import Self
 
 from dateutil import parser as timeparser
-from polars import DataFrame, Datetime, col
+from polars import DataFrame, Datetime, Expr, col
 
 from ..configs.configtypes import SpecialItemData
 from .base_rules import Column, Comparable, FastComparable, Producer, Rule
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
-
-    from polars import Expr
 
 STAT_TRACKED = ("st_size", "st_atime", "st_mtime", "st_ctime")
 

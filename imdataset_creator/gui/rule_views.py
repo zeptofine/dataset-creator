@@ -1,26 +1,7 @@
 from abc import abstractmethod
 
-from PySide6.QtCore import QDate, QDateTime, QRect, Qt, QThread, QTime, Signal, Slot
-from PySide6.QtWidgets import (
-    QCheckBox,
-    QComboBox,
-    QDateTimeEdit,
-    QFrame,
-    QGridLayout,
-    QGroupBox,
-    QLabel,
-    QLineEdit,
-    QMenu,
-    QPushButton,
-    QScrollArea,
-    QSizePolicy,
-    QSlider,
-    QSpinBox,
-    QSplitter,
-    QTextEdit,
-    QToolButton,
-    QWidget,
-)
+from PySide6.QtCore import QDate, QDateTime, QTime, Slot
+from PySide6.QtWidgets import QCheckBox, QDateTimeEdit, QLabel, QLineEdit, QSpinBox, QTextEdit
 
 from ..configs import ItemData
 from ..datarules import base_rules, data_rules, image_rules

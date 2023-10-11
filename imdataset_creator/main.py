@@ -197,13 +197,13 @@ def main(
             p.log(db.df)
 
         if rules:
-            filter_t = p.add_task("filtering", total=1)
+            filter_t = p.add_task("filtering", total=0)
             files: list[File] = [resolved[file] for file in db.filter(set(resolved))]
             p.update(filter_t, total=len(files), completed=len(files))
         else:
             files: list[File] = [resolved[file] for file in resolved]
 
-        scenarios = list(parse_files(p.track(files, description="parsing scenarios"), outputs))
+        scenarios = list(parse_files(p.track(files, description="parsing files"), outputs))
 
         if not scenarios:
             p.log("Finished. No images remain.")

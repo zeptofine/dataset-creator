@@ -7,8 +7,8 @@ from pathlib import Path
 
 from PySide6 import QtWidgets
 from PySide6.QtCore import Qt, Signal, Slot
-from PySide6.QtGui import QAction, QKeySequence, QShortcut
-from PySide6.QtWidgets import QFileDialog, QMainWindow, QSplitter, QStatusBar, QToolBar, QWidget, QMenu, QGridLayout
+from PySide6.QtGui import QAction, QKeySequence
+from PySide6.QtWidgets import QFileDialog, QMainWindow, QSplitter, QWidget, QMenu, QGridLayout
 from rich import print as rprint
 
 from ..configs import MainConfig

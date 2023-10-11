@@ -2,25 +2,19 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Collection
-from typing import TypeVar
 
 from PySide6.QtCore import QRect, QSize, Qt, Signal, Slot
-from PySide6.QtGui import QAction, QCursor, QFont, QMouseEvent
+from PySide6.QtGui import QAction, QFont, QMouseEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QFrame,
     QGridLayout,
     QGroupBox,
     QLabel,
-    QLineEdit,
-    QListWidget,
-    QListWidgetItem,
     QMenu,
     QProgressBar,
     QScrollArea,
     QSizePolicy,
-    QSpinBox,
-    QTextEdit,
     QToolButton,
     QVBoxLayout,
     QWidget,

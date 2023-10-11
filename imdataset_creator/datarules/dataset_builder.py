@@ -6,16 +6,15 @@ from pathlib import Path
 from typing import Generator, Literal, TypeVar, overload
 
 import polars as pl
-from polars import DataFrame, Expr, concat
+from polars import DataFrame, Expr
 from polars.type_aliases import SchemaDefinition
 
-from ..configs import FilterData, MainConfig
+from ..configs import MainConfig
 from .base_rules import (
     Comparable,
     DataTypeSchema,
     ExprDict,
     FastComparable,
-    Filter,
     Input,
     Output,
     Producer,

@@ -4,21 +4,15 @@ from collections.abc import Mapping, Sequence
 from string import Formatter
 from typing import Any
 
-from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import (
     QCheckBox,
-    QFileDialog,
     QLabel,
     QLineEdit,
-    QSizePolicy,
-    QSizeGrip,
 )
 
 from ..configs import OutputData
 from ..datarules.base_rules import Output
-from .err_dialog import catch_errors
-from .frames import FlowItem, FlowList
+from .frames import FlowList
 from .input_view import InputView
 from .output_filters import (
     BlurFilterView,
