@@ -2,13 +2,12 @@ from abc import abstractmethod
 from typing import Callable
 
 import numpy as np
-from PySide6.QtWidgets import QDoubleSpinBox, QLabel, QSpinBox
+from PySide6.QtCore import QSize
+from PySide6.QtWidgets import QDoubleSpinBox, QLabel, QSpinBox, QWidget
 
-from PySide6.QtCore import QRect, QSize, Qt, Signal, Slot
-from ..datarules import base_rules, data_rules, image_rules
 from ..datarules.base_rules import Filter
 from ..image_filters import destroyers, resizer
-from .frames import FlowItem, FlowList, MiniCheckList
+from .frames import FlowItem, FlowList, MiniCheckList, tooltip
 
 
 class FilterView(FlowItem):
@@ -22,6 +21,14 @@ class FilterView(FlowItem):
 
     def get(self):
         super().get()
+
+
+TOOLTIPS = {
+    "blur_range": "Range of values for blur kernel size or standard deviation (e.g., 1,10)",
+    "blur_scale": "Adjusts the scaling of the blur range. For average and gaussian, this will add 1 when the new value is even",
+    "noise_range": "Range of values for noise intensity (e.g., 0,50)",
+    "scale_factor": "Adjusts the scaling of the noise range",
+}
 
 
 class ResizeFilterView(FilterView):
@@ -61,23 +68,30 @@ class BlurFilterView(FilterView):
     def configure_settings_group(self):
         self.algorithms = MiniCheckList(destroyers.AllBlurAlgos, self)
         self.scale = QDoubleSpinBox(self)
-        self.scale.setSuffix("%")
-        self.scale.setMinimum(1)
-        self.scale.setMaximum(1_000)
+        scale_label = QLabel("Scale:", self)
+        tooltip(scale_label, TOOLTIPS["blur_scale"])
+
+        self.scale.setMinimum(0)
+        self.scale.setMaximum(100)
+        self.scale.setSingleStep(0.1)
+
+        blur_label = QLabel("Blur Range:", self)
+        tooltip(blur_label, TOOLTIPS["blur_range"])
         self.blur_range_x = QSpinBox(self)
         self.blur_range_x.setMinimum(0)
         self.blur_range_y = QSpinBox(self)
         self.blur_range_y.setMinimum(0)
 
         self.group_grid.addWidget(self.algorithms, 0, 0, 1, 2)
-        self.group_grid.addWidget(QLabel("Scale:", self), 1, 0)
+        self.group_grid.addWidget(scale_label, 1, 0)
         self.group_grid.addWidget(self.scale, 1, 1)
-        self.group_grid.addWidget(QLabel("Blur Range:", self), 2, 0)
+        self.group_grid.addWidget(blur_label, 2, 0)
         self.group_grid.addWidget(self.blur_range_x, 2, 1)
         self.group_grid.addWidget(self.blur_range_y, 3, 1)
 
     def reset_settings_group(self):
-        self.scale.setValue(25)
+        self.algorithms.disable_all()
+        self.scale.setValue(0.25)
         self.blur_range_x.setValue(1)
         self.blur_range_y.setValue(16)
 
@@ -115,6 +129,8 @@ class NoiseFilterView(FilterView):
         self.scale.setSuffix("%")
         self.scale.setMinimum(1)
         self.scale.setMaximum(1_000)
+        intensity_label = QLabel("Intensity Range:", self)
+        tooltip(intensity_label, TOOLTIPS["noise_range"])
         self.intensity_range_x = QSpinBox(self)
         self.intensity_range_x.setMinimum(0)
         self.intensity_range_y = QSpinBox(self)
@@ -123,12 +139,13 @@ class NoiseFilterView(FilterView):
         self.group_grid.addWidget(self.algorithms, 0, 0, 1, 2)
         self.group_grid.addWidget(QLabel("Scale:", self), 1, 0)
         self.group_grid.addWidget(self.scale, 1, 1)
-        self.group_grid.addWidget(QLabel("Intensity Range:", self), 2, 0)
+        self.group_grid.addWidget(intensity_label, 2, 0)
         self.group_grid.addWidget(self.intensity_range_x, 2, 1)
         self.group_grid.addWidget(self.intensity_range_y, 3, 1)
 
     def reset_settings_group(self):
         self.scale.setValue(25)
+        self.algorithms.disable_all()
         self.intensity_range_x.setValue(1)
         self.intensity_range_y.setValue(16)
 
@@ -136,11 +153,13 @@ class NoiseFilterView(FilterView):
         algos = [algo for algo, enabled in self.algorithms.get_config().items() if enabled]
         if not algos:
             raise EmptyAlgorithmsError(self)
-        return {
-            "algorithms": [algo for algo, enabled in self.algorithms.get_config().items() if enabled],
-            "intensity_range": [self.intensity_range_x.value(), self.intensity_range_y.value()],
-            "scale": self.scale.value() / 100,
-        }
+        return destroyers.NoiseData(
+            {
+                "algorithms": [algo for algo, enabled in self.algorithms.get_config().items() if enabled],
+                "intensity_range": [self.intensity_range_x.value(), self.intensity_range_y.value()],
+                "scale": self.scale.value() / 100,
+            }
+        )
 
     @classmethod
     def from_config(cls, cfg, parent=None):
@@ -226,15 +245,17 @@ class CompressionFilterView(FilterView):
         algos = [algo for algo, enabled in self.algorithms.get_config().items() if enabled]
         if not algos:
             raise EmptyAlgorithmsError(self)
-        return {
-            "algorithms": [algo for algo, enabled in self.algorithms.get_config().items() if enabled],
-            "jpeg_quality_range": [self.j_range_min.value(), self.j_range_max.value()],
-            "webp_quality_range": [self.w_range_min.value(), self.w_range_max.value()],
-            "h264_crf_range": [self.h264_range_min.value(), self.h264_range_max.value()],
-            "hevc_crf_range": [self.hevc_range_min.value(), self.hevc_range_max.value()],
-            "mpeg_bitrate": self.mpeg_bitrate.value(),
-            "mpeg2_bitrate": self.mpeg2_bitrate.value(),
-        }
+        return destroyers.CompressionData(
+            {
+                "algorithms": [algo for algo, enabled in self.algorithms.get_config().items() if enabled],
+                "jpeg_quality_range": [self.j_range_min.value(), self.j_range_max.value()],
+                "webp_quality_range": [self.w_range_min.value(), self.w_range_max.value()],
+                "h264_crf_range": [self.h264_range_min.value(), self.h264_range_max.value()],
+                "hevc_crf_range": [self.hevc_range_min.value(), self.hevc_range_max.value()],
+                "mpeg_bitrate": self.mpeg_bitrate.value(),
+                "mpeg2_bitrate": self.mpeg2_bitrate.value(),
+            }
+        )
 
     @classmethod
     def from_config(cls, cfg, parent=None):
