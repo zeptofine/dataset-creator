@@ -144,9 +144,9 @@ class ResolvedRule(Rule):
 
 
 class TotalLimitRule(Rule):
-    def __init__(self, total=1000):
+    def __init__(self, limit=1000):
         super().__init__()
-        self.total = total
+        self.total = limit
         self.comparer = Comparable(self.compare)
 
     def compare(self, selected: DataFrame, _) -> DataFrame:
