@@ -4,23 +4,13 @@ from collections.abc import Mapping, Sequence
 from string import Formatter
 from typing import Any
 
-from PySide6.QtWidgets import (
-    QCheckBox,
-    QLabel,
-    QLineEdit,
-)
+from PySide6.QtWidgets import QCheckBox, QFileDialog, QLabel, QLineEdit
 
 from ..configs import OutputData
 from ..datarules.base_rules import Output
 from .frames import FlowList
 from .input_view import InputView
-from .output_filters import (
-    BlurFilterView,
-    CompressionFilterView,
-    FilterView,
-    NoiseFilterView,
-    ResizeFilterView,
-)
+from .output_filters import BlurFilterView, CompressionFilterView, FilterView, NoiseFilterView, ResizeFilterView
 
 
 class FilterList(FlowList):
@@ -51,6 +41,7 @@ class OutputView(InputView):
         super().__init__(*args, **kwargs)
         self.setMouseTracking(True)
         self.setMinimumHeight(400)
+        self.filedialog.setFileMode(QFileDialog.FileMode.AnyFile)
         self.previous_position = None
 
     def configure_settings_group(self):

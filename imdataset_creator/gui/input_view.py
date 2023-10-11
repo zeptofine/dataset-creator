@@ -107,7 +107,7 @@ class InputView(FlowItem):
 
     def configure_settings_group(self):
         self.gather_button = QToolButton(self)
-        self.globexprs = QTextEdit(self)
+        self.glob_exprs = QTextEdit(self)
         self.gatherer = GathererThread(self)
 
         self.gatherer.count.connect(self.filecount.setNum)
@@ -120,7 +120,7 @@ class InputView(FlowItem):
         self.gather_button.clicked.connect(self.get)
 
         self.group_grid.addWidget(QLabel("Search patterns:", self), 1, 0, 1, 3)
-        self.group_grid.addWidget(self.globexprs, 2, 0, 1, 3)
+        self.group_grid.addWidget(self.glob_exprs, 2, 0, 1, 3)
         self.group_grid.addWidget(self.gather_button, 3, 0, 1, 1)
 
     def _top_bar(self) -> list[QWidget]:
@@ -142,7 +142,7 @@ class InputView(FlowItem):
     @Slot()
     def reset_settings_group(self):
         self.text.clear()
-        self.globexprs.setText("\n".join(f"**/*{ext}" for ext in DEFAULT_IMAGE_FORMATS))
+        self.glob_exprs.setText("\n".join(f"**/*{ext}" for ext in DEFAULT_IMAGE_FORMATS))
 
     @catch_errors("gathering failed")
     @Slot()
@@ -150,7 +150,7 @@ class InputView(FlowItem):
         if not self.text.text():
             raise NotADirectoryError(self.text.text())
 
-        self.gatherer.input = Input(Path(self.text.text()), self.globexprs.toPlainText().splitlines())
+        self.gatherer.input = Input(Path(self.text.text()), self.glob_exprs.toPlainText().splitlines())
         self.gatherer.start()
 
     @Slot(dict)
@@ -160,14 +160,14 @@ class InputView(FlowItem):
     def get_config(self) -> InputData:
         return {
             "folder": self.text.text(),
-            "expressions": self.globexprs.toPlainText().splitlines(),
+            "expressions": self.glob_exprs.toPlainText().splitlines(),
         }
 
     @classmethod
     def from_config(cls, cfg: InputData, parent=None):
         self = cls(parent)
         self.text.setText(cfg["folder"])
-        self.globexprs.setText("\n".join(cfg["expressions"]))
+        self.glob_exprs.setText("\n".join(cfg["expressions"]))
 
         return self
 
@@ -175,13 +175,15 @@ class InputView(FlowItem):
     def select_folder(self):
         # ! this as a whole is very fucky
 
-        self.filedialog.setDirectory(self.text.text() or str(Path.home()))
-        if self.filedialog.exec():
-            print(self.filedialog.selectedFiles())
-            files = self.filedialog.selectedFiles()
-
+        files = self._select_folder()
+        if files:
             while len(files) > 1:
                 self.text.setText(files.pop(0))
                 self.duplicate.emit()
-
             self.text.setText(files.pop(0))
+
+    def _select_folder(self):
+        self.filedialog.setDirectory(self.text.text() or str(Path.home()))
+        if self.filedialog.exec():
+            return self.filedialog.selectedFiles()
+        return []
