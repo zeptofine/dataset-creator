@@ -105,6 +105,7 @@ class Noise(Filter):
         # algorithm (should be) == NoiseAlgorithms.GRAY
         noise = np.zeros((img.shape[0], img.shape[1]), dtype=np.uint8)
         cv2.randn(noise, 0, (randint(*intensity_range),))  # type: ignore
+        noise = noise[..., None]
         return img + noise
 
 
