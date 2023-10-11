@@ -65,13 +65,13 @@ The order of these rules in the list is important, as they will be executed in o
 
 Outputs have a folder, which is used to send created images, and the format_text is used to define files new paths. The `overwrite existing files` checkbox defines whether you overwrite existing files in the output folder if they already exist.
 
-The `Filters` list show functions that will be applied to images going through this step. They can apply noise, compression, etc. to images.
+The `Filters` list show functions that will be applied to images going through this step. They can apply noise, compression, etc. to images. Many of these are nearly ripped from [Kim2091/helpful-scripts/Dataset-Destroyer](https://github.com/Kim2091/helpful-scripts/).
 
 ### Every list item can be dragged and resized to help viewing them
 
 ## Running
 
-To run the program, run `python -m imdataset_creator` (or if you installed it, `imdataset-creator`) in the terminal.
+To run the actual program, run `python -m imdataset_creator` (or if you installed it, `imdataset-creator`) in the terminal.
 
 ### Arguments
 
