@@ -8,7 +8,7 @@ from pathlib import Path
 from PySide6 import QtWidgets
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtGui import QAction, QKeySequence, QShortcut
-from PySide6.QtWidgets import QFileDialog, QMainWindow, QSplitter, QStatusBar, QToolBar, QWidget, QMenu
+from PySide6.QtWidgets import QFileDialog, QMainWindow, QSplitter, QStatusBar, QToolBar, QWidget, QMenu, QGridLayout
 from rich import print as rprint
 
 from ..configs import MainConfig
@@ -40,7 +40,9 @@ def get_recent_files():
 
 
 def save_recent_files(files):
-    RECENT_FILES_PATH.write_text("\n".join(files))
+    RECENT_FILES_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with RECENT_FILES_PATH.open("w") as f:
+        f.writelines(files)
 
 
 class InputList(FlowList):
@@ -85,19 +87,16 @@ catch_gathering = catch_errors("gathering failed")
 catch_building = catch_errors("building failed")
 
 
-class Window(QMainWindow):
-    def __init__(self, cfg_path=Path("config.json")):
-        super().__init__()
-        self.resize(1200, 500)
-        self.setMinimumSize(400, 300)
+class MainWidget(QWidget):
+    status = Signal(str)
+
+    def __init__(self, parent, cfg_path=Path("config.json")):
+        super().__init__(parent)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.ActionsContextMenu)
         self._cfg_path: Path
         self.cfg_path = cfg_path
-        self.setContextMenuPolicy(Qt.ContextMenuPolicy.ActionsContextMenu)
 
-        self.lists = QSplitter(self)
-        self.setCentralWidget(self.lists)
-        self.producers_rules = QSplitter(self)
-        self.producers_rules.setOrientation(Qt.Orientation.Vertical)
+        self.file_dict = {}
 
         self.input_list = InputList(self)
         self.input_list.set_text("Inputs")
@@ -124,45 +123,49 @@ class Window(QMainWindow):
             HashRuleView,
         )
 
+        self.producers_rules = QSplitter(self)
+        self.producers_rules.addWidget(self.producer_list)
+        self.producers_rules.addWidget(self.rule_list)
+        self.producers_rules.setOrientation(Qt.Orientation.Vertical)
+
         self.output_list = FlowList(self)
         self.output_list.set_text("Outputs")
         self.output_list.register_item(OutputView)
 
+        self.lists = QSplitter(self)
         self.lists.addWidget(self.input_list)
-        self.producers_rules.addWidget(self.producer_list)
-        self.producers_rules.addWidget(self.rule_list)
         self.lists.addWidget(self.producers_rules)
         self.lists.addWidget(self.output_list)
 
-        (save_action := QAction("Save", self)).triggered.connect(self.save_config)
-        (save_as_action := QAction("Save As...", self)).triggered.connect(self.save_config_as)
-        (open_action := QAction("Open...", self)).triggered.connect(self.open_config)
-        (reload_action := QAction("Reload", self)).triggered.connect(self.load_config)
-        (clear_action := QAction("clear", self)).triggered.connect(self.clear)
-        save_action.setShortcut(QKeySequence("Ctrl+S"))
-        save_as_action.setShortcut(QKeySequence("Ctrl+Shift+S"))
-        open_action.setShortcut(QKeySequence("Ctrl+O"))
-        reload_action.setShortcut(QKeySequence("Ctrl+R"))
-        menu = self.menuBar()
+        self.save_action = QAction("Save", self)
+        self.save_as_action = QAction("Save as...", self)
+        self.open_action = QAction("Open...", self)
+        self.reload_action = QAction("Reload", self)
+        self.clear_action = QAction("clear", self)
+        self.save_action.triggered.connect(self.save_config)
+        self.save_as_action.triggered.connect(self.save_config_as)
+        self.open_action.triggered.connect(self.open_config)
+        self.reload_action.triggered.connect(self.load_config)
+        self.clear_action.triggered.connect(self.clear)
 
-        file_menu = menu.addMenu("File")
-        file_menu.addAction(open_action)
-        file_menu.addAction(save_action)
-        file_menu.addAction(save_as_action)
-        file_menu.addAction(reload_action)
+        self.save_action.setShortcut(QKeySequence("Ctrl+S"))
+        self.save_as_action.setShortcut(QKeySequence("Ctrl+Shift+S"))
+        self.open_action.setShortcut(QKeySequence("Ctrl+O"))
+        self.reload_action.setShortcut(QKeySequence("Ctrl+R"))
 
         self.recent_menu = QMenu("Open Recent", self)
         self.recent_files = []
-        file_menu.addMenu(self.recent_menu)
-
-        edit_menu = menu.addMenu("Edit")
-        edit_menu.addAction(clear_action)
 
         # (get_builder := QAction("get builder", self)).triggered.connect(self.create_builder)
         # (run_builder := QAction("run builder", self)).triggered.connect(self.run_builder)
 
         if self.cfg_path.exists():
             self.load_config()
+
+        self._layout = QGridLayout(self)
+        self.setLayout(self._layout)
+
+        self._layout.addWidget(self.lists, 0, 0)
 
     def get_config(self) -> MainConfig:
         return {
@@ -206,6 +209,7 @@ class Window(QMainWindow):
     @cfg_path.setter
     def cfg_path(self, s):
         self._cfg_path = s
+        self.status.emit(str(self.cfg_path))
         self.setWindowTitle(f"{self.cfg_path} | dataset-creator")
 
     @Slot()
@@ -282,6 +286,32 @@ class Window(QMainWindow):
         print("gathered resources")
 
 
+class MainWindow(QMainWindow):
+    def __init__(self, cfg_path=Path("config.json")):
+        super().__init__()
+        self.resize(1200, 500)
+        self.setMinimumSize(400, 300)
+
+        self.widget = MainWidget(self, cfg_path)
+        self.widget.status.connect(self.status_changed)
+        self.status_changed(str(self.widget.cfg_path))
+
+        self.setCentralWidget(self.widget)
+        file_menu: QMenu = self.menuBar().addMenu("File")
+        file_menu.addAction(self.widget.save_action)
+        file_menu.addAction(self.widget.save_as_action)
+        file_menu.addAction(self.widget.open_action)
+        file_menu.addMenu(self.widget.recent_menu)
+        file_menu.addAction(self.widget.reload_action)
+
+        edit_menu = self.menuBar().addMenu("Edit")
+        edit_menu.addAction(self.widget.clear_action)
+
+    @Slot(str)
+    def status_changed(self, s: str):
+        self.setWindowTitle(f"{s} | dataset-creator")
+
+
 def main():
     import argparse
 
@@ -294,7 +324,7 @@ def main():
     save_recent_files([file for file in get_recent_files() if os.path.exists(file)])
 
     app = QtWidgets.QApplication([])
-    central_window = Window(Path(args.cfg_path)) if args.cfg_path else Window()
+    central_window = MainWindow(Path(args.cfg_path)) if args.cfg_path else MainWindow()
     central_window.show()
     code = app.exec()
     sys.exit(code)
