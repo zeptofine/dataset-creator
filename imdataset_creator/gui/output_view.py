@@ -70,8 +70,8 @@ class OutputView(InputView):
         self.overwrite.setChecked(False)
         self.list.items.clear()
 
-    def get(self) -> str:
-        return self.text.text()
+    def get(self) -> Output:
+        return Output.from_cfg(self.get_config())
 
     def get_config(self) -> OutputData:
         return {

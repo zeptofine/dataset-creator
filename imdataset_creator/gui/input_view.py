@@ -42,7 +42,6 @@ DEFAULT_IMAGE_FORMATS = (
 class GathererThread(QThread):
     input: Input
 
-    count = Signal(int)
     total = Signal(int)
     files = Signal(list)
 
@@ -51,17 +50,17 @@ class GathererThread(QThread):
         filelist = []
 
         count = 0
-        self.count.emit(0)
+        self.total.emit(0)
         emit_timer = time.time()
         for file in self.input.run():
             count += 1
-            if (newtime := time.time()) > emit_timer + 0.2:
-                self.count.emit(count)
-                emit_timer = newtime
+            if (new_time := time.time()) > emit_timer + 0.2:
+                self.total.emit(count)
+                emit_timer = new_time
             filelist.append(file)
 
         print(f"Gathered {count} files from '{self.input.folder}'")
-        self.count.emit(count)
+        self.total.emit(count)
         self.files.emit(filelist)
 
 
@@ -82,25 +81,25 @@ class InputView(FlowItem):
         super().setup_widget()
 
         self.text = QLineEdit(self)
-        self.text.textChanged.connect(self.toptext.setText)
+        self.text.textChanged.connect(self.top_text.setText)
 
-        self.fileselect = QToolButton(self)
-        self.fileselect.setText("...")
-        self.fileselect.setIcon(QIcon.fromTheme("folder-open"))
-        self.fileselect.clicked.connect(self.select_folder)
+        self.file_select = QToolButton(self)
+        self.file_select.setText("...")
+        self.file_select.setIcon(QIcon.fromTheme("folder-open"))
+        self.file_select.clicked.connect(self.select_folder)
         self.group_grid.setGeometry(QRect(0, 0, 800, 800))
         self.group_grid.addWidget(QLabel("Folder: ", self), 0, 0)
         self.group_grid.addWidget(self.text, 0, 1)
-        self.group_grid.addWidget(self.fileselect, 0, 2)
+        self.group_grid.addWidget(self.file_select, 0, 2)
 
         self.filedialog = QFileDialog(self)
         self.filedialog.setFileMode(QFileDialog.FileMode.Directory)
         self.filedialog.setOption(QFileDialog.Option.ShowDirsOnly, True)
         self.filedialog.setOption(QFileDialog.Option.DontResolveSymlinks, True)
 
-        fileview: QListView = self.filedialog.findChild(QListView, "listView")  # type: ignore
-        if fileview:
-            fileview.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        file_view: QListView = self.filedialog.findChild(QListView, "listView")  # type: ignore
+        if file_view:
+            file_view.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         f_tree_view: QTreeView = self.filedialog.findChild(QTreeView)  # type: ignore
         if f_tree_view:
             f_tree_view.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
@@ -110,11 +109,11 @@ class InputView(FlowItem):
         self.glob_exprs = QTextEdit(self)
         self.gatherer = GathererThread(self)
 
-        self.gatherer.count.connect(self.filecount.setNum)
+        self.gatherer.total.connect(self.file_count.setNum)
+        self.gatherer.total.connect(self.on_total)
         self.gatherer.files.connect(self.on_gathered)
         self.gatherer.started.connect(self.on_started)
         self.gatherer.finished.connect(self.on_finished)
-        self.gatherer.finished.connect(self.increment.emit)
 
         self.gather_button.setText("gather")
         self.gather_button.clicked.connect(self.get)
@@ -125,18 +124,24 @@ class InputView(FlowItem):
 
     def _top_bar(self) -> list[QWidget]:
         top: list[QWidget] = super()._top_bar()
-        self.toptext = QLabel(self)
-        self.filecount = QLabel(self)
+        self.top_text = QLabel(self)
+        self.file_count = QLabel(self)
 
-        top[:1] += [self.toptext, self.filecount]
+        top[:1] += [self.top_text, self.file_count]
         return top
+
+    @Slot(int)
+    def on_total(self, val):
+        self.total = val
 
     @Slot()
     def on_started(self):
+        self.n = 0
         self.setEnabled(False)
 
     @Slot()
     def on_finished(self):
+        self.n = self.total
         self.setEnabled(True)
 
     @Slot()
@@ -147,6 +152,8 @@ class InputView(FlowItem):
     @catch_errors("gathering failed")
     @Slot()
     def get(self):
+        self.total = 0
+        self.n = 0
         if not self.text.text():
             raise NotADirectoryError(self.text.text())
 

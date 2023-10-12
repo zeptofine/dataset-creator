@@ -36,7 +36,8 @@ class FlowItem(QFrame):  # TODO: Better name lmao
     closed = Signal()
     duplicate = Signal()
 
-    increment = Signal()
+    n_changed = Signal(int)
+    total_changed = Signal(int)
 
     bound_item: type[Keyworded] | Keyworded
 
@@ -54,6 +55,9 @@ class FlowItem(QFrame):  # TODO: Better name lmao
 
         self._minimum_size = self.size()
         self.previous_position = None
+
+        self._n = 0
+        self._total = 0
 
         self.setup_widget()
         self.configure_settings_group()
@@ -110,7 +114,6 @@ class FlowItem(QFrame):  # TODO: Better name lmao
     @abstractmethod
     def get(self):
         """produces something the item represents"""
-        self.increment.emit()
 
     @abstractmethod
     def configure_settings_group(self) -> None:
@@ -127,6 +130,24 @@ class FlowItem(QFrame):  # TODO: Better name lmao
     def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
         self.toggle_group()
         event.accept()
+
+    @property
+    def n(self) -> int:
+        return self._n
+
+    @n.setter
+    def n(self, val):
+        self._n = val
+        self.n_changed.emit(self._n)
+
+    @property
+    def total(self):
+        return self._total
+
+    @total.setter
+    def total(self, val):
+        self._total = val
+        self.total_changed.emit(self._total)
 
     @property
     def enabled(self):
@@ -194,6 +215,7 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
         self._layout = QGridLayout()
         self.items: list[FlowItem] = []
         self.registered_items: dict[str, type[FlowItem]] = {}
+
         self.setLayout(self._layout)
         self.scroll_area = QScrollArea(self)
         self.scroll_area.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Sunken)
@@ -215,6 +237,7 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
         self.add_button.hide()
         self.progressbar = QProgressBar(self)
         self.progressbar.setFormat("%p%  %v/%m")
+        self.progressbar.hide()
 
         self.total.connect(self.progressbar.setMaximum)
         self.n.connect(self.progressbar.setValue)
@@ -230,6 +253,25 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
 
     def set_text(self, s: str):
         self.name_text.setText(s)
+
+    @Slot()
+    def update_n(self):
+        n = 0
+        for item in self.items:
+            n += item.n
+        self.n.emit(n)
+
+    @Slot()
+    def update_total(self):
+        total = 0
+        for item in self.items:
+            total += item.total
+
+        if total > 0 and not self.progressbar.isVisible():
+            self.progressbar.setVisible(True)
+        elif total == 0 and self.progressbar.isVisible():
+            self.progressbar.setVisible(False)
+        self.total.emit(total)
 
     def _register_item(self, item: type[FlowItem]):
         self.add_item_to_menu(item)
@@ -262,7 +304,8 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
         item.move_down.connect(lambda: self.move_item(item, 1))
         item.closed.connect(lambda: self.remove_item(item))
         item.duplicate.connect(lambda: self.duplicate_item(item))
-        item.increment.connect(self.increment_pbar)
+        item.n_changed.connect(self.update_n)
+        item.total_changed.connect(self.update_total)
 
     def remove_item(self, item: FlowItem):
         item.setGeometry(QRect(0, 0, 0, 0))
@@ -299,10 +342,6 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
     def empty(self):
         for item in self.items.copy():
             self.remove_item(item)
-
-    @Slot()
-    def increment_pbar(self):
-        self.n.emit(self.progressbar.value() + 1)
 
     @Slot()
     def get_config(self) -> list[ItemConfig]:
