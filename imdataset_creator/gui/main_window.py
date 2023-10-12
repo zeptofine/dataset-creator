@@ -8,16 +8,16 @@ from pathlib import Path
 from PySide6 import QtWidgets
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import QFileDialog, QMainWindow, QSplitter, QWidget, QMenu, QGridLayout
+from PySide6.QtWidgets import QFileDialog, QGridLayout, QMainWindow, QMenu, QSplitter, QWidget
 from rich import print as rprint
 
 from ..configs import MainConfig
 from ..datarules.dataset_builder import DatasetBuilder
 from .err_dialog import catch_errors
 from .frames import FlowList
-from .input_view import InputView
-from .output_view import OutputView
-from .producer_views import FileInfoProducerView, HashProducerView, ImShapeProducerView, ProducerView
+from .input_view import InputList, InputView
+from .output_view import OutputView, OutputList
+from .producer_views import FileInfoProducerView, HashProducerView, ImShapeProducerView, ProducerView, ProducerList
 from .rule_views import (
     BlacklistWhitelistView,
     ChannelRuleView,
@@ -26,6 +26,7 @@ from .rule_views import (
     RuleView,
     StatRuleView,
     TotalLimitRuleView,
+    RuleList,
 )
 
 CPU_COUNT = os.cpu_count()
@@ -43,43 +44,6 @@ def save_recent_files(files):
     RECENT_FILES_PATH.parent.mkdir(parents=True, exist_ok=True)
     with RECENT_FILES_PATH.open("w") as f:
         f.writelines(files)
-
-
-class InputList(FlowList):
-    items: list[InputView]
-
-    gathered = Signal(dict)
-
-    def add_item(self, item: InputView, *args, **kwargs):
-        item.gathered.connect(self.gathered.emit)
-        return super().add_item(item, *args, **kwargs)
-
-
-class ProducerList(FlowList):
-    items: list[ProducerView]
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.__registered_by: dict[str, type[ProducerView]] = {}
-
-    def add_item_to_menu(self, item: type[ProducerView]):
-        self.add_menu.addAction(f"{item.title}: {set(item.bound_item.produces)}", lambda: self.initialize_item(item))
-
-    def _register_item(self, item: type[ProducerView]):
-        super()._register_item(item)
-        for produces in item.bound_item.produces:
-            self.__registered_by[produces] = item
-
-    def registered_by(self, s: str):
-        return self.__registered_by.get(s)
-
-
-class RuleList(FlowList):
-    items: list[RuleView]
-
-
-class OutputList(FlowList):
-    items: list[OutputView]
 
 
 catch_loading = catch_errors("loading failed")
@@ -128,7 +92,7 @@ class MainWidget(QWidget):
         self.producers_rules.addWidget(self.rule_list)
         self.producers_rules.setOrientation(Qt.Orientation.Vertical)
 
-        self.output_list = FlowList(self)
+        self.output_list = OutputList(self)
         self.output_list.set_text("Outputs")
         self.output_list.register_item(OutputView)
 

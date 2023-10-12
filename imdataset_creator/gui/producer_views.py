@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from PySide6.QtWidgets import (
-    QComboBox,
-    QLabel,
-)
+from PySide6.QtWidgets import QComboBox, QLabel
 
 from ..datarules import base_rules, data_rules, image_rules
-from .frames import FlowItem
+from .frames import FlowItem, FlowList
 
 
 class ProducerView(FlowItem):
@@ -69,3 +66,22 @@ class HashProducerView(ProducerView):
     def get(self):
         super().get()
         return self.bound_item(image_rules.HASHERS(self.hash_type.currentText()))
+
+
+class ProducerList(FlowList):
+    items: list[ProducerView]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__registered_by: dict[str, type[ProducerView]] = {}
+
+    def add_item_to_menu(self, item: type[ProducerView]):
+        self.add_menu.addAction(f"{item.title}: {set(item.bound_item.produces)}", lambda: self.initialize_item(item))
+
+    def _register_item(self, item: type[ProducerView]):
+        super()._register_item(item)
+        for produces in item.bound_item.produces:
+            self.__registered_by[produces] = item
+
+    def registered_by(self, s: str):
+        return self.__registered_by.get(s)

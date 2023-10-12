@@ -89,3 +89,7 @@ class OutputView(InputView):
         self.list.add_from_cfg(cfg["lst"])
         self.overwrite.setChecked(cfg["overwrite"])
         return self
+
+
+class OutputList(FlowList):
+    items: list[OutputView]

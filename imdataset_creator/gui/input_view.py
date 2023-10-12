@@ -194,3 +194,13 @@ class InputView(FlowItem):
         if self.filedialog.exec():
             return self.filedialog.selectedFiles()
         return []
+
+
+class InputList(FlowList):
+    items: list[InputView]
+
+    gathered = Signal(dict)
+
+    def add_item(self, item: InputView, *args, **kwargs):
+        item.gathered.connect(self.gathered.emit)
+        return super().add_item(item, *args, **kwargs)

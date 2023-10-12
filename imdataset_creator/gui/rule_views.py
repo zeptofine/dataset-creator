@@ -5,7 +5,7 @@ from PySide6.QtWidgets import QCheckBox, QDateTimeEdit, QLabel, QLineEdit, QSpin
 
 from ..configs import ItemData
 from ..datarules import base_rules, data_rules, image_rules
-from .frames import FlowItem
+from .frames import FlowItem, FlowList
 
 
 class RuleView(FlowItem):
@@ -308,3 +308,7 @@ class HashRuleView(RuleView):
     @Slot(bool)
     def toggle_resolver(self, x):
         self.resolver.setEnabled(not x)
+
+
+class RuleList(FlowList):
+    items: list[RuleView]
