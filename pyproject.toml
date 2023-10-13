@@ -26,7 +26,7 @@ wcmatch = "^8.5"
 
 [tool.poetry.scripts]
 imdataset-creator = "imdataset_creator.__main__:app"
-imdataset-creator-gui = "imdataset_creator.gui.main_window:main"
+imdataset-creator-gui = "imdataset_creator.gui.__main__:main"
 [build-system]
 build-backend = "poetry.core.masonry.api"
 requires = ["poetry-core"]
