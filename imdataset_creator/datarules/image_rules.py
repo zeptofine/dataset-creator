@@ -20,16 +20,6 @@ def whash_db4(img) -> imagehash.ImageHash:
     return imagehash.whash(img, mode="db4")
 
 
-def get_channels(img: Image.Image) -> int:
-    return len(img.getbands())
-
-
-def imopen(pth):
-    print(pth)
-    return Image.open(pth)
-
-
-@cache
 def get_hwc(pth):
     img = Image.open(pth)
     return {"width": img.width, "height": img.height, "channels": len(img.getbands())}
@@ -171,23 +161,10 @@ class HashRule(Rule):
         self.comparer = Comparable(self.compare)
 
     def compare(self, partial: DataFrame, full: DataFrame) -> DataFrame:
-        return (
-            full.filter(
-                col("hash").is_in(
-                    full.filter(col("path").is_in(partial.get_column("path"))).get_column("hash").unique()
-                ),
-            )
-            .groupby("hash")
-            .apply(lambda df: df.filter(self.resolver) if len(df) > 1 else df)
-        )
+        return partial.groupby("hash").apply(lambda df: df.filter(self.resolver) if len(df) > 1 else df)
 
     @classmethod
     def get_cfg(cls) -> dict:
         return {
             "resolver": "ignore_all",
-            "!#resolver": " ignore_all | column name",
-            "include_only_partial": False,
-            "!#include_only_partial": " only takes in account the part of the dataframe given",
-            "hasher": "average",
-            "!#hasher": " | ".join(HASHERS),
         }
