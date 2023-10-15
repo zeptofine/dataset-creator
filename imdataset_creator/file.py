@@ -22,9 +22,9 @@ class File:
     @classmethod
     def from_src(cls, src: Path, pth: Path):
         return cls(
-            absolute_pth=str(pth),
+            absolute_pth=str(pth.resolve()),
             src=str(src),
             relative_path=str(pth.relative_to(src).parent),
             file=pth.stem,
-            ext=pth.suffix[pth.suffix[0] == "." :],
+            ext=pth.suffix[1:],
         )
