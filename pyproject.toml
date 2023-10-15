@@ -27,6 +27,32 @@ wcmatch = "^8.5"
 [tool.poetry.scripts]
 imdataset-creator = "imdataset_creator.__main__:app"
 imdataset-creator-gui = "imdataset_creator.gui.__main__:main"
+
 [build-system]
 build-backend = "poetry.core.masonry.api"
 requires = ["poetry-core"]
+
+[tool.ruff]
+extend-ignore = ["F401", "E501"]
+extend-select = [
+  "A",
+  "ASYNC",
+  "UP",
+  "I",
+  "B",
+  "ICN",
+  "F",
+  "RET",
+  "SIM",
+  "TRY",
+  "NPY",
+  "PERF",
+  "RUF",
+  "PIE",
+  "C4",
+]
+fixable = ["ALL"]
+line-length = 120
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["E402"]
