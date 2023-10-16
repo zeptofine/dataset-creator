@@ -64,16 +64,23 @@ class ResRule(Rule):
             Column("height", int),
         )
 
-        if crop:
-            self.comparer = FastComparable(
-                (pl.min_horizontal(col("width"), col("height")) // scale * scale >= min_res)
-                & (pl.max_horizontal(col("width"), col("height")) // scale * scale <= max_res)
-            )
-        else:
-            self.comparer = FastComparable(
-                (pl.min_horizontal(col("width"), col("height")) >= min_res)
-                & (pl.max_horizontal(col("width"), col("height")) <= max_res)
-            )
+        smallest = pl.min_horizontal(col("width"), col("height"))
+        largest = pl.max_horizontal(col("width"), col("height"))
+
+        comp: Expr | None = None
+        m_comp: Expr | None = (smallest // scale * scale if crop else smallest) >= min_res if min_res else None
+        l_comp: Expr | None = (largest // scale * scale if crop else largest) <= max_res if max_res else None
+
+        if m_comp is not None and l_comp is not None:
+            comp = m_comp & l_comp
+        elif m_comp is not None:
+            comp = m_comp
+        elif l_comp is not None:
+            comp = l_comp
+
+        assert comp is not None
+
+        self.comparer = FastComparable(comp)
 
     @classmethod
     def get_cfg(cls) -> ResData:
