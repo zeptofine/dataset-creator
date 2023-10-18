@@ -68,5 +68,5 @@ env.bak/
 venv.bak/
 
 filedb.arrow
-config.json
+config*.json
 imdataset_creator/gui/.recent_files
