@@ -37,7 +37,6 @@ class OutputView(InputView):
         super().__init__(*args, **kwargs)
         self.setMouseTracking(True)
         self.setMinimumHeight(400)
-        self.filedialog.setFileMode(QFileDialog.FileMode.AnyFile)
         self.previous_position = None
 
     def configure_settings_group(self):
