@@ -1,4 +1,6 @@
 import inspect
+import os
+import textwrap
 import warnings
 from collections.abc import Collection, Iterable
 from datetime import datetime
@@ -6,10 +8,12 @@ from pathlib import Path
 from typing import Generator, Literal, TypeVar, overload
 
 import polars as pl
-from polars import DataFrame, Expr
+from polars import DataFrame, Expr, Series
 from polars.type_aliases import SchemaDefinition
 
 from ..configs import MainConfig
+from ..file import File
+from ..scenarios import FileScenario, OutputScenario
 from .base_rules import (
     Comparable,
     DataTypeSchema,
@@ -18,9 +22,14 @@ from .base_rules import (
     Input,
     Output,
     Producer,
+    ProducerSchema,
     ProducerSet,
     Rule,
 )
+
+
+def indent(t):
+    return textwrap.indent(t, "    ")
 
 
 def current_time() -> datetime:
@@ -34,16 +43,37 @@ def chunk_split(
     df: DataFrame,
     chunksize: int,
     col_name: str = "_idx",
-):
+) -> Generator[DataFrame, None, None]:
     return (
-        ((idx, len(part)), part.drop(col_name))
-        for idx, part in df.with_row_count(col_name)
+        part.drop(col_name)
+        for _, part in df.with_row_count(col_name)
         .with_columns(pl.col(col_name) // chunksize)
         .groupby(col_name, maintain_order=True)
     )
 
 
-def blacklist_schema(schema: list[ExprDict], blacklist: Collection) -> list[ExprDict]:
+def combine_exprs(rules: Iterable[Rule]) -> list[Expr | bool | Comparable]:
+    """this combines expressions from different objects to a list of compressed expressions.
+    DataRules that are FastComparable can be combined, but `Comparable`s cannot. They will be copied to the list.
+    """
+    combinations: list[Expr | bool | Comparable] = []
+    combination: Expr | bool | None = None
+    for rule in rules:
+        comparer: Comparable | FastComparable = rule.comparer
+        if isinstance(comparer, FastComparable):
+            combination = combination & comparer() if combination is not None else comparer()
+        elif isinstance(comparer, Comparable):
+            if combination is not None:
+                combinations.append(combination)
+                combination = None
+            combinations.append(comparer)
+    if combination is not None:
+        combinations.append(combination)
+
+    return combinations
+
+
+def blacklist_schema(schema: ProducerSchema, blacklist: Collection) -> ProducerSchema:
     return [out for dct in schema if (out := {k: v for k, v in dct.items() if k not in blacklist})]
 
 
@@ -146,7 +176,7 @@ class DatasetBuilder:
             ).is_empty()
         )
 
-    def remove_unfinished_producers(self) -> ProducerSet:
+    def remove_finished_producers(self) -> ProducerSet:
         """
         Takes the completed producers out of the set
 
@@ -168,8 +198,8 @@ class DatasetBuilder:
     def split_files_via_nulls(
         self,
         df: DataFrame,
-        schema: list[ExprDict] | None = None,
-    ) -> Generator[tuple[list[ExprDict], DataFrame], None, None]:
+        schema: ProducerSchema | None = None,
+    ) -> Generator[tuple[ProducerSchema, DataFrame], None, None]:
         """
         groups a df by nulls, and gets a schema based on the nulls
 
@@ -177,12 +207,12 @@ class DatasetBuilder:
         ----------
         df : DataFrame
             the dataframe to split
-        schema : list[ExprDict] | None, optional
+        schema : ProducerSchema | None, optional
             the schema to combine with the groups, by default None
 
         Yields
         ------
-        Generator[tuple[list[ExprDict], DataFrame], None, None]
+        Generator[tuple[ProducerSchema, DataFrame], None, None]
             each group is given separately
         """
         if schema is None:
@@ -202,20 +232,37 @@ class DatasetBuilder:
                 group,
             )
 
+    def populate_chunks(
+        self,
+        chunks: Iterable[DataFrame],
+        schemas: ProducerSchema,
+        db_schema: DataTypeSchema | None = None,
+    ):
+        if db_schema is None:
+            db_schema = self.type_schema
+        chunk: DataFrame
+        for chunk in chunks:
+            for schema in schemas:
+                chunk = chunk.with_columns(**schema)
+            chunk = chunk.select(db_schema)
+            yield chunk
+
     def df_with_types(self, types: DataTypeSchema | None = None):
         if types is None:
             types = self.type_schema
         return self.comply_to_schema(types).with_columns(types)
 
-    def get_unfinished(
-        self,
-    ) -> DataFrame:
+    def get_unfinished(self) -> DataFrame:
         # check if producers are completely finished
         type_schema: DataTypeSchema = self.type_schema
         self.comply_to_schema(type_schema, in_place=True)
-        updated_df: DataFrame = self.__df.with_columns(type_schema)
-        unfinished: DataFrame = self.unfinished_by_col(updated_df)
-        return unfinished
+        return self.unfinished_by_col(self.__df.with_columns(type_schema))
+
+    def get_unfinished_existing(self) -> DataFrame:
+        unfinished = self.get_unfinished()
+        if not len(unfinished):
+            return unfinished
+        return unfinished.filter(pl.col("path").apply(os.path.exists))
 
     def filter(self, lst, sort_col="path") -> Iterable[str]:  # noqa: A003
         assert sort_col in self.__df.columns, f"'{sort_col}' is not in {self.__df.columns}"
@@ -225,32 +272,11 @@ class DatasetBuilder:
             )
 
         vdf: DataFrame = self.__df.filter(pl.col("path").is_in(lst))
-        combined = self.combine_exprs(self.rules)
+        combined = combine_exprs(self.rules)
         for f in combined:
             vdf = f(vdf, self.__df) if isinstance(f, Comparable) else vdf.filter(f)
 
         return vdf.sort(sort_col).get_column("path")
-
-    @staticmethod
-    def combine_exprs(rules: Iterable[Rule]) -> list[Expr | bool | Comparable]:
-        """this combines expressions from different objects to a list of compressed expressions.
-        DataRules that are FastComparable can be combined, but Comparables cannot. They will be copied to the list.
-        """
-        combinations: list[Expr | bool | Comparable] = []
-        combination: Expr | bool | None = None
-        for rule in rules:
-            comparer: Comparable | FastComparable = rule.comparer
-            if isinstance(comparer, FastComparable):
-                combination = combination & comparer() if combination is not None else comparer()
-            elif isinstance(comparer, Comparable):
-                if combination is not None:
-                    combinations.append(combination)
-                    combination = None
-                combinations.append(comparer)
-        if combination is not None:
-            combinations.append(combination)
-
-        return combinations
 
     def save_df(self, pth: str | Path | None = None) -> None:
         """saves the dataframe to self.filepath"""
@@ -258,6 +284,16 @@ class DatasetBuilder:
 
     def update(self, df: DataFrame, on="path", how: Literal["left", "inner"] = "left"):
         self.__df = self.__df.update(df, on=on, how=how)
+
+    def trigger_save_via_time(
+        self, save_timer: datetime, collected: list[DataFrame], interval=60
+    ) -> tuple[datetime, list[DataFrame]]:
+        if ((new_time := datetime.now()) - save_timer).total_seconds() > interval:
+            data: DataFrame = pl.concat(collected, how="diagonal")
+            self.update(data)
+            self.save_df()
+            return new_time, []
+        return save_timer, collected
 
     @property
     def df(self) -> DataFrame:
@@ -284,30 +320,16 @@ class DatasetBuilder:
         return f"{self.__class__.__name__}({', '.join(attrlist)})"
 
     @overload
-    def comply_to_schema(self, schema: SchemaDefinition, in_place: Literal[True]) -> None:
-        ...
-
-    @overload
     def comply_to_schema(self, schema: SchemaDefinition, in_place: Literal[False] = False) -> DataFrame:
         ...
 
-    def comply_to_schema(self, schema: SchemaDefinition, in_place=False) -> DataFrame | None:
+    @overload
+    def comply_to_schema(self, schema: SchemaDefinition, in_place: Literal[True] = True) -> None:
+        ...
+
+    def comply_to_schema(self, schema: SchemaDefinition, in_place: bool = False) -> DataFrame | None:
         new_df: DataFrame = pl.concat((self.__df, DataFrame(schema=schema)), how="diagonal")
         if in_place:
             self.__df = new_df
         return new_df
 
-
-class ConfigHandler:
-    def __init__(self, cfg: MainConfig):
-        # generate `Input`s
-        self.inputs: list[Input] = [Input.from_cfg(folder["data"]) for folder in cfg["inputs"]]
-        # generate `Output`s
-        self.outputs: list[Output] = [Output.from_cfg(folder["data"]) for folder in cfg["output"]]
-        # generate `Producer`s
-        self.producers: list[Producer] = [
-            Producer.all_producers[p["name"]].from_cfg(p["data"]) for p in cfg["producers"]
-        ]
-
-        # generate `Rule`s
-        self.rules: list[Rule] = [Rule.all_rules[r["name"]].from_cfg(r["data"]) for r in cfg["rules"]]

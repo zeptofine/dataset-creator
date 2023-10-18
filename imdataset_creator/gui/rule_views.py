@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import abstractmethod
 
 from PySide6.QtCore import QDate, QDateTime, QTime, Slot
@@ -5,30 +7,61 @@ from PySide6.QtWidgets import QCheckBox, QDateTimeEdit, QLabel, QLineEdit, QSpin
 
 from ..configs import ItemData
 from ..datarules import base_rules, data_rules, image_rules
-from .frames import FlowItem, FlowList
+from .frames import BuilderDependencyList, FlowItem
 
 
 class RuleView(FlowItem):
     title = "Rule"
     bound_item: type[base_rules.Rule]
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__original_desc = self.desc
+
+    def __init_subclass__(cls) -> None:
+        cls.__wrap_get()
+
     def setup_widget(self, *args, **kwargs):
         super().setup_widget(*args, **kwargs)
-        if requires := self.bound_item().requires:
-            if self.desc:
-                self.desc += "\n"
-            self.desc += "requires: "
-            self.desc += str(
-                requires.name if isinstance(requires, base_rules.Column) else set(col.name for col in requires)
-            )
-
-            self.description_widget.setText(self.desc)
 
     @abstractmethod
-    def get(self):
+    def get(self) -> base_rules.Rule:
         """Evaluates the settings and returns a Rule instance"""
         super().get()
         return base_rules.Rule()
+
+    @classmethod
+    def __wrap_get(cls: type[RuleView]):
+        original_get = cls.get
+        original_get_config = cls.get_config
+
+        def get_wrapper(self: RuleView):
+            rule = original_get(self)
+            if rule.requires:
+                if isinstance(rule.requires, base_rules.Column):
+                    self.set_requires(str({rule.requires.name}))
+                else:
+                    self.set_requires(str(set({r.name for r in rule.requires})))
+            return rule
+
+        def get_config_wrapper(self: RuleView):
+            self.get()
+            return original_get_config(self)
+
+        cls.get = get_wrapper
+        cls.get_config = get_config_wrapper
+
+    def set_requires(self, val):
+        newdesc = self.__original_desc
+        if val:
+            newdesc += f"\n requires: {val}"
+            print("updated requires")
+            self.description_widget.setText(newdesc)
+
+
+class ItemsUnusedError(ValueError):
+    def __init__(self):
+        super().__init__("At least one item must be selected")
 
 
 class StatRuleView(RuleView):
@@ -63,7 +96,7 @@ class StatRuleView(RuleView):
     def get(self):
         super().get()
         if not (self.use_before.isChecked() or self.use_after.isChecked()):
-            raise ValueError("At least one of the before or after must be selected")
+            raise ItemsUnusedError()
         return data_rules.StatRule(
             self.before_widget.dateTime().toString(self._datetime_format) if self.use_before.isChecked() else None,
             self.after_widget.dateTime().toString(self._datetime_format) if self.use_after.isChecked() else None,
@@ -79,7 +112,7 @@ class StatRuleView(RuleView):
 
     def get_config(self):
         if not (self.use_before.isChecked() or self.use_after.isChecked()):
-            raise ValueError("At least one of the before or after must be selected")
+            raise ItemsUnusedError()
         return {
             "after": self.after_widget.dateTime().toString(self._datetime_format)
             if self.use_after.isChecked()
@@ -277,38 +310,38 @@ class HashRuleView(RuleView):
     bound_item = image_rules.HashRule
 
     def configure_settings_group(self):
-        self.ignore_all_btn = QCheckBox(self)
         self.resolver = QLineEdit(self)
-        self.resolver.setText("mtime")
-        self.ignore_all_btn.toggled.connect(self.toggle_resolver)
-        self.group_grid.addWidget(QLabel("Ignore all with conflicts: ", self), 0, 0)
-        self.group_grid.addWidget(self.ignore_all_btn, 0, 1)
-        self.group_grid.addWidget(QLabel("Conflict resolver column: ", self), 1, 0)
-        self.group_grid.addWidget(self.resolver, 2, 0, 1, 2)
+        self.resolver.setText("ignore_all")
+        self.group_grid.addWidget(QLabel("Conflict resolver column: ", self), 0, 0)
+        self.group_grid.addWidget(self.resolver, 1, 0, 1, 2)
 
     def get(self):
         super().get()
-        return image_rules.HashRule(
-            resolver=self.resolver.text() if not self.ignore_all_btn.isChecked() else "ignore_all"
-        )
+        return image_rules.HashRule(resolver=self.resolver.text())
 
     def get_config(self):
         return {
             "resolver": self.resolver.text(),
-            "ignore_all": self.ignore_all_btn.isChecked(),
         }
 
     @classmethod
     def from_config(cls, cfg, parent=None):
         self = cls(parent)
-        self.ignore_all_btn.setChecked(cfg["ignore_all"])
         self.resolver.setText(cfg["resolver"])
         return self
 
-    @Slot(bool)
-    def toggle_resolver(self, x):
-        self.resolver.setEnabled(not x)
 
-
-class RuleList(FlowList):
+class RuleList(BuilderDependencyList):
     items: list[RuleView]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.set_text("Rules")
+        self.register_item(
+            StatRuleView,
+            BlacklistWhitelistView,
+            TotalLimitRuleView,
+            ResRuleView,
+            ChannelRuleView,
+            HashRuleView,
+        )

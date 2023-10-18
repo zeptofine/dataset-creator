@@ -10,11 +10,7 @@ from ..configs import OutputData
 from ..datarules.base_rules import Output
 from .frames import FlowList
 from .input_view import InputView
-from .output_filters import BlurFilterView, CompressionFilterView, FilterView, NoiseFilterView, ResizeFilterView
-
-
-class FilterList(FlowList):
-    items: list[FilterView]
+from .output_filters import FilterList
 
 
 class InvalidFormatException(Exception):
@@ -51,13 +47,6 @@ class OutputView(InputView):
         self.overwrite.setText("overwrite existing files")
 
         self.list = FilterList(self)
-        self.list.set_text("Filters")
-        self.list.register_item(
-            ResizeFilterView,
-            BlurFilterView,
-            NoiseFilterView,
-            CompressionFilterView,
-        )
 
         self.list.register_item()
         self.group_grid.addWidget(self.overwrite, 1, 0, 1, 3)

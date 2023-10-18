@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 from pathlib import Path
 
@@ -17,11 +18,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .. import File, Input
 from ..configs.configtypes import InputData
-from ..datarules.base_rules import Input
 from .err_dialog import catch_errors
 from .frames import FlowItem, FlowList
 from .output_filters import FilterView
+
+log = logging.getLogger()
 
 
 class FilterList(FlowList):
@@ -40,26 +43,26 @@ DEFAULT_IMAGE_FORMATS = (
 
 
 class GathererThread(QThread):
-    input: Input
+    inputobj: Input
 
     total = Signal(int)
     files = Signal(list)
 
     def run(self):
-        print(f"Starting search in: '{self.input.folder}' with expressions: {self.input.expressions}")
+        log.info(f"Starting search in: '{self.inputobj.folder}' with expressions: {self.inputobj.expressions}")
         filelist = []
 
         count = 0
         self.total.emit(0)
         emit_timer = time.time()
-        for file in self.input.run():
+        for file in self.inputobj.run():
             count += 1
             if (new_time := time.time()) > emit_timer + 0.2:
                 self.total.emit(count)
                 emit_timer = new_time
             filelist.append(file)
 
-        print(f"Gathered {count} files from '{self.input.folder}'")
+        log.info(f"Gathered {count} files from '{self.inputobj.folder}'")
         self.total.emit(count)
         self.files.emit(filelist)
 
@@ -157,12 +160,12 @@ class InputView(FlowItem):
         if not self.text.text():
             raise NotADirectoryError(self.text.text())
 
-        self.gatherer.input = Input(Path(self.text.text()), self.glob_exprs.toPlainText().splitlines())
+        self.gatherer.inputobj = Input(Path(self.text.text()), self.glob_exprs.toPlainText().splitlines())
         self.gatherer.start()
 
     @Slot(dict)
     def on_gathered(self, lst):
-        self.gathered.emit({self.text.text(): lst})
+        self.gathered.emit({self.text.text(): [File.from_src(Path(self.text.text()), file) for file in lst]})
 
     def get_config(self) -> InputData:
         return {
@@ -201,6 +204,16 @@ class InputList(FlowList):
 
     gathered = Signal(dict)
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.set_text("Inputs")
+        self.register_item(InputView)
+
     def add_item(self, item: InputView, *args, **kwargs):
         item.gathered.connect(self.gathered.emit)
         return super().add_item(item, *args, **kwargs)
+
+    @Slot()
+    def gather_all(self):
+        for item in self.items:
+            item.get()

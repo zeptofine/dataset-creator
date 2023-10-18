@@ -10,7 +10,7 @@ from dateutil import parser as timeparser
 from polars import DataFrame, Datetime, Expr, col
 
 from ..configs.configtypes import SpecialItemData
-from .base_rules import Column, Comparable, FastComparable, Producer, Rule
+from .base_rules import Column, Comparable, FastComparable, Producer, ProducerSchema, Rule, combine_expr_conds
 
 STAT_TRACKED = ("st_size", "st_atime", "st_mtime", "st_ctime")
 
@@ -34,7 +34,7 @@ class FileInfoProducer(Producer):
         }
     )
 
-    def __call__(self):
+    def __call__(self) -> ProducerSchema:
         return [
             {"stat": col("path").apply(stat)},
             {
@@ -63,22 +63,23 @@ class StatRule(Rule):
         super().__init__()
         self.requires = Column("mtime", Datetime("ms"))
 
-        expr: Expr | bool = True
+        exprs: list[Expr] = []
 
         self.before: datetime | None = None
         self.after: datetime | None = None
         if after is not None:
             if not isinstance(after, datetime):
                 self.after = timeparser.parse(after)
-            expr &= self.after < col("mtime")
+            exprs.append(self.after < col("mtime"))
+
         if before is not None:
             if not isinstance(before, datetime):
                 self.before = timeparser.parse(before)
-            expr &= self.before > col("mtime")
+            exprs.append(self.before > col("mtime"))
         if self.before is not None and self.after is not None and self.after > self.before:
             raise self.AgeError(self.after, self.before)
 
-        self.comparer = FastComparable(expr)
+        self.comparer = FastComparable(combine_expr_conds(exprs))
 
     @classmethod
     def from_cfg(cls, cfg) -> Self:
@@ -91,6 +92,11 @@ class StatRule(Rule):
     class AgeError(timeparser.ParserError):
         def __init__(self, older, newer):
             super().__init__(f"{older} is older than {newer}")
+
+
+class EmptyListsError(ValueError):
+    def __init__(self):
+        super().__init__("whitelist and blacklist cannot both be empty")
 
 
 class BlackWhitelistData(SpecialItemData):
@@ -108,34 +114,20 @@ class BlackWhitelistRule(Rule):
 
         self.whitelist: list[str] | None = whitelist
         self.blacklist: list[str] | None = blacklist
-
-        expr: Expr | bool = True
-
+        if not self.whitelist or self.blacklist:
+            raise EmptyListsError()
+        exprs: list[Expr] = []
         if self.whitelist:
-            for item in self.whitelist:
-                expr &= col("path").str.contains(item)
+            exprs.extend(col("path").str.contains(item) for item in self.whitelist)
+
         if self.blacklist:
-            for item in self.blacklist:
-                expr &= col("path").str.contains(item).is_not()
-        self.comparer = FastComparable(expr)
+            exprs.extend(col("path").str.contains(item).is_not() for item in self.blacklist)
+
+        self.comparer = FastComparable(combine_expr_conds(exprs))
 
     @classmethod
     def get_cfg(cls) -> BlackWhitelistData:
         return {"whitelist": [], "blacklist": []}
-
-
-class ResolvedRule(Rule):
-    def __init__(self, use_full=False):
-        super().__init__()
-        self.use_full: bool = use_full
-        self.comparer = Comparable(self.compare)
-
-    def compare(self, selected: DataFrame, full: DataFrame) -> DataFrame:
-        return selected.filter(
-            col("path").is_in(
-                {Path(p).resolve(): p for p in (full if self.use_full else selected).get_column("path")}.values()
-            )
-        )
 
 
 class TotalLimitRule(Rule):

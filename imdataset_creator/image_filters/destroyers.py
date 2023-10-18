@@ -1,6 +1,7 @@
 import logging
 import subprocess
 import typing
+from dataclasses import dataclass
 from math import sqrt
 from random import choice, randint
 from typing import Literal
@@ -28,22 +29,23 @@ class BlurData(FilterData):
     scale: float
 
 
+@dataclass(frozen=True)
 class Blur(Filter):
-    @staticmethod
+    algorithms: list[BlurAlgorithms] | None = None
+    blur_range: tuple[int, int] = (1, 16)
+    scale: float = 0.25
+
     def run(
+        self,
         img: np.ndarray,
-        algorithms: list[BlurAlgorithms] | None = None,
-        blur_range: tuple[int, int] = (1, 16),
-        scale: float = 0.25,
     ) -> np.ndarray:
-        if algorithms is None:
-            algorithms = ["average"]
+        algorithms = self.algorithms or ["average"]
 
         algorithm: BlurAlgorithms = choice(algorithms)
 
-        start, stop = blur_range
+        start, stop = self.blur_range
         if algorithm in ["average", "gaussian"]:
-            ksize: int = int((randint(start, stop) | 1) * scale)
+            ksize: int = int((randint(start, stop) | 1) * self.scale)
             ksize = ksize + (ksize % 2 == 0)  # ensure ksize is odd
 
             if algorithm == "average":
@@ -51,12 +53,12 @@ class Blur(Filter):
             return cv2.GaussianBlur(img, (ksize, ksize), 0)
 
         if algorithm in ["isotropic", "anisotropic"]:
-            sigma1: float = randint(start, stop) * scale
+            sigma1: float = randint(start, stop) * self.scale
             ksize1: int = 2 * int(4 * sigma1 + 0.5) + 1
             if algorithm == "anisotropic":
                 return cv2.GaussianBlur(img, (ksize1, ksize1), sigmaX=sigma1, sigmaY=sigma1)
 
-            sigma2: float = randint(start, stop) * scale
+            sigma2: float = randint(start, stop) * self.scale
             ksize2: int = 2 * int(4 * sigma2 + 0.5) + 1
             return cv2.GaussianBlur(img, (ksize1, ksize2), sigmaX=sigma1, sigmaY=sigma2)
 
@@ -73,37 +75,35 @@ class NoiseData(FilterData):
     scale: float
 
 
+@dataclass(frozen=True)
 class Noise(Filter):
-    @staticmethod
-    def run(
-        img: ndarray,
-        algorithms: list[NoiseAlgorithms] | None = None,
-        intensity_range: tuple[int, int] = (1, 16),
-        scale: float = 0.25,
-    ) -> ndarray:
-        if algorithms is None:
-            algorithms = ["uniform"]
+    algorithms: list[NoiseAlgorithms] | None = None
+    intensity_range: tuple[int, int] = (1, 16)
+    scale: float = 0.25
+
+    def run(self, img: ndarray) -> ndarray:
+        algorithms = self.algorithms or ["uniform"]
         algorithm = choice(algorithms)
 
         if algorithm == "uniform":
-            intensity = randint(*intensity_range) * scale
+            intensity = randint(*self.intensity_range) * self.scale
             noise = np_gen.uniform(-intensity, intensity, img.shape)
             return cv2.add(img, noise.astype(img.dtype))
 
         if algorithm == "gaussian":
-            sigma = sqrt(randint(*intensity_range) * scale)
+            sigma = sqrt(randint(*self.intensity_range) * self.scale)
             noise = np_gen.normal(0, sigma, img.shape)
             return cv2.add(img, noise.astype(img.dtype))
 
         if algorithm == "color":
             noise = np.zeros_like(img)
-            s = (randint(*intensity_range), randint(*intensity_range), randint(*intensity_range))
+            s = (randint(*self.intensity_range), randint(*self.intensity_range), randint(*self.intensity_range))
             cv2.randn(noise, 0, s)  # type: ignore
             return img + noise
 
         # algorithm (should be) == NoiseAlgorithms.GRAY
         noise = np.zeros((img.shape[0], img.shape[1]), dtype=np.uint8)
-        cv2.randn(noise, 0, (randint(*intensity_range),))  # type: ignore
+        cv2.randn(noise, 0, (randint(*self.intensity_range),))  # type: ignore
         noise = noise[..., None]
         return img + noise
 
@@ -129,33 +129,31 @@ class CompressionData(FilterData):
     mpeg2_bitrate: int
 
 
+@dataclass(frozen=True, repr=False)
 class Compression(Filter):
-    @staticmethod
-    def run(
-        img: ndarray,
-        algorithms: list[CompressionAlgorithms] | None = None,
-        jpeg_quality_range: tuple[int, int] = (0, 100),
-        webp_quality_range: tuple[int, int] = (1, 100),
-        h264_crf_range: tuple[int, int] = (20, 28),
-        hevc_crf_range: tuple[int, int] = (25, 33),
-        mpeg_bitrate: int = 4_500_000,
-        mpeg2_bitrate: int = 4_000_000,
-    ):
-        if algorithms is None or not algorithms:
-            algorithms = ["jpeg"]
+    algorithms: list[CompressionAlgorithms] | None = None
+    jpeg_quality_range: tuple[int, int] = (0, 100)
+    webp_quality_range: tuple[int, int] = (1, 100)
+    h264_crf_range: tuple[int, int] = (20, 28)
+    hevc_crf_range: tuple[int, int] = (25, 33)
+    mpeg_bitrate: int = 4_500_000
+    mpeg2_bitrate: int = 4_000_000
 
-        algorithm = choice(algorithms)
+    def run(self, img: ndarray):
+        algos = self.algorithms or ["jpeg"]
+
+        algorithm = choice(algos)
         quality: int
-        encimg: ndarray
+        enc_img: ndarray
         if algorithm == "jpeg":
-            quality = randint(*jpeg_quality_range)
-            encimg = cv2.imencode(".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), quality])[1]
-            return cv2.imdecode(encimg, 1)
+            quality = randint(*self.jpeg_quality_range)
+            enc_img = cv2.imencode(".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), quality])[1]
+            return cv2.imdecode(enc_img, 1)
 
         if algorithm == "webp":
-            quality = randint(*webp_quality_range)
-            encimg = cv2.imencode(".webp", img, [int(cv2.IMWRITE_WEBP_QUALITY), quality])[1]
-            return cv2.imdecode(encimg, 1)
+            quality = randint(*self.webp_quality_range)
+            enc_img = cv2.imencode(".webp", img, [int(cv2.IMWRITE_WEBP_QUALITY), quality])[1]
+            return cv2.imdecode(enc_img, 1)
 
         if algorithm in ["h264", "hevc", "mpeg", "mpeg2"]:
             height, width, _ = img.shape
@@ -165,17 +163,17 @@ class Compression(Filter):
             output_args: dict[str, int | str]
             crf: int
             if algorithm == "h264":
-                crf = randint(*h264_crf_range)
+                crf = randint(*self.h264_crf_range)
                 output_args = {"crf": crf}
             elif algorithm == "hevc":
-                crf = randint(*hevc_crf_range)
+                crf = randint(*self.hevc_crf_range)
                 output_args = {"crf": crf, "x265-params": "log-level=0"}
             elif algorithm == "mpeg":
-                output_args = {"b": mpeg_bitrate}
+                output_args = {"b": self.mpeg_bitrate}
                 codec = "mpeg1video"
 
             else:
-                output_args = {"b": mpeg2_bitrate}
+                output_args = {"b": self.mpeg2_bitrate}
                 codec = "mpeg2video"
 
             compressor = (

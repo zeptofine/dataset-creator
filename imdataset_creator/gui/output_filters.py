@@ -3,7 +3,7 @@ from PySide6.QtWidgets import QDoubleSpinBox, QLabel, QSpinBox
 
 from ..datarules.base_rules import Filter
 from ..image_filters import destroyers, resizer
-from .frames import FlowItem, MiniCheckList, tooltip
+from .frames import FlowItem, FlowList, MiniCheckList, tooltip
 
 
 class FilterView(FlowItem):
@@ -53,6 +53,41 @@ class ResizeFilterView(FilterView):
         self = cls(parent)
         self.scale.setValue(cfg["scale"] * 100)
         return self
+
+
+class CropFilterView(FilterView):
+    title = "Crop"
+    desc = "Crop the image to the specified size. If the item is 0, it will not be considered"
+    needs_settings = True
+
+    bound_item = resizer.Crop
+
+    def configure_settings_group(self) -> None:
+        self.left_box = QSpinBox(self)
+        self.top_box = QSpinBox(self)
+        self.width_box = QSpinBox(self)
+        self.height_box = QSpinBox(self)
+        self.left_box.setMaximum(9_999_999)
+        self.top_box.setMaximum(9_999_999)
+        self.width_box.setMaximum(9_999_999)
+        self.height_box.setMaximum(9_999_999)
+
+        self.group_grid.addWidget(QLabel("Left:", self), 0, 0)
+        self.group_grid.addWidget(self.left_box, 0, 1)
+        self.group_grid.addWidget(QLabel("Top:", self), 1, 0)
+        self.group_grid.addWidget(self.top_box, 1, 1)
+        self.group_grid.addWidget(QLabel("Width:", self), 2, 0)
+        self.group_grid.addWidget(self.width_box, 2, 1)
+        self.group_grid.addWidget(QLabel("Height:", self), 3, 0)
+        self.group_grid.addWidget(self.height_box, 3, 1)
+
+    def get_config(self) -> resizer.CropData:
+        return {
+            "left": val if (val := self.left_box.value()) else None,
+            "top": val if (val := self.top_box.value()) else None,
+            "width": val if (val := self.width_box.value()) else None,
+            "height": val if (val := self.height_box.value()) else None,
+        }
 
 
 class BlurFilterView(FilterView):
@@ -261,6 +296,16 @@ class CompressionFilterView(FilterView):
         self = cls(parent)
         for item in cfg["algorithms"]:
             self.algorithms.set_config(item, True)
+        self.j_range_min.setValue(cfg["jpeg_quality_range"][0])
+        self.j_range_max.setValue(cfg["jpeg_quality_range"][1])
+        self.w_range_min.setValue(cfg["webp_quality_range"][0])
+        self.w_range_max.setValue(cfg["webp_quality_range"][1])
+        self.h264_range_min.setValue(cfg["h264_crf_range"][0])
+        self.h264_range_max.setValue(cfg["h264_crf_range"][1])
+        self.hevc_range_min.setValue(cfg["hevc_crf_range"][0])
+        self.hevc_range_max.setValue(cfg["hevc_crf_range"][1])
+        self.mpeg_bitrate.setValue(cfg["mpeg_bitrate"])
+        self.mpeg2_bitrate.setValue(cfg["mpeg2_bitrate"])
 
         return self
 
@@ -270,3 +315,18 @@ class EmptyAlgorithmsError(Exception):
 
     def __init__(self, f: FilterView):
         super().__init__(f"No algorithms enabled in {f}")
+
+
+class FilterList(FlowList):
+    items: list[FilterView]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.set_text("Filters")
+        self.register_item(
+            ResizeFilterView,
+            CropFilterView,
+            BlurFilterView,
+            NoiseFilterView,
+            CompressionFilterView,
+        )

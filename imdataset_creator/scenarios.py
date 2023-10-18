@@ -14,11 +14,11 @@ from .datarules.base_rules import File, Filter
 @dataclass
 class OutputScenario:
     path: str
-    filters: dict[Filter, FilterData]
+    filters: list[Filter]
 
     def run(self, img: np.ndarray, stat: os.stat_result):
-        for f, kwargs in self.filters.items():
-            img = f.run(img=img, **kwargs)
+        for f in self.filters:
+            img = f.run(img=img)
 
         Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         cv2.imwrite(self.path, img)

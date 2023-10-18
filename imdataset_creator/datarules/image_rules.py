@@ -13,7 +13,7 @@ from PIL import Image
 from polars import DataFrame, Expr, col
 
 from ..configs.configtypes import SpecialItemData
-from .base_rules import Column, Comparable, FastComparable, Producer, Rule
+from .base_rules import Column, Comparable, ExprDict, FastComparable, Producer, ProducerSchema, Rule, combine_expr_conds
 
 
 def whash_db4(img) -> imagehash.ImageHash:
@@ -28,7 +28,7 @@ def get_hwc(pth):
 class ImShapeProducer(Producer):
     produces = MappingProxyType({"width": int, "height": int, "channels": int})
 
-    def __call__(self):
+    def __call__(self) -> ProducerSchema:
         return [
             {
                 "shape": col("path").apply(get_hwc),
@@ -67,20 +67,14 @@ class ResRule(Rule):
         smallest = pl.min_horizontal(col("width"), col("height"))
         largest = pl.max_horizontal(col("width"), col("height"))
 
-        comp: Expr | None = None
-        m_comp: Expr | None = (smallest // scale * scale if crop else smallest) >= min_res if min_res else None
-        l_comp: Expr | None = (largest // scale * scale if crop else largest) <= max_res if max_res else None
+        exprs = []
 
-        if m_comp is not None and l_comp is not None:
-            comp = m_comp & l_comp
-        elif m_comp is not None:
-            comp = m_comp
-        elif l_comp is not None:
-            comp = l_comp
+        if min_res:
+            exprs.append((smallest // scale * scale if crop else smallest) >= min_res)
+        if max_res:
+            exprs.append((largest // scale * scale if crop else largest) <= max_res)
 
-        assert comp is not None
-
-        self.comparer = FastComparable(comp)
+        self.comparer = FastComparable(combine_expr_conds(exprs))
 
     @classmethod
     def get_cfg(cls) -> ResData:
@@ -149,7 +143,7 @@ class HashProducer(Producer):
     def __init__(self, hash_type: HASHERS = HASHERS.AVERAGE):
         self.hasher: Callable[[Image.Image], imagehash.ImageHash] = _HASHERS[hash_type]
 
-    def __call__(self):
+    def __call__(self) -> ProducerSchema:
         return [{"hash": col("path").apply(self._hash_img)}]
 
     def _hash_img(self, pth) -> str:

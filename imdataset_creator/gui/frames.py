@@ -190,11 +190,10 @@ class FlowItem(QFrame):  # TODO: Better name lmao
         return cls(parent=parent)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
-        if event.buttons() == Qt.MouseButton.LeftButton and self.opened:
-            if self.previous_position is not None:
-                pos_change = event.position() - self.previous_position
-                new_size = QSize(self.size().width(), int(self.size().height() + pos_change.y()))
-                self.setMinimumHeight(new_size.height())
+        if event.buttons() == Qt.MouseButton.LeftButton and self.opened and self.previous_position is not None:
+            pos_change = event.position() - self.previous_position
+            new_size = QSize(self.size().width(), int(self.size().height() + pos_change.y()))
+            self.setMinimumHeight(new_size.height())
         self.previous_position = event.position()
         return super().mouseMoveEvent(event)
 
@@ -209,6 +208,8 @@ class FlowItem(QFrame):  # TODO: Better name lmao
 class FlowList(QGroupBox):  # TODO: Better name lmao
     n = Signal(int)
     total = Signal(int)
+
+    changed = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -363,11 +364,13 @@ class FlowList(QGroupBox):  # TODO: Better name lmao
             self.add_item(item)
 
     def get(self, include_not_enabled=False) -> list:
-        self.total.emit(len(self.items))
-        self.n.emit(0)
         if include_not_enabled:
             return list(map(FlowItem.get, self.items))
         return [item.get() for item in self.items if item.enabled]
+
+
+class BuilderDependencyList(FlowList):
+    builder_changed = Signal()
 
 
 class MiniCheckList(QFrame):

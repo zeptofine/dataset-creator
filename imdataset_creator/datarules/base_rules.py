@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import textwrap
 from abc import abstractmethod
 from collections import defaultdict
 from collections.abc import Callable, Mapping, Sequence
@@ -9,6 +10,7 @@ from string import Formatter
 from types import MappingProxyType
 from typing import Any, ClassVar, Set
 
+import numpy as np
 import wcmatch.glob as wglob
 from polars import DataFrame, DataType, Expr, PolarsDataType
 
@@ -19,10 +21,12 @@ from ..file import File
 PartialDataFrame = DataFrame
 FullDataFrame = DataFrame
 DataTypeSchema = dict[str, DataType | type]
-ExprDict = dict[str, Expr | bool]
-ProducerResult = list[ExprDict]
+ExprDict = dict[str, Expr]
+ProducerSchema = list[ExprDict]
 
-repr_blacklist = ("requires", "comparer")
+
+def indent(t):
+    return textwrap.indent(t, "    ")
 
 
 class Comparable:
@@ -31,21 +35,24 @@ class Comparable:
     def __init__(self, func: Callable[[PartialDataFrame, FullDataFrame], DataFrame]):
         self.func = func
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, **kwargs) -> DataFrame:
         return self.func(*args, **kwargs)
 
     def __repr__(self):
-        return f"<Comparable {self.func.__name__}>"
+        return f"Comparable({self.func.__name__})"
 
 
 class FastComparable:
-    expr: Expr | bool
+    expr: Expr
 
-    def __init__(self, expr: Expr | bool):
+    def __init__(self, expr: Expr):
         self.expr = expr
 
-    def __call__(self) -> Expr | bool:
+    def __call__(self) -> Expr:
         return self.expr
+
+    def __repr__(self) -> str:
+        return f"FastComparable({self.expr})"
 
 
 @dataclass(frozen=True)
@@ -68,27 +75,20 @@ class Producer(Keyworded):
     def __init_subclass__(cls) -> None:
         Producer.all_producers[cls.cfg_kwd()] = cls
 
-    def __call__(self) -> ProducerResult:
+    def __call__(self) -> ProducerSchema:
         raise NotImplementedError
-
-    def __repr__(self) -> str:
-        attr_list: list[str] = [
-            f"{key}=..." if hasattr(val, "__iter__") and not isinstance(val, str) else f"{key}={val}"
-            for key, val in vars(self).items()
-        ]
-        return f"{self.__class__.__name__}({', '.join(attr_list)})"
 
 
 class ProducerSet(Set[Producer]):
     @staticmethod
-    def _combine_schema(exprs: ProducerResult) -> ExprDict:
+    def _combine_schema(exprs: ProducerSchema) -> ExprDict:
         return {col: expr for expression in exprs for col, expr in expression.items()}
 
     @property
-    def schema(self) -> list[ExprDict]:
+    def schema(self) -> ProducerSchema:
         dct = defaultdict(list)
         for producer in self:
-            exprs: ProducerResult = producer()
+            exprs: ProducerSchema = producer()
             for idx, expr_dict in enumerate(exprs):
                 dct[idx].append(expr_dict)
         return [self._combine_schema(sequence) for sequence in dct.values()]
@@ -112,29 +112,30 @@ class Rule(Keyworded):
     def __init_subclass__(cls) -> None:
         Rule.all_rules[cls.cfg_kwd()] = cls
 
-    def __repr__(self) -> str:
-        attr_list: list[str] = [f"{key}={val}" for key, val in vars(self).items() if key not in repr_blacklist]
-        return f"{self.__class__.__name__}({', '.join(attr_list)})"
-
     def __str__(self) -> str:
         return self.__class__.__name__
 
 
+@dataclass(frozen=True, repr=False)
 class Filter(Keyworded):
+    """EVERY FILTER MUST BE A FROZEN DATACLASS.
+    Define your arguments just like how you'd define a dataclass, and run() defines the Filter action.
+    """
+
     all_filters: ClassVar[dict[str, type[Filter]]] = {}
 
     def __init_subclass__(cls):
         Filter.all_filters[cls.cfg_kwd()] = cls
 
     @abstractmethod
-    def run(self, *args, **kwargs):
+    def run(self, img: np.ndarray):
         raise NotImplementedError
 
 
-flags = wglob.BRACE | wglob.SPLIT | wglob.EXTMATCH | wglob.IGNORECASE | wglob.GLOBSTAR
+flags: int = wglob.BRACE | wglob.SPLIT | wglob.EXTMATCH | wglob.IGNORECASE | wglob.GLOBSTAR
 
 
-@dataclass
+@dataclass(repr=False)
 class Input(Keyworded):
     folder: Path
     expressions: list[str]
@@ -144,7 +145,7 @@ class Input(Keyworded):
         return cls(Path(cfg["folder"]), cfg["expressions"])
 
     def run(self):
-        for file in wglob.iglob(self.expressions, flags=flags, root_dir=self.folder):
+        for file in wglob.iglob(self.expressions, flags=flags, root_dir=self.folder):  # type: ignore
             yield self.folder / file
 
 
@@ -170,14 +171,20 @@ PLACEHOLDER_FORMAT_FILE = File("/folder/subfolder/to/file.png", "/folder", "subf
 PLACEHOLDER_FORMAT_KWARGS = PLACEHOLDER_FORMAT_FILE.to_dict()
 
 
-@dataclass
+@dataclass(repr=False)
 class Output(Keyworded):
     folder: Path
-    filters: dict[Filter, FilterData]
+    filters: list[Filter]
     output_format: str
     overwrite: bool
 
-    def __init__(self, path, filters, overwrite=False, output_format=DEFAULT_OUTPUT_FORMAT):
+    def __init__(
+        self,
+        path: Path,
+        filters: list[Filter],
+        overwrite: bool = False,
+        output_format: str = DEFAULT_OUTPUT_FORMAT,
+    ):
         self.folder = path
         # try to format. If it fails, it will raise InvalidFormatException
         output_formatter.format(output_format, **PLACEHOLDER_FORMAT_KWARGS)
@@ -192,7 +199,16 @@ class Output(Keyworded):
     def from_cfg(cls, cfg: OutputData):
         return cls(
             Path(cfg["folder"]),
-            {Filter.all_filters[filter_["name"]]: filter_["data"] for filter_ in cfg["lst"]},
+            [Filter.all_filters[filter_["name"]].from_cfg(filter_["data"]) for filter_ in cfg["lst"]],
             cfg["overwrite"],
             cfg["output_format"],
         )
+
+
+def combine_expr_conds(exprs: list[Expr]) -> Expr:
+    assert exprs
+
+    comp = exprs[0]
+    for e in exprs[1:]:
+        comp &= e
+    return comp
