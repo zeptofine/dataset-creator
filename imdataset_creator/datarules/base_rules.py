@@ -167,7 +167,7 @@ output_formatter = SafeFormatter()
 
 
 DEFAULT_OUTPUT_FORMAT = "{relative_path}/{file}.{ext}"
-PLACEHOLDER_FORMAT_FILE = File("/folder/subfolder/to/file.png", "/folder", "subfolder/to", "file", ".png")
+PLACEHOLDER_FORMAT_FILE = File.from_src(Path("/folder"), Path("/folder/subfolder/to/file.png"))
 PLACEHOLDER_FORMAT_KWARGS = PLACEHOLDER_FORMAT_FILE.to_dict()
 
 

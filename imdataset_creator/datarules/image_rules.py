@@ -147,7 +147,6 @@ class HashProducer(Producer):
         return [{"hash": col("path").apply(self._hash_img)}]
 
     def _hash_img(self, pth) -> str:
-        assert self.hasher is not None
         return str(self.hasher(Image.open(pth)))
 
 

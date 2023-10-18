@@ -44,7 +44,6 @@ extend-select = [
   "F",
   "RET",
   "SIM",
-  "TRY",
   "NPY",
   "PERF",
   "RUF",

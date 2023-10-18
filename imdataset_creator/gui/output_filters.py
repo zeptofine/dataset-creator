@@ -1,5 +1,18 @@
 from PySide6.QtCore import QSize
-from PySide6.QtWidgets import QDoubleSpinBox, QLabel, QSpinBox
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDoubleSpinBox,
+    QFrame,
+    QLabel,
+    QLineEdit,
+    QProgressBar,
+    QPushButton,
+    QSlider,
+    QSpinBox,
+    QToolButton,
+    QWidget,
+)
 
 from ..datarules.base_rules import Filter
 from ..image_filters import destroyers, resizer
@@ -34,13 +47,16 @@ class ResizeFilterView(FilterView):
     bound_item = resizer.Resize
 
     def configure_settings_group(self):
+        self.resize_mode = QComboBox(self)
+        self.resize_mode.addItems(resizer.ResizeMode._member_names_)
         self.scale = QDoubleSpinBox(self)
-        self.scale.setSuffix("%")
         self.scale.setMinimum(1)
-        self.scale.setMaximum(1_000)
+        self.scale.setMaximum(100_000)
 
-        self.group_grid.addWidget(QLabel("Scale:", self), 0, 0)
-        self.group_grid.addWidget(self.scale, 0, 1)
+        self.group_grid.addWidget(QLabel("Resize mode: ", self), 0, 0)
+        self.group_grid.addWidget(self.resize_mode, 0, 1)
+        self.group_grid.addWidget(QLabel("Scale:", self), 1, 0)
+        self.group_grid.addWidget(self.scale, 1, 1)
 
     def reset_settings_group(self):
         self.scale.setValue(100)
@@ -89,6 +105,15 @@ class CropFilterView(FilterView):
             "height": val if (val := self.height_box.value()) else None,
         }
 
+    @classmethod
+    def from_config(cls, cfg: resizer.CropData, parent=None):
+        self = cls(parent)
+        self.left_box.setValue(cfg["left"] or 0)
+        self.top_box.setValue(cfg["top"] or 0)
+        self.width_box.setValue(cfg["width"] or 0)
+        self.height_box.setValue(cfg["height"] or 0)
+        return self
+
 
 class BlurFilterView(FilterView):
     title = "Blur"
@@ -97,7 +122,7 @@ class BlurFilterView(FilterView):
     bound_item = destroyers.Blur
 
     def configure_settings_group(self):
-        self.algorithms = MiniCheckList(destroyers.AllBlurAlgos, self)
+        self.algorithms = MiniCheckList(destroyers.BlurAlgorithm._member_names_, self)
         self.scale = QDoubleSpinBox(self)
         scale_label = QLabel("Scale:", self)
         tooltip(scale_label, TOOLTIPS["blur_scale"])
@@ -134,14 +159,14 @@ class BlurFilterView(FilterView):
             {
                 "algorithms": algos,
                 "blur_range": [self.blur_range_x.value(), self.blur_range_y.value()],
-                "scale": self.scale.value() / 100,
+                "scale": self.scale.value(),
             }
         )
 
     @classmethod
     def from_config(cls, cfg, parent=None):
         self = cls(parent)
-        self.scale.setValue(cfg["scale"] * 100)
+        self.scale.setValue(cfg["scale"])
         for item in cfg["algorithms"]:
             self.algorithms.set_config(item, True)
         r_x, r_y = cfg["blur_range"]
@@ -158,7 +183,7 @@ class NoiseFilterView(FilterView):
     bound_item = destroyers.Noise
 
     def configure_settings_group(self):
-        self.algorithms = MiniCheckList(destroyers.AllNoiseAlgos, self)
+        self.algorithms = MiniCheckList(destroyers.NoiseAlgorithm._member_names_, self)
         self.scale = QDoubleSpinBox(self)
         self.scale.setSuffix("%")
         self.scale.setMinimum(1)
@@ -215,7 +240,7 @@ class CompressionFilterView(FilterView):
     bound_item = destroyers.Compression
 
     def configure_settings_group(self):
-        self.algorithms = MiniCheckList(destroyers.AllCompressionAlgos, self)
+        self.algorithms = MiniCheckList(destroyers.CompressionAlgorithms._member_names_, self)
         self.group_grid.addWidget(self.algorithms, 0, 0, 1, 3)
 
         # jpeg quality

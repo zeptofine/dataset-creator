@@ -8,19 +8,14 @@ from pathlib import Path
 from typing import Generator, Literal, TypeVar, overload
 
 import polars as pl
-from polars import DataFrame, Expr, Series
+from polars import DataFrame, Expr
 from polars.type_aliases import SchemaDefinition
 
-from ..configs import MainConfig
-from ..file import File
-from ..scenarios import FileScenario, OutputScenario
 from .base_rules import (
     Comparable,
     DataTypeSchema,
     ExprDict,
     FastComparable,
-    Input,
-    Output,
     Producer,
     ProducerSchema,
     ProducerSet,
@@ -242,6 +237,7 @@ class DatasetBuilder:
             db_schema = self.type_schema
         chunk: DataFrame
         for chunk in chunks:
+            # current_paths = list(chunk.get_column("path"))  # used for debugging
             for schema in schemas:
                 chunk = chunk.with_columns(**schema)
             chunk = chunk.select(db_schema)
@@ -332,4 +328,3 @@ class DatasetBuilder:
         if in_place:
             self.__df = new_df
         return new_df
-

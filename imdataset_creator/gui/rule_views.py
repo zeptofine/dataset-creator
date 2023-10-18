@@ -54,9 +54,12 @@ class RuleView(FlowItem):
     def set_requires(self, val):
         newdesc = self.__original_desc
         if val:
-            newdesc += f"\n requires: {val}"
+            newdesc = newdesc + ("\n" if newdesc else "") + f"requires: {val}"
             print("updated requires")
+            self.desc = newdesc
             self.description_widget.setText(newdesc)
+            if not self.description_widget.isVisible():
+                self.description_widget.show()
 
 
 class ItemsUnusedError(ValueError):
@@ -157,8 +160,8 @@ class BlacklistWhitelistView(RuleView):
     def get(self):
         super().get()
         return data_rules.BlackWhitelistRule(
-            self.whitelist.toPlainText().splitlines(),
-            self.blacklist.toPlainText().splitlines(),
+            whitelist=self.whitelist.toPlainText().splitlines(),
+            blacklist=self.blacklist.toPlainText().splitlines(),
         )
 
     def get_config(self) -> data_rules.BlackWhitelistData:
@@ -238,7 +241,6 @@ class ResRuleView(RuleView):
         self.crop.setChecked(True)
 
     def get(self):
-        super().get()
         return image_rules.ResRule(
             min_res=self.min.value(),
             max_res=self.max.value(),

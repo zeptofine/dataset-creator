@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import Enum
 from random import choice
 from typing import Literal
 
@@ -11,20 +12,29 @@ from ..datarules.base_rules import Filter
 
 np_gen = np.random.default_rng()
 
-RESIZE_ALGOS = {
-    "bicubic": cv2.INTER_CUBIC,
-    "bilinear": cv2.INTER_LINEAR,
-    "box": cv2.INTER_AREA,
-    "nearest": cv2.INTER_NEAREST,
-    "lanczos": cv2.INTER_LANCZOS4,
-}
-ResizeAlgorithms = Literal["bicubic", "bilinear", "box", "nearest", "lanczos", "down_up"]
-DownUpScaleAlgorithms = list(RESIZE_ALGOS.keys())
+
+class ResizeAlgos(Enum):
+    BICUBIC = cv2.INTER_CUBIC
+    BILINEAR = cv2.INTER_LINEAR
+    BOX = cv2.INTER_AREA
+    NEAREST = cv2.INTER_NEAREST
+    LANCZOS = cv2.INTER_LANCZOS4
+    DOWN_UP = False
+
+
+DownUpAlgos = [e for e in ResizeAlgos if e != ResizeAlgos.DOWN_UP]
+
+
+class ResizeMode(Enum):
+    VALUE = 0
+    MAX_RESOLUTION = 1
+    MIN_RESOLUTION = 2
 
 
 @dataclass(frozen=True)
 class Resize(Filter):
-    algorithms: list[ResizeAlgorithms] | None = None
+    mode: ResizeMode = ResizeMode.MIN_RESOLUTION
+    algorithms: list[ResizeAlgos] | None = None
     down_up_range: tuple[float, float] = (0.5, 2)
     scale: float = 0.5
 
@@ -35,19 +45,26 @@ class Resize(Filter):
         algorithms = self.algorithms
         original_algos = algorithms
         if algorithms is None:
-            algorithms = ["down_up"]
+            algorithms = [ResizeAlgos.DOWN_UP]
 
         algorithm = choice(algorithms)
 
         h, w = img.shape[:2]
-        new_h = int(h * self.scale)
-        new_w = int(w * self.scale)
+        scale = self.scale
+        if self.mode == ResizeMode.MAX_RESOLUTION:
+            scale = min(1, self.scale / max(h, w))
+        elif self.mode == ResizeMode.MIN_RESOLUTION:
+            scale = max(1, self.scale / min(h, w))
+
+        new_h = int(h * scale)
+        new_w = int(w * scale)
+
         if algorithm == "down_up":
-            algo1: str
-            algo2: str
+            algo1: ResizeAlgos
+            algo2: ResizeAlgos
             if original_algos is None:
-                algo1 = choice(DownUpScaleAlgorithms)
-                algo2 = choice(DownUpScaleAlgorithms)
+                algo1 = choice(DownUpAlgos)
+                algo2 = choice(DownUpAlgos)
             else:
                 algo1 = original_algos[0]
                 algo2 = original_algos[-1]
@@ -57,16 +74,16 @@ class Resize(Filter):
                 cv2.resize(
                     img,
                     (int(w * scale_factor), int(h * scale_factor)),
-                    interpolation=RESIZE_ALGOS[algo1],
+                    interpolation=algo1.value,
                 ),
                 (new_w, new_h),
-                interpolation=RESIZE_ALGOS[algo2],
+                interpolation=algo2.value,
             )
 
         return cv2.resize(
             img,
             (new_w, new_h),
-            interpolation=RESIZE_ALGOS[algorithm],
+            interpolation=algorithm.value,
         )
 
 
