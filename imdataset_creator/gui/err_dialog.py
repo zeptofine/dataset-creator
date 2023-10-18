@@ -1,10 +1,15 @@
+import traceback
+
+from PySide6.QtGui import QFont, Qt
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QLabel,
     QVBoxLayout,
 )
-import traceback
+
+BIG_ERR_FONT = QFont()
+BIG_ERR_FONT.setPointSize(16)
 
 
 class ErrorDialog(QDialog):
@@ -21,11 +26,11 @@ class ErrorDialog(QDialog):
         self.buttonBox = QDialogButtonBox(QBtn)
         self.buttonBox.accepted.connect(self.accept)
         exc_text = "".join(traceback.format_exception(exc))
-        label_text = (
-            f"{exc.__class__.__name__}: {exc_text}"
-            if prompt is None
-            else f"{prompt}: {exc.__class__.__name__}({exc_text})"
-        )
+        label_text = f"{exc.__class__.__name__}: {exc_text}" if prompt is None else f"{prompt}: {exc_text}"
+        big_text = QLabel(f"{prompt}:\n{exc}", self)
+        big_text.setFont(BIG_ERR_FONT)
+        big_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.layout().addWidget(big_text)
         self.layout().addWidget(QLabel(label_text, self))
         self.layout().addWidget(self.buttonBox)
 
@@ -38,7 +43,7 @@ def catch_errors(msg):
             except Exception as e:
                 dlg = ErrorDialog(e, msg)
                 dlg.exec_()
-                raise e
+                raise
 
         return wrapper
 
