@@ -13,7 +13,7 @@ import numpy as np
 from numpy import ndarray
 
 from ..configs.configtypes import FilterData
-from ..datarules.base_rules import Filter
+from ..datarules import Filter
 
 log = logging.getLogger()
 

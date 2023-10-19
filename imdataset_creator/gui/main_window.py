@@ -8,8 +8,8 @@ from pathlib import Path
 from pprint import pprint
 
 from polars import DataFrame, concat
-from PySide6.QtCore import QRect, Qt, QThread, Signal, Slot
-from PySide6.QtGui import QAction, QIcon, QKeySequence
+from PySide6.QtCore import Qt, QThread, Signal, Slot
+from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QFileDialog,
     QGridLayout,
@@ -23,25 +23,14 @@ from PySide6.QtWidgets import (
 )
 from rich import print as rprint
 
-from imdataset_creator.datarules.dataset_builder import chunk_split
-
-from .. import DatasetBuilder, File, Input
+from .. import DatasetBuilder, File
 from ..configs import MainConfig
+from ..datarules import chunk_split
 from .err_dialog import catch_errors
-from .input_view import InputList, InputView
-from .output_filters import FilterView
-from .output_view import OutputList, OutputView
-from .producer_views import FileInfoProducerView, HashProducerView, ImShapeProducerView, ProducerList, ProducerView
-from .rule_views import (
-    BlacklistWhitelistView,
-    ChannelRuleView,
-    HashRuleView,
-    ResRuleView,
-    RuleList,
-    RuleView,
-    StatRuleView,
-    TotalLimitRuleView,
-)
+from .input_view import InputList
+from .output_view import OutputList
+from .producer_views import ProducerList
+from .rule_views import RuleList
 
 log = logging.getLogger()
 
@@ -109,8 +98,6 @@ class MainWidget(QWidget):
         # self.run_population_button.clicked.connect(self.run_population)
 
         self.output_list = OutputList(self)
-        self.output_list.set_text("Outputs")
-        self.output_list.register_item(OutputView)
 
         self.lists = QSplitter(self)
         self.lists.addWidget(self.input_list)

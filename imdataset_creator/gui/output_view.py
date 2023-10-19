@@ -7,7 +7,7 @@ from typing import Any
 from PySide6.QtWidgets import QCheckBox, QFileDialog, QLabel, QLineEdit
 
 from ..configs import OutputData
-from ..datarules.base_rules import Output
+from ..datarules import Output
 from .frames import FlowList
 from .input_view import InputView
 from .output_filters import FilterList
@@ -81,3 +81,8 @@ class OutputView(InputView):
 
 class OutputList(FlowList):
     items: list[OutputView]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.set_text("Outputs")
+        self.register_item(OutputView)

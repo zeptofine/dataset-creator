@@ -2,7 +2,7 @@ from collections.abc import Generator, Iterable
 from pathlib import Path
 
 from .configs import MainConfig, _repr_indent
-from .datarules.base_rules import Input, Output, Producer, Rule
+from .datarules import Input, Output, Producer, Rule
 from .file import File
 from .scenarios import FileScenario, OutputScenario
 

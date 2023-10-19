@@ -6,7 +6,8 @@ import cv2
 import numpy as np
 
 from .configs.keyworded import fancy_repr
-from .datarules.base_rules import File, Filter
+from .datarules import Filter
+from .file import File
 
 # IDK Wtf to call these things other than scenarios
 

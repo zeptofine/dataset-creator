@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..datarules.base_rules import Filter
+from ..datarules import Filter
 from ..image_filters import destroyers, resizer
 from .frames import FlowItem, FlowList, MiniCheckList, tooltip
 

@@ -1,14 +1,13 @@
 from dataclasses import dataclass
 from enum import Enum
 from random import choice
-from typing import Literal
 
 import cv2
 import numpy as np
 
 from imdataset_creator.configs.configtypes import FilterData
 
-from ..datarules.base_rules import Filter
+from ..datarules import Filter
 
 np_gen = np.random.default_rng()
 
