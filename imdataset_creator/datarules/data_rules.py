@@ -10,7 +10,7 @@ from dateutil import parser as timeparser
 from polars import DataFrame, Datetime, Expr, col
 
 from ..configs.configtypes import SpecialItemData
-from .base_rules import Column, Comparable, FastComparable, Producer, ProducerSchema, Rule, combine_expr_conds
+from .base_rules import Comparable, DataColumn, FastComparable, Producer, ProducerSchema, Rule, combine_expr_conds
 
 STAT_TRACKED = ("st_size", "st_atime", "st_mtime", "st_ctime")
 
@@ -61,7 +61,7 @@ class StatRule(Rule):
         after: str | datetime | None = None,
     ) -> None:
         super().__init__()
-        self.requires = Column("mtime", Datetime("ms"))
+        self.requires = DataColumn("mtime", Datetime("ms"))
 
         exprs: list[Expr] = []
 

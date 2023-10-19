@@ -56,7 +56,7 @@ class FastComparable:
 
 
 @dataclass(frozen=True)
-class Column:
+class DataColumn:
     """A class defining a column that a filter may need"""
 
     name: str
@@ -101,7 +101,7 @@ class ProducerSet(Set[Producer]):
 class Rule(Keyworded):
     """An abstract DataFilter format, for use in DatasetBuilder."""
 
-    requires: Column | tuple[Column, ...]
+    requires: DataColumn | tuple[DataColumn, ...]
     comparer: Comparable | FastComparable
 
     all_rules: ClassVar[dict[str, type[Rule]]] = {}

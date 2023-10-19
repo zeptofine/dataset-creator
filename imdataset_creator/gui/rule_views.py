@@ -38,7 +38,7 @@ class RuleView(FlowItem):
         def get_wrapper(self: RuleView):
             rule = original_get(self)
             if rule.requires:
-                if isinstance(rule.requires, base_rules.Column):
+                if isinstance(rule.requires, base_rules.DataColumn):
                     self.set_requires(str({rule.requires.name}))
                 else:
                     self.set_requires(str(set({r.name for r in rule.requires})))

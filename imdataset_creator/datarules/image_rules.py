@@ -13,7 +13,15 @@ from PIL import Image
 from polars import DataFrame, Expr, col
 
 from ..configs.configtypes import SpecialItemData
-from .base_rules import Column, Comparable, ExprDict, FastComparable, Producer, ProducerSchema, Rule, combine_expr_conds
+from .base_rules import (
+    Comparable,
+    DataColumn,
+    FastComparable,
+    Producer,
+    ProducerSchema,
+    Rule,
+    combine_expr_conds,
+)
 
 
 def whash_db4(img) -> imagehash.ImageHash:
@@ -60,8 +68,8 @@ class ResRule(Rule):
     ) -> None:
         super().__init__()
         self.requires = (
-            Column("width", int),
-            Column("height", int),
+            DataColumn("width", int),
+            DataColumn("height", int),
         )
 
         smallest = pl.min_horizontal(col("width"), col("height"))
@@ -100,7 +108,7 @@ class ChannelRule(Rule):
 
     def __init__(self, min_channels=1, max_channels=4) -> None:
         super().__init__()
-        self.requires = Column("channels", int)
+        self.requires = DataColumn("channels", int)
         self.comparer = FastComparable((min_channels <= col("channels")) & (col("channels") <= max_channels))
 
 
@@ -154,9 +162,9 @@ class HashRule(Rule):
     def __init__(self, resolver: str | Literal["ignore_all"] = "ignore_all") -> None:
         super().__init__()
 
-        self.requires = Column("hash", str)
+        self.requires = DataColumn("hash", str)
         if resolver != "ignore_all":
-            self.requires = (self.requires, Column(resolver))
+            self.requires = (self.requires, DataColumn(resolver))
         self.resolver: Expr | bool = {"ignore_all": False}.get(resolver, col(resolver) == col(resolver).max())
         self.comparer = Comparable(self.compare)
 
