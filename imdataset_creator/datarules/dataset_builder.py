@@ -12,10 +12,10 @@ from polars import DataFrame, Expr
 from polars.type_aliases import SchemaDefinition
 
 from .base_rules import (
-    Comparable,
+    DataFrameMatcher,
     DataTypeSchema,
     ExprDict,
-    FastComparable,
+    ExprMatcher,
     Producer,
     ProducerSchema,
     ProducerSet,
@@ -47,17 +47,17 @@ def chunk_split(
     )
 
 
-def combine_exprs(rules: Iterable[Rule]) -> list[Expr | bool | Comparable]:
+def combine_exprs(rules: Iterable[Rule]) -> list[Expr | bool | DataFrameMatcher]:
     """this combines expressions from different objects to a list of compressed expressions.
-    DataRules that are FastComparable can be combined, but `Comparable`s cannot. They will be copied to the list.
+    DataRules that are `ExprComparer`s can be combined, but `DataFrameComparer`s cannot. They will be copied to the list.
     """
-    combinations: list[Expr | bool | Comparable] = []
+    combinations: list[Expr | bool | DataFrameMatcher] = []
     combination: Expr | bool | None = None
     for rule in rules:
-        comparer: Comparable | FastComparable = rule.comparer
-        if isinstance(comparer, FastComparable):
+        comparer: DataFrameMatcher | ExprMatcher = rule.matcher
+        if isinstance(comparer, ExprMatcher):
             combination = combination & comparer() if combination is not None else comparer()
-        elif isinstance(comparer, Comparable):
+        elif isinstance(comparer, DataFrameMatcher):
             if combination is not None:
                 combinations.append(combination)
                 combination = None
@@ -270,7 +270,7 @@ class DatasetBuilder:
         vdf: DataFrame = self.__df.filter(pl.col("path").is_in(lst))
         combined = combine_exprs(self.rules)
         for f in combined:
-            vdf = f(vdf, self.__df) if isinstance(f, Comparable) else vdf.filter(f)
+            vdf = f(vdf, self.__df) if isinstance(f, DataFrameMatcher) else vdf.filter(f)
 
         return vdf.sort(sort_col).get_column("path")
 

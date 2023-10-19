@@ -33,7 +33,7 @@ class File:
     file: MalleablePath
     ext: str
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, str | MalleablePath]:
         return {
             "absolute_pth": self.absolute_pth,
             "src": self.src,

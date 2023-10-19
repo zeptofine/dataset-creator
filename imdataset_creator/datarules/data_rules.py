@@ -10,7 +10,15 @@ from dateutil import parser as timeparser
 from polars import DataFrame, Datetime, Expr, col
 
 from ..configs.configtypes import SpecialItemData
-from .base_rules import Comparable, DataColumn, FastComparable, Producer, ProducerSchema, Rule, combine_expr_conds
+from .base_rules import (
+    DataColumn,
+    DataFrameMatcher,
+    ExprMatcher,
+    Producer,
+    ProducerSchema,
+    Rule,
+    combine_expr_conds,
+)
 
 STAT_TRACKED = ("st_size", "st_atime", "st_mtime", "st_ctime")
 
@@ -79,7 +87,7 @@ class StatRule(Rule):
         if self.before is not None and self.after is not None and self.after > self.before:
             raise self.AgeError(self.after, self.before)
 
-        self.comparer = FastComparable(combine_expr_conds(exprs))
+        self.matcher = ExprMatcher(combine_expr_conds(exprs))
 
     @classmethod
     def from_cfg(cls, cfg) -> Self:
@@ -123,7 +131,7 @@ class BlackWhitelistRule(Rule):
         if self.blacklist:
             exprs.extend(col("path").str.contains(item).is_not() for item in self.blacklist)
 
-        self.comparer = FastComparable(combine_expr_conds(exprs))
+        self.matcher = ExprMatcher(combine_expr_conds(exprs))
 
     @classmethod
     def get_cfg(cls) -> BlackWhitelistData:
@@ -134,7 +142,7 @@ class TotalLimitRule(Rule):
     def __init__(self, limit=1000):
         super().__init__()
         self.total = limit
-        self.comparer = Comparable(self.compare)
+        self.matcher = DataFrameMatcher(self.compare)
 
     def compare(self, selected: DataFrame, _) -> DataFrame:
         return selected.head(self.total)

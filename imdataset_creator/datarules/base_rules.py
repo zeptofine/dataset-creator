@@ -29,20 +29,31 @@ def indent(t):
     return textwrap.indent(t, "    ")
 
 
-class Comparable:
+class DataFrameMatcher:
+    """A class that filters sections of a dataframe based on a function"""
+
     func: Callable[[PartialDataFrame, FullDataFrame], DataFrame]
 
     def __init__(self, func: Callable[[PartialDataFrame, FullDataFrame], DataFrame]):
+        """
+        Parameters
+        ----------
+        func : Callable[[PartialDataFrame, FullDataFrame], DataFrame]
+            A function that takes a DataFrame and a Dataframe with more information as input, and returns a filtered
+            DataFrame as an output.
+        """
         self.func = func
 
     def __call__(self, *args, **kwargs) -> DataFrame:
         return self.func(*args, **kwargs)
 
     def __repr__(self):
-        return f"Comparable({self.func.__name__})"
+        return f"DataFrameMatcher({self.func.__name__})"
 
 
-class FastComparable:
+class ExprMatcher:
+    """A class that filters files based on an expression"""
+
     expr: Expr
 
     def __init__(self, expr: Expr):
@@ -52,7 +63,7 @@ class FastComparable:
         return self.expr
 
     def __repr__(self) -> str:
-        return f"FastComparable({self.expr})"
+        return f"ExprMatcher({self.expr})"
 
 
 @dataclass(frozen=True)
@@ -102,7 +113,7 @@ class Rule(Keyworded):
     """An abstract DataFilter format, for use in DatasetBuilder."""
 
     requires: DataColumn | tuple[DataColumn, ...]
-    comparer: Comparable | FastComparable
+    matcher: DataFrameMatcher | ExprMatcher
 
     all_rules: ClassVar[dict[str, type[Rule]]] = {}
 

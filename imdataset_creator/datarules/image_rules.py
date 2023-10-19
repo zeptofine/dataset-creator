@@ -14,9 +14,9 @@ from polars import DataFrame, Expr, col
 
 from ..configs.configtypes import SpecialItemData
 from .base_rules import (
-    Comparable,
     DataColumn,
-    FastComparable,
+    DataFrameMatcher,
+    ExprMatcher,
     Producer,
     ProducerSchema,
     Rule,
@@ -82,7 +82,7 @@ class ResRule(Rule):
         if max_res:
             exprs.append((largest // scale * scale if crop else largest) <= max_res)
 
-        self.comparer = FastComparable(combine_expr_conds(exprs))
+        self.matcher = ExprMatcher(combine_expr_conds(exprs))
 
     @classmethod
     def get_cfg(cls) -> ResData:
@@ -109,7 +109,7 @@ class ChannelRule(Rule):
     def __init__(self, min_channels=1, max_channels=4) -> None:
         super().__init__()
         self.requires = DataColumn("channels", int)
-        self.comparer = FastComparable((min_channels <= col("channels")) & (col("channels") <= max_channels))
+        self.matcher = ExprMatcher((min_channels <= col("channels")) & (col("channels") <= max_channels))
 
 
 def get_size(pth):
@@ -166,10 +166,10 @@ class HashRule(Rule):
         if resolver != "ignore_all":
             self.requires = (self.requires, DataColumn(resolver))
         self.resolver: Expr | bool = {"ignore_all": False}.get(resolver, col(resolver) == col(resolver).max())
-        self.comparer = Comparable(self.compare)
+        self.matcher = DataFrameMatcher(self.compare)
 
     def compare(self, partial: DataFrame, full: DataFrame) -> DataFrame:
-        return partial.groupby("hash").apply(lambda df: df.filter(self.resolver) if len(df) > 1 else df)
+        return partial.groupby("hash").apply(lambda group: group.filter(self.resolver) if len(group) > 1 else group)
 
     @classmethod
     def get_cfg(cls) -> dict:
