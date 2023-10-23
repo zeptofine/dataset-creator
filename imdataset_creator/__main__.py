@@ -56,12 +56,6 @@ def main(
     with config_path.open("r") as f:
         cfg: MainConfig = json.load(f)
 
-    db = DatasetBuilder(db_path=Path(database_path))
-
-    db_cfg = ConfigHandler(cfg)
-    db.add_rules(*db_cfg.rules)
-    db.add_producers(*db_cfg.producers)
-
     c = Console(record=True)
     with Progress(
         progress.TaskProgressColumn(),
@@ -71,7 +65,11 @@ def main(
         progress.MofNCompleteColumn(),
         progress.SpinnerColumn(),
         console=c,
-    ) as p:
+    ) as p, DatasetBuilder(db_path=Path(database_path)) as db:
+        db_cfg = ConfigHandler(cfg)
+        db.add_rules(*db_cfg.rules)
+        db.add_producers(*db_cfg.producers)
+
         count_t: TaskID
         total_t: TaskID
         null_t: TaskID

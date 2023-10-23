@@ -8,7 +8,7 @@ from typing import Self
 from .configtypes import ItemData, SpecialItemData
 
 
-def _repr_indent(t):
+def _repr_indent(t: str) -> str:
     return textwrap.indent(t, "    ")
 
 
