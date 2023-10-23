@@ -1,8 +1,11 @@
 from collections.abc import Generator, Iterable
 from pathlib import Path
+from typing import overload
 
+from .alphanumeric_sort import alphanumeric_sort
 from .configs import MainConfig, _repr_indent
 from .datarules import Input, Output, Producer, Rule
+from .datarules.base_rules import PathGenerator
 from .file import File
 from .scenarios import FileScenario, OutputScenario
 
@@ -21,9 +24,23 @@ class ConfigHandler:
         # generate `Rule`s
         self.rules: list[Rule] = [Rule.all_rules[r["name"]].from_cfg(r["data"]) for r in cfg["rules"]]
 
-    def gather_images(self) -> Generator[tuple[Path, Generator[Path, None, None]], None, None]:
+    @overload
+    def gather_images(self, sort=True, reverse=False) -> Generator[tuple[Path, list[Path]], None, None]:
+        ...
+
+    @overload
+    def gather_images(self, sort=False, reverse=False) -> Generator[tuple[Path, PathGenerator], None, None]:
+        ...
+
+    def gather_images(
+        self, sort=False, reverse=False
+    ) -> Generator[tuple[Path, PathGenerator | list[Path]], None, None]:
         for input_ in self.inputs:
-            yield input_.folder, input_.run()
+            gen = input_.run()
+            if sort:
+                yield input_.folder, list(map(Path, sorted(map(str, gen), key=alphanumeric_sort, reverse=reverse)))
+            else:
+                yield input_.folder, gen
 
     def get_outputs(self, file: File) -> list[OutputScenario]:
         return [

@@ -82,7 +82,7 @@ class ResRule(Rule):
         if max_res:
             exprs.append((largest // scale * scale if crop else largest) <= max_res)
 
-        self.matcher = ExprMatcher(combine_expr_conds(exprs))
+        self.matcher = ExprMatcher(*exprs)
 
     @classmethod
     def get_cfg(cls) -> ResData:

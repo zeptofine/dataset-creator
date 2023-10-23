@@ -13,23 +13,6 @@ from .input_view import InputView
 from .output_filters import FilterList
 
 
-class InvalidFormatException(Exception):
-    def __init__(self, disallowed: str):
-        super().__init__(f"invalid format string. '{disallowed}' is not allowed.")
-
-
-class SafeFormatter(Formatter):
-    def get_field(self, field_name: str, args: Sequence[Any], kwargs: Mapping[str, Any]) -> Any:
-        # the goal is to make sure `property`s and indexing is still available, while dunders and things are not
-        if "__" in field_name:
-            raise InvalidFormatException("__")
-
-        return super().get_field(field_name, args, kwargs)
-
-
-output_formatter = SafeFormatter()
-
-
 class OutputView(InputView):
     bound_item = Output
 

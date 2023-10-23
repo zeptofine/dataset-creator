@@ -87,7 +87,7 @@ class StatRule(Rule):
         if self.before is not None and self.after is not None and self.after > self.before:
             raise self.AgeError(self.after, self.before)
 
-        self.matcher = ExprMatcher(combine_expr_conds(exprs))
+        self.matcher = ExprMatcher(*exprs)
 
     @classmethod
     def from_cfg(cls, cfg) -> Self:
@@ -131,7 +131,7 @@ class BlackWhitelistRule(Rule):
         if self.blacklist:
             exprs.extend(col("path").str.contains(item).is_not() for item in self.blacklist)
 
-        self.matcher = ExprMatcher(combine_expr_conds(exprs))
+        self.matcher = ExprMatcher(*exprs)
 
     @classmethod
     def get_cfg(cls) -> BlackWhitelistData:

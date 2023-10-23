@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from typing import Self
 
 from PySide6.QtCore import QDate, QDateTime, QTime, Slot
 from PySide6.QtWidgets import QCheckBox, QDateTimeEdit, QLabel, QLineEdit, QSpinBox, QTextEdit
@@ -31,11 +32,11 @@ class RuleView(FlowItem):
         return base_rules.Rule()
 
     @classmethod
-    def __wrap_get(cls: type[RuleView]):
+    def __wrap_get(cls: type[Self]):
         original_get = cls.get
         original_get_config = cls.get_config
 
-        def get_wrapper(self: RuleView):
+        def get_wrapper(self: Self):
             rule = original_get(self)
             if rule.requires:
                 if isinstance(rule.requires, base_rules.DataColumn):
@@ -44,7 +45,7 @@ class RuleView(FlowItem):
                     self.set_requires(str(set({r.name for r in rule.requires})))
             return rule
 
-        def get_config_wrapper(self: RuleView):
+        def get_config_wrapper(self: Self):
             self.get()
             return original_get_config(self)
 
@@ -318,7 +319,6 @@ class HashRuleView(RuleView):
         self.group_grid.addWidget(self.resolver, 1, 0, 1, 2)
 
     def get(self):
-        super().get()
         return image_rules.HashRule(resolver=self.resolver.text())
 
     def get_config(self):

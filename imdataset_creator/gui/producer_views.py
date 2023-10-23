@@ -74,7 +74,7 @@ class ProducerList(BuilderDependencyList):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__registered_by: dict[str, type[ProducerView]] = {}
-        self.set_text("Rules")
+        self.set_text("Producers")
         self.register_item(
             FileInfoProducerView,
             ImShapeProducerView,

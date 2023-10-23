@@ -3,12 +3,12 @@ from __future__ import annotations
 import textwrap
 from abc import abstractmethod
 from collections import defaultdict
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Generator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from string import Formatter
 from types import MappingProxyType
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Iterable
 
 import numpy as np
 import wcmatch.glob as wglob
@@ -36,10 +36,8 @@ class DataFrameMatcher:
 
     def __init__(self, func: Callable[[PartialDataFrame, FullDataFrame], DataFrame]):
         """
-        Parameters
-        ----------
-        func : Callable[[PartialDataFrame, FullDataFrame], DataFrame]
-            A function that takes a DataFrame and a Dataframe with more information as input, and returns a filtered
+        Args:
+            func (Callable[[PartialDataFrame, FullDataFrame], DataFrame]): A function that takes a DataFrame and a Dataframe with more information as input, and returns a filtered
             DataFrame as an output.
         """
         self.func = func
@@ -56,8 +54,8 @@ class ExprMatcher:
 
     expr: Expr
 
-    def __init__(self, expr: Expr):
-        self.expr = expr
+    def __init__(self, *exprs: Expr):
+        self.expr = combine_expr_conds(exprs)
 
     def __call__(self) -> Expr:
         return self.expr
@@ -146,6 +144,9 @@ class Filter(Keyworded):
 flags: int = wglob.BRACE | wglob.SPLIT | wglob.EXTMATCH | wglob.IGNORECASE | wglob.GLOBSTAR
 
 
+PathGenerator = Generator[Path, None, None]
+
+
 @dataclass(repr=False)
 class Input(Keyworded):
     """
@@ -166,7 +167,7 @@ class Input(Keyworded):
     def from_cfg(cls, cfg: InputData):
         return cls(Path(cfg["folder"]), cfg["expressions"])
 
-    def run(self):
+    def run(self) -> PathGenerator:
         """
         Yield the paths of all files in the input folder that match the glob patterns.
 
@@ -268,7 +269,7 @@ class Output(Keyworded):
         )
 
 
-def combine_expr_conds(exprs: list[Expr]) -> Expr:
+def combine_expr_conds(exprs: Iterable[Expr]) -> Expr:
     """
     Combine a list of `Expr` objects using the `&` operator.
 
@@ -282,7 +283,9 @@ def combine_expr_conds(exprs: list[Expr]) -> Expr:
     Expr
         A single `Expr` object representing the combined expression.
     """
-    comp: Expr = exprs[0]
-    for e in exprs[1:]:
-        comp &= e
+    comp: Expr | None = None
+    for e in exprs:
+        comp = comp & e if comp is None else e
+    assert comp is not None
+
     return comp

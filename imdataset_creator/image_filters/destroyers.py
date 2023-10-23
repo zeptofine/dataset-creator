@@ -1,11 +1,10 @@
 import logging
 import subprocess
-import typing
 from dataclasses import dataclass
 from enum import Enum
 from math import sqrt
 from random import choice, randint
-from typing import Literal, Self
+from typing import Self
 
 import cv2
 import ffmpeg

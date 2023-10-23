@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Generator, Literal, TypeVar, overload
 
 import polars as pl
-from polars import DataFrame, Expr
+from polars import DataFrame, Expr, LazyFrame
 from polars.type_aliases import SchemaDefinition
 
 from .base_rules import (
@@ -39,6 +39,17 @@ def chunk_split(
     chunksize: int,
     col_name: str = "_idx",
 ) -> Generator[DataFrame, None, None]:
+    """
+    Splits a dataframe into chunks based on index.
+
+    Args:
+        df (DataFrame): the dataframe to split
+        chunksize (int): the size of each resulting chunk
+        col_name (str, optional): the name of the temporary chunk. Defaults to "_idx".
+
+    Yields:
+        Generator[DataFrame, None, None]: a chunk
+    """
     return (
         part.drop(col_name)
         for _, part in df.with_row_count(col_name)
@@ -47,25 +58,23 @@ def chunk_split(
     )
 
 
-def combine_exprs(rules: Iterable[Rule]) -> list[Expr | bool | DataFrameMatcher]:
-    """this combines expressions from different objects to a list of compressed expressions.
-    DataRules that are `ExprComparer`s can be combined, but `DataFrameComparer`s cannot. They will be copied to the list.
+def combine_matchers(
+    matchers: Iterable[DataFrameMatcher | ExprMatcher],
+) -> Generator[Expr | DataFrameMatcher, None, None]:
+    """this combines expressions from different matchers to compressed expressions.
+    DataRules that are `ExprMatcher`s can be combined, but `DataFrameMatcher`s cannot. They will be copied to the list.
     """
-    combinations: list[Expr | bool | DataFrameMatcher] = []
     combination: Expr | bool | None = None
-    for rule in rules:
-        comparer: DataFrameMatcher | ExprMatcher = rule.matcher
-        if isinstance(comparer, ExprMatcher):
-            combination = combination & comparer() if combination is not None else comparer()
-        elif isinstance(comparer, DataFrameMatcher):
+    for matcher in matchers:
+        if isinstance(matcher, DataFrameMatcher):
             if combination is not None:
-                combinations.append(combination)
+                yield combination
                 combination = None
-            combinations.append(comparer)
+            yield matcher
+        elif isinstance(matcher, ExprMatcher):
+            combination = combination & matcher() if combination is not None else matcher()
     if combination is not None:
-        combinations.append(combination)
-
-    return combinations
+        yield combination
 
 
 def blacklist_schema(schema: ProducerSchema, blacklist: Collection) -> ProducerSchema:
@@ -185,7 +194,15 @@ class DatasetBuilder:
         self.producers = new
         return ProducerSet(old - new)
 
+    @overload
     def unfinished_by_col(self, df: DataFrame, cols: Iterable[str] | None = None) -> DataFrame:
+        ...
+
+    @overload
+    def unfinished_by_col(self, df: LazyFrame, cols: Iterable[str] | None = None) -> LazyFrame:
+        ...
+
+    def unfinished_by_col(self, df: DataFrame | LazyFrame, cols: Iterable[str] | None = None) -> DataFrame | LazyFrame:
         if cols is None:
             cols = set(self.type_schema) & set(df.columns)
         return df.filter(pl.any_horizontal(pl.col(col).is_null() for col in cols))
@@ -232,7 +249,7 @@ class DatasetBuilder:
         chunks: Iterable[DataFrame],
         schemas: ProducerSchema,
         db_schema: DataTypeSchema | None = None,
-    ):
+    ) -> Generator[DataFrame, None, None]:
         if db_schema is None:
             db_schema = self.type_schema
         chunk: DataFrame
@@ -248,37 +265,31 @@ class DatasetBuilder:
             types = self.type_schema
         return self.comply_to_schema(types).with_columns(types)
 
-    def get_unfinished(self) -> DataFrame:
+    def get_unfinished(self) -> LazyFrame:
         # check if producers are completely finished
         type_schema: DataTypeSchema = self.type_schema
         self.comply_to_schema(type_schema, in_place=True)
-        return self.unfinished_by_col(self.__df.with_columns(type_schema))
+        return self.unfinished_by_col(self.__df.lazy().with_columns(type_schema))
 
-    def get_unfinished_existing(self) -> DataFrame:
-        unfinished = self.get_unfinished()
-        if not len(unfinished):
-            return unfinished
-        return unfinished.filter(pl.col("path").apply(os.path.exists))
+    def get_unfinished_existing(self) -> LazyFrame:
+        return self.get_unfinished().filter(pl.col("path").apply(os.path.exists))
 
-    def filter(self, lst, sort_col="path") -> Iterable[str]:  # noqa: A003
-        assert sort_col in self.__df.columns, f"'{sort_col}' is not in {self.__df.columns}"
+    def filter(self, lst) -> DataFrame:  # noqa: A003
         if len(self.unready_rules):
             warnings.warn(
                 f"{len(self.unready_rules)} filters are not initialized and will not be populated", stacklevel=2
             )
 
         vdf: DataFrame = self.__df.filter(pl.col("path").is_in(lst))
-        combined = combine_exprs(self.rules)
-        for f in combined:
-            vdf = f(vdf, self.__df) if isinstance(f, DataFrameMatcher) else vdf.filter(f)
-
-        return vdf.sort(sort_col).get_column("path")
+        for matcher in combine_matchers([rule.matcher for rule in self.rules]):
+            vdf = matcher(vdf, self.__df) if isinstance(matcher, DataFrameMatcher) else vdf.filter(matcher)
+        return vdf
 
     def save_df(self, pth: str | Path | None = None) -> None:
         """saves the dataframe to self.filepath"""
         self.__df.write_ipc(pth or self.filepath)
 
-    def update(self, df: DataFrame, on="path", how: Literal["left", "inner"] = "left"):
+    def update(self, df: DataFrame, on="path", how: Literal["left", "inner", "outer"] = "left"):
         self.__df = self.__df.update(df, on=on, how=how)
 
     def trigger_save_via_time(
@@ -316,11 +327,11 @@ class DatasetBuilder:
         return f"{self.__class__.__name__}({', '.join(attrlist)})"
 
     @overload
-    def comply_to_schema(self, schema: SchemaDefinition, in_place: Literal[False] = False) -> DataFrame:
+    def comply_to_schema(self, schema: SchemaDefinition) -> DataFrame:
         ...
 
     @overload
-    def comply_to_schema(self, schema: SchemaDefinition, in_place: Literal[True] = True) -> None:
+    def comply_to_schema(self, schema: SchemaDefinition, in_place=True) -> None:
         ...
 
     def comply_to_schema(self, schema: SchemaDefinition, in_place: bool = False) -> DataFrame | None:

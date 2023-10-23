@@ -1,6 +1,5 @@
 import json
 import logging
-import time
 from datetime import datetime
 from multiprocessing import Pool, cpu_count, freeze_support
 from pathlib import Path
@@ -22,7 +21,6 @@ from . import (
     File,
     FileScenario,
     MainConfig,
-    alphanumeric_sort,
     chunk_split,
 )
 
@@ -78,27 +76,24 @@ def main(
         if verbose:
             p.log(pformat(db_cfg))
         # Gather images
-        images: dict[Path, list[Path]] = {}
         resolved: dict[str, File] = {}
         count_t = p.add_task("Gathering", total=None)
-        for folder, gen in db_cfg.gather_images():
-            images[folder] = sorted(gen, key=lambda x: alphanumeric_sort(str(x)), reverse=True)
-            for pth in images[folder]:
-                resolved[str((folder / pth).resolve())] = File.from_src(folder, pth)
-            p.update(count_t, advance=len(images[folder]))
 
-        if diff := sum(map(len, images.values())) - len(resolved):
+        for folder, lst in db_cfg.gather_images(sort=True, reverse=True):
+            for pth in lst:
+                resolved[str((folder / pth).resolve())] = File.from_src(folder, pth)
+            p.update(count_t, advance=len(lst))
+
+        if diff := p.tasks[count_t].completed - len(resolved):
             p.log(f"removed an estimated {diff} conflicting symlinks")
 
         p.update(count_t, total=len(resolved), completed=len(resolved))
 
         total_t = p.add_task("populating df", total=None)
         db.add_new_paths(set(resolved))
-        db_schema = db.type_schema
+        db.comply_to_schema(db.type_schema, in_place=True)
 
-        db.comply_to_schema(db_schema)
-        unfinished: DataFrame = db.get_unfinished_existing()
-
+        unfinished: DataFrame = db.get_unfinished_existing().collect()
         if not unfinished.is_empty():
             p.update(total_t, total=len(unfinished))
             null_t = p.add_task("nulls set", total=None)
@@ -152,7 +147,7 @@ def main(
         files: list[File]
         if db_cfg.rules:
             filter_t = p.add_task("filtering", total=0)
-            files = [resolved[file] for file in db.filter(set(resolved))]
+            files = [resolved[file] for file in db.filter(set(resolved)).get_column("path")]
             p.update(filter_t, total=len(files), completed=len(files))
         else:
             files = list(resolved.values())
