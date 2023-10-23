@@ -397,6 +397,9 @@ class MiniCheckList(QFrame):
     def set_config(self, i: str, val: bool):
         self.items[i].setChecked(val)
 
+    def get_enabled(self):
+        return [i for i, item in self.items.items() if item.isChecked()]
+
 
 UnderlineFont = QFont()
 UnderlineFont.setUnderline(True)

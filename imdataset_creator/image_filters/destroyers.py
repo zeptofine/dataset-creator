@@ -14,6 +14,7 @@ from numpy import ndarray
 
 from ..configs.configtypes import FilterData
 from ..datarules import Filter
+from ..enum_helpers import listostr2listoenum
 
 log = logging.getLogger()
 
@@ -73,7 +74,7 @@ class Blur(Filter):
     @classmethod
     def from_cfg(cls, cfg: BlurData) -> Self:
         return cls(
-            algorithms=[BlurAlgorithm._member_map_[k] for k in cfg["algorithms"]],  # type: ignore
+            algorithms=listostr2listoenum(cfg["algorithms"], BlurAlgorithm),
             blur_range=cfg["blur_range"],  # type: ignore
             scale=cfg["scale"],
         )
@@ -123,6 +124,14 @@ class Noise(Filter):
         cv2.randn(noise, 0, (randint(*self.intensity_range),))  # type: ignore
         noise = noise[..., None]
         return img + noise
+
+    @classmethod
+    def from_cfg(cls, cfg: NoiseData) -> Self:
+        return cls(
+            algorithms=listostr2listoenum(cfg["algorithms"], NoiseAlgorithm),
+            intensity_range=cfg["intensity_range"],  # type: ignore
+            scale=cfg["scale"],
+        )
 
 
 class CompressionAlgorithms(Enum):
@@ -230,7 +239,7 @@ class Compression(Filter):
     @classmethod
     def from_cfg(cls, cfg: CompressionData) -> Self:
         return cls(
-            algorithms=[CompressionAlgorithms._member_map_[k] for k in cfg["algorithms"]],  # type: ignore
+            algorithms=listostr2listoenum(cfg["algorithms"], CompressionAlgorithms),
             jpeg_quality_range=cfg["jpeg_quality_range"],  # type: ignore
             webp_quality_range=cfg["webp_quality_range"],  # type: ignore
             h264_crf_range=cfg["h264_crf_range"],  # type: ignore

@@ -1,4 +1,4 @@
-from PySide6.QtCore import QSize
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -14,6 +14,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from imdataset_creator.configs.configtypes import ItemData
+
 from ..datarules import Filter
 from ..image_filters import destroyers, resizer
 from .frames import FlowItem, FlowList, MiniCheckList, tooltip
@@ -21,6 +23,7 @@ from .frames import FlowItem, FlowList, MiniCheckList, tooltip
 
 class FilterView(FlowItem):
     title = "Filter"
+    needs_settings = True
 
     bound_item: type[Filter]
 
@@ -42,7 +45,6 @@ TOOLTIPS = {
 
 class ResizeFilterView(FilterView):
     title = "Resize"
-    needs_settings = True
 
     bound_item = resizer.Resize
 
@@ -74,7 +76,6 @@ class ResizeFilterView(FilterView):
 class CropFilterView(FilterView):
     title = "Crop"
     desc = "Crop the image to the specified size. If the item is 0, it will not be considered"
-    needs_settings = True
 
     bound_item = resizer.Crop
 
@@ -117,7 +118,6 @@ class CropFilterView(FilterView):
 
 class BlurFilterView(FilterView):
     title = "Blur"
-    needs_settings = True
 
     bound_item = destroyers.Blur
 
@@ -152,7 +152,7 @@ class BlurFilterView(FilterView):
         self.blur_range_y.setValue(16)
 
     def get_config(self) -> destroyers.BlurData:
-        algos = [algo for algo, enabled in self.algorithms.get_config().items() if enabled]
+        algos = self.algorithms.get_enabled()
         if not algos:
             raise EmptyAlgorithmsError(self)
         return destroyers.BlurData(
@@ -178,7 +178,6 @@ class BlurFilterView(FilterView):
 
 class NoiseFilterView(FilterView):
     title = "Noise"
-    needs_settings = True
 
     bound_item = destroyers.Noise
 
@@ -209,7 +208,7 @@ class NoiseFilterView(FilterView):
         self.intensity_range_y.setValue(16)
 
     def get_config(self) -> destroyers.NoiseData:
-        algos = [algo for algo, enabled in self.algorithms.get_config().items() if enabled]
+        algos = self.algorithms.get_enabled()
         if not algos:
             raise EmptyAlgorithmsError(self)
         return destroyers.NoiseData(
@@ -235,7 +234,6 @@ class NoiseFilterView(FilterView):
 
 class CompressionFilterView(FilterView):
     title = "Compression"
-    needs_settings = True
 
     bound_item = destroyers.Compression
 
@@ -291,6 +289,7 @@ class CompressionFilterView(FilterView):
         self.group_grid.addWidget(self.mpeg2_bitrate, 6, 1, 1, 2)
 
     def reset_settings_group(self):
+        self.algorithms.disable_all()
         self.j_range_min.setValue(0)
         self.j_range_max.setValue(100)
         self.w_range_min.setValue(1)
@@ -301,12 +300,12 @@ class CompressionFilterView(FilterView):
         self.hevc_range_max.setValue(33)
 
     def get_config(self) -> destroyers.CompressionData:
-        algos = [algo for algo, enabled in self.algorithms.get_config().items() if enabled]
+        algos = self.algorithms.get_enabled()
         if not algos:
             raise EmptyAlgorithmsError(self)
         return destroyers.CompressionData(
             {
-                "algorithms": [algo for algo, enabled in self.algorithms.get_config().items() if enabled],
+                "algorithms": algos,
                 "jpeg_quality_range": [self.j_range_min.value(), self.j_range_max.value()],
                 "webp_quality_range": [self.w_range_min.value(), self.w_range_max.value()],
                 "h264_crf_range": [self.h264_range_min.value(), self.h264_range_max.value()],
@@ -335,6 +334,96 @@ class CompressionFilterView(FilterView):
         return self
 
 
+class RandomFlipFilterView(FilterView):
+    title = "Random Flip"
+
+    bound_item = resizer.RandomFlip
+
+    def configure_settings_group(self):
+        self.flip_x_slider = QSlider(Qt.Orientation.Horizontal, self)
+        self.flip_x_slider.setMaximum(100)
+        self.flip_x_slider.setMinimum(0)
+        self.flip_y_slider = QSlider(Qt.Orientation.Horizontal, self)
+        self.flip_y_slider.setMaximum(100)
+        self.flip_y_slider.setMinimum(0)
+        self.flip_x_chance = QDoubleSpinBox(self)
+        self.flip_x_chance.setRange(0, 100)
+        self.flip_x_chance.setSuffix("%")
+        self.flip_x_chance.setSingleStep(0.5)
+        self.flip_y_chance = QDoubleSpinBox(self)
+        self.flip_y_chance.setRange(0, 100)
+        self.flip_y_chance.setSuffix("%")
+        self.flip_y_chance.setSingleStep(0.5)
+
+        self.flip_x_slider.valueChanged.connect(self.flip_x_chance.setValue)
+        self.flip_y_slider.valueChanged.connect(self.flip_y_chance.setValue)
+        self.flip_x_chance.valueChanged.connect(self.flip_x_slider.setValue)
+        self.flip_y_chance.valueChanged.connect(self.flip_y_slider.setValue)
+
+        self.group_grid.addWidget(QLabel("Flip X Chance", self), 0, 0, 1, 1)
+        self.group_grid.addWidget(self.flip_x_slider, 0, 1, 1, 1)
+        self.group_grid.addWidget(self.flip_x_chance, 0, 2, 1, 1)
+        self.group_grid.addWidget(QLabel("Flip Y Chance", self), 1, 0, 1, 1)
+        self.group_grid.addWidget(self.flip_y_slider, 1, 1, 1, 1)
+        self.group_grid.addWidget(self.flip_y_chance, 1, 2, 1, 1)
+
+    def reset_settings_group(self):
+        self.flip_x_chance.setValue(50)
+        self.flip_y_chance.setValue(50)
+
+    @classmethod
+    def from_config(cls, cfg: resizer.RandomFlipData, parent=None):
+        self = cls(parent)
+        self.flip_x_chance.setValue(cfg["flip_x_chance"] * 100)
+        self.flip_y_chance.setValue(cfg["flip_y_chance"] * 100)
+        return self
+
+    def get_config(self) -> resizer.RandomFlipData:
+        return {
+            "flip_x_chance": self.flip_x_chance.value() / 100,
+            "flip_y_chance": self.flip_y_chance.value() / 100,
+        }
+
+
+class RandomRotateFilterView(FilterView):
+    title = "Random Rotate"
+
+    bound_item = resizer.RandomRotate
+
+    def configure_settings_group(self) -> None:
+        self.rotate_chance = QDoubleSpinBox(self)
+        self.rotate_slider = QSlider(Qt.Orientation.Horizontal, self)
+        self.rotate_chance.valueChanged.connect(self.rotate_slider.setValue)
+        self.rotate_slider.valueChanged.connect(self.rotate_chance.setValue)
+        self.rotate_slider.setRange(0, 100)
+
+        self.rotation_list = MiniCheckList(resizer.RandomRotateDirections._member_names_, self)
+        self.group_grid.addWidget(self.rotation_list, 0, 0, 1, 3)
+        self.group_grid.addWidget(QLabel("Rotation chance:", self), 1, 0, 1, 1)
+        self.group_grid.addWidget(self.rotate_slider, 1, 1, 1, 1)
+        self.group_grid.addWidget(self.rotate_chance, 1, 2, 1, 1)
+
+    def reset_settings_group(self):
+        self.rotation_list.disable_all()
+
+    @classmethod
+    def from_config(cls, cfg: resizer.RandomRotateData, parent=None):
+        self = cls(parent)
+        for item in cfg["rotate_directions"]:
+            self.rotation_list.set_config(item, True)
+        self.rotate_chance.setValue(cfg["rotate_chance"] * 100)
+        return self
+
+    def get_config(self) -> resizer.RandomRotateData:
+        rots = self.rotation_list.get_enabled()
+        if not rots:
+            raise EmptyAlgorithmsError(self)
+        return {
+            "rotate_chance": self.rotate_chance.value() / 100,
+            "rotate_directions": rots,
+        }
+
+
 class EmptyAlgorithmsError(Exception):
     """Raised when no algorithms are enabled"""
 
@@ -354,4 +443,6 @@ class FilterList(FlowList):
             BlurFilterView,
             NoiseFilterView,
             CompressionFilterView,
+            RandomFlipFilterView,
+            RandomRotateFilterView,
         )

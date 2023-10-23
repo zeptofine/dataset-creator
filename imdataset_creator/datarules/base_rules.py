@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from string import Formatter
 from types import MappingProxyType
-from typing import Any, ClassVar, Set
+from typing import Any, ClassVar
 
 import numpy as np
 import wcmatch.glob as wglob
@@ -90,7 +90,7 @@ class Producer(Keyworded):
         raise NotImplementedError
 
 
-class ProducerSet(Set[Producer]):
+class ProducerSet(set[Producer]):
     @staticmethod
     def _combine_schema(exprs: ProducerSchema) -> ExprDict:
         return {col: expr for expression in exprs for col, expr in expression.items()}
@@ -139,7 +139,7 @@ class Filter(Keyworded):
         Filter.all_filters[cls.cfg_kwd()] = cls
 
     @abstractmethod
-    def run(self, img: np.ndarray):
+    def run(self, img: np.ndarray) -> np.ndarray:
         raise NotImplementedError
 
 
@@ -148,6 +148,17 @@ flags: int = wglob.BRACE | wglob.SPLIT | wglob.EXTMATCH | wglob.IGNORECASE | wgl
 
 @dataclass(repr=False)
 class Input(Keyworded):
+    """
+    A dataclass representing the input configuration.
+
+    Attributes
+    ----------
+    folder : Path
+        The path to the input folder.
+    expressions : list[str]
+        A list of glob patterns to match files in the input folder.
+    """
+
     folder: Path
     expressions: list[str]
 
@@ -156,6 +167,14 @@ class Input(Keyworded):
         return cls(Path(cfg["folder"]), cfg["expressions"])
 
     def run(self):
+        """
+        Yield the paths of all files in the input folder that match the glob patterns.
+
+        Returns
+        -------
+        Iterator[Path]
+            An iterator over all paths of files in the input folder that match the glob patterns.
+        """
         for file in wglob.iglob(self.expressions, flags=flags, root_dir=self.folder):  # type: ignore
             yield self.folder / file
 
@@ -184,6 +203,26 @@ PLACEHOLDER_FORMAT_KWARGS = PLACEHOLDER_FORMAT_FILE.to_dict()
 
 @dataclass(repr=False)
 class Output(Keyworded):
+    """
+    A dataclass representing the output configuration.
+
+    Attributes
+    ----------
+    folder : Path
+        The path to the output folder.
+    filters : list[Filter]
+        A list of `Filter` objects to be applied to the output.
+    output_format : str
+        The format of the output files.
+    overwrite : bool
+        Whether to overwrite existing files.
+
+    Raises
+    ------
+    InvalidFormatException
+        If the `output_format` is invalid.
+    """
+
     folder: Path
     filters: list[Filter]
     output_format: str
@@ -204,6 +243,19 @@ class Output(Keyworded):
         self.filters = filters
 
     def format_file(self, file: File):
+        """
+        Format a `File` object according to the `output_format`.
+
+        Parameters
+        ----------
+        file : File
+            The `File` object to be formatted.
+
+        Returns
+        -------
+        str
+            The formatted string.
+        """
         return output_formatter.format(self.output_format, **file.to_dict())
 
     @classmethod
@@ -217,9 +269,20 @@ class Output(Keyworded):
 
 
 def combine_expr_conds(exprs: list[Expr]) -> Expr:
-    assert exprs
+    """
+    Combine a list of `Expr` objects using the `&` operator.
 
-    comp = exprs[0]
+    Parameters
+    ----------
+    exprs : list[Expr]
+        A list of `Expr` objects to be combined.
+
+    Returns
+    -------
+    Expr
+        A single `Expr` object representing the combined expression.
+    """
+    comp: Expr = exprs[0]
     for e in exprs[1:]:
         comp &= e
     return comp
