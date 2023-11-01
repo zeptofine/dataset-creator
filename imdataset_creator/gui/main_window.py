@@ -71,8 +71,6 @@ class MainWidget(QWidget):
         # self.set_builder_button.clicked.connect(self.set_builder)
 
         self.input_list = InputList(self)
-        self.input_list.gathered.connect(self.collect_files)
-        self.file_dict: dict[str, list[File]] = {}
         # self.run_all_inputs_button = QPushButton("Gather all inputs", self)
         # self.run_all_inputs_button.clicked.connect(self.input_list.gather_all)
 
@@ -139,10 +137,10 @@ class MainWidget(QWidget):
 
     def get_config(self) -> MainConfig:
         return {
-            "inputs": self.input_list.get_config(),
-            "output": self.output_list.get_config(),
-            "producers": self.producer_list.get_config(),
-            "rules": self.rule_list.get_config(),
+            "inputs": self.input_list.get_cfg(),
+            "output": self.output_list.get_cfg(),
+            "producers": self.producer_list.get_cfg(),
+            "rules": self.rule_list.get_cfg(),
         }
 
     @catch_errors("Error saving")
@@ -243,11 +241,6 @@ class MainWidget(QWidget):
         if self.locks == 0:
             log.info("unlocked")
         ...
-
-    @Slot(dict)
-    def collect_files(self, dct):
-        for pth, files in dct.items():
-            self.file_dict[pth] = files
 
     @catch_building
     @Slot()

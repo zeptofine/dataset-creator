@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
-from enum import Enum
+from enum import Enum, StrEnum
 from functools import cache
 from types import MappingProxyType
 from typing import Literal, Self
@@ -129,7 +129,7 @@ _HASHERS: dict[str, Callable] = {
 }
 
 
-class HASHERS(str, Enum):
+class HASHERS(StrEnum):
     """
     Available hashers.
     """

@@ -277,7 +277,8 @@ class DatasetBuilder:
     def filter(self, lst) -> DataFrame:  # noqa: A003
         if len(self.unready_rules):
             warnings.warn(
-                f"{len(self.unready_rules)} filters are not initialized and will not be populated", stacklevel=2
+                f"{len(self.unready_rules)} filters are not initialized and will not be populated",
+                stacklevel=2,
             )
 
         vdf: DataFrame = self.__df.filter(pl.col("path").is_in(lst))
@@ -331,6 +332,10 @@ class DatasetBuilder:
         ...
 
     @overload
+    def comply_to_schema(self, schema: SchemaDefinition, in_place=False) -> DataFrame:
+        ...
+
+    @overload
     def comply_to_schema(self, schema: SchemaDefinition, in_place=True) -> None:
         ...
 
@@ -338,4 +343,5 @@ class DatasetBuilder:
         new_df: DataFrame = pl.concat((self.__df, DataFrame(schema=schema)), how="diagonal")
         if in_place:
             self.__df = new_df
+            return None
         return new_df

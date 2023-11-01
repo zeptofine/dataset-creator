@@ -6,7 +6,7 @@ from typing import Sequence
 import cv2
 import numpy as np
 
-from ..configs.configtypes import FilterData
+from ..configs.configtypes import FilterData, SpecialItemData
 from ..datarules import Filter
 from ..enum_helpers import listostr2listoenum
 
@@ -29,6 +29,13 @@ class ResizeMode(Enum):
     VALUE = 0
     MAX_RESOLUTION = 1
     MIN_RESOLUTION = 2
+
+
+class ResizeData(SpecialItemData):
+    mode: str
+    algorithms: list[str]
+    down_up_range: list[float]
+    scale: float
 
 
 @dataclass(frozen=True)
@@ -149,5 +156,7 @@ class RandomRotate(Filter):
     def from_cfg(cls, cfg: RandomRotateData):
         return cls(
             rotate_chance=cfg["rotate_chance"],
-            rotate_directions=[RandomRotateDirections[d] for d in cfg["rotate_directions"]],
+            rotate_directions=[
+                RandomRotateDirections[d] for d in cfg["rotate_directions"]
+            ],
         )

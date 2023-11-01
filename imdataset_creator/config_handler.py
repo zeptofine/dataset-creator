@@ -13,23 +13,34 @@ from .scenarios import FileScenario, OutputScenario
 class ConfigHandler:
     def __init__(self, cfg: MainConfig):
         # generate `Input`s
-        self.inputs: list[Input] = [Input.from_cfg(folder["data"]) for folder in cfg["inputs"]]
+        self.inputs: list[Input] = [
+            Input.from_cfg(folder["data"]) for folder in cfg["inputs"]
+        ]
         # generate `Output`s
-        self.outputs: list[Output] = [Output.from_cfg(folder["data"]) for folder in cfg["output"]]
+        self.outputs: list[Output] = [
+            Output.from_cfg(folder["data"]) for folder in cfg["output"]
+        ]
         # generate `Producer`s
         self.producers: list[Producer] = [
-            Producer.all_producers[p["name"]].from_cfg(p["data"]) for p in cfg["producers"]
+            Producer.all_producers[p["name"]].from_cfg(p["data"])
+            for p in cfg["producers"]
         ]
 
         # generate `Rule`s
-        self.rules: list[Rule] = [Rule.all_rules[r["name"]].from_cfg(r["data"]) for r in cfg["rules"]]
+        self.rules: list[Rule] = [
+            Rule.all_rules[r["name"]].from_cfg(r["data"]) for r in cfg["rules"]
+        ]
 
     @overload
-    def gather_images(self, sort=True, reverse=False) -> Generator[tuple[Path, list[Path]], None, None]:
+    def gather_images(
+        self, sort=True, reverse=False
+    ) -> Generator[tuple[Path, list[Path]], None, None]:
         ...
 
     @overload
-    def gather_images(self, sort=False, reverse=False) -> Generator[tuple[Path, PathGenerator], None, None]:
+    def gather_images(
+        self, sort=False, reverse=False
+    ) -> Generator[tuple[Path, PathGenerator], None, None]:
         ...
 
     def gather_images(
@@ -38,7 +49,12 @@ class ConfigHandler:
         for input_ in self.inputs:
             gen = input_.run()
             if sort:
-                yield input_.folder, list(map(Path, sorted(map(str, gen), key=alphanumeric_sort, reverse=reverse)))
+                yield input_.folder, list(
+                    map(
+                        Path,
+                        sorted(map(str, gen), key=alphanumeric_sort, reverse=reverse),
+                    )
+                )
             else:
                 yield input_.folder, gen
 
@@ -46,7 +62,8 @@ class ConfigHandler:
         return [
             OutputScenario(str(pth), output.filters)
             for output in self.outputs
-            if not (pth := output.folder / Path(output.format_file(file))).exists() or output.overwrite
+            if not (pth := output.folder / Path(output.format_file(file))).exists()
+            or output.overwrite
         ]
 
     def parse_files(self, files: Iterable[File]) -> Generator[FileScenario, None, None]:

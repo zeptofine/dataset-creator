@@ -1,93 +1,44 @@
 from __future__ import annotations
 
-from PySide6.QtWidgets import QComboBox, QLabel
-
 from ..datarules import base_rules, data_rules, image_rules
-from .frames import BuilderDependencyList, FlowItem, FlowList
+from .config_inputs import (
+    ItemDeclaration,
+    ItemSettings,
+    ProceduralConfigList,
+)
+from .settings_inputs import DropdownInput
+
+# class ProducerView(FlowItem):
+#     title = "Producer"
+#     movable = False
+
+#     bound_item: type[base_rules.Producer]
+
+#     def setup_widget(self):
+#         super().setup_widget()
+#         if self.desc:
+#             self.desc += "\n"
+#         self.desc += f"Produces: {set(self.bound_item.produces)}"
+#         self.description_widget.setText(self.desc)
 
 
-class ProducerView(FlowItem):
-    title = "Producer"
-    movable = False
-
-    bound_item: type[base_rules.Producer]
-
-    def setup_widget(self):
-        super().setup_widget()
-        if self.desc:
-            self.desc += "\n"
-        self.desc += f"Produces: {set(self.bound_item.produces)}"
-        self.description_widget.setText(self.desc)
+FileInfoProducerView = ItemDeclaration("File Info Producer", data_rules.FileInfoProducer)
+ImShapeProducerView = ItemDeclaration("Image shape", image_rules.ImShapeProducer)
+HashProducerView = ItemDeclaration(
+    "Hash Producer",
+    image_rules.HashProducer,
+    desc="gets a hash for the contents of an image",
+    settings=ItemSettings(
+        {"hash_type": DropdownInput(list(image_rules.HASHERS.__members__.values())).label("Hash type:")}
+    ),
+)
 
 
-class FileInfoProducerView(ProducerView):
-    title = "File Info Producer"
-
-    bound_item = data_rules.FileInfoProducer
-
-    def get(self):
-        super().get()
-        return self.bound_item()
-
-
-class ImShapeProducerView(ProducerView):
-    title = "Image shape"
-    bound_item = image_rules.ImShapeProducer
-
-    def get(self):
-        super().get()
-        return self.bound_item()
-
-
-class HashProducerView(ProducerView):
-    title = "Hash Producer"
-    desc = "gets a hash for the contents of an image"
-    bound_item: type[image_rules.HashProducer] = image_rules.HashProducer
-    needs_settings = True
-
-    def configure_settings_group(self):
-        self.hash_type = QComboBox()
-        self.hash_type.addItems([*image_rules.HASHERS])
-        self.group_grid.addWidget(QLabel("Hash type: ", self), 0, 0)
-        self.group_grid.addWidget(self.hash_type, 0, 1)
-
-    def reset_settings_group(self):
-        self.hash_type.setCurrentIndex(0)
-
-    def get_config(self):
-        return {"hash_type": self.hash_type.currentText()}
-
-    @classmethod
-    def from_config(cls, cfg, parent=None):
-        self = cls(parent)
-        self.hash_type.setCurrentText(cfg["hash_type"])
-        return self
-
-    def get(self):
-        super().get()
-        return self.bound_item(image_rules.HASHERS(self.hash_type.currentText()))
-
-
-class ProducerList(BuilderDependencyList):
-    items: list[ProducerView]
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.__registered_by: dict[str, type[ProducerView]] = {}
-        self.set_text("Producers")
-        self.register_item(
-            FileInfoProducerView,
-            ImShapeProducerView,
-            HashProducerView,
-        )
-
-    def add_item_to_menu(self, item: type[ProducerView]):
-        self.add_menu.addAction(f"{item.title}: {set(item.bound_item.produces)}", lambda: self.initialize_item(item))
-
-    def _register_item(self, item: type[ProducerView]):
-        super()._register_item(item)
-        for produces in item.bound_item.produces:
-            self.__registered_by[produces] = item
-
-    def registered_by(self, s: str):
-        return self.__registered_by.get(s)
+def ProducerList(parent=None) -> ProceduralConfigList:
+    return ProceduralConfigList(
+        FileInfoProducerView,
+        ImShapeProducerView,
+        HashProducerView,
+        parent=parent,
+        unique=True,
+    ).label("Producers")

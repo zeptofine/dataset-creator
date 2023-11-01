@@ -1,71 +1,189 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from string import Formatter
-from typing import Any
+from PySide6.QtCore import Qt
 
-from PySide6.QtWidgets import QCheckBox, QFileDialog, QLabel, QLineEdit
-
-from ..configs import OutputData
 from ..datarules import Output
-from .frames import FlowList
-from .input_view import InputView
-from .output_filters import FilterList
+from ..image_filters import destroyers, resizer
+from .config_inputs import ItemDeclaration, ProceduralConfigList, ProceduralFlowListInput
+from .settings_inputs import (
+    BoolInput,
+    DirectoryInput,
+    DoubleInput,
+    DropdownInput,
+    EnumChecklistInput,
+    ItemSettings,
+    NumberInput,
+    RangeInput,
+    TextInput,
+)
+
+# class FilterView(FlowItem):
+#     title = "Filter"
+#     needs_settings = True
+
+#     bound_item: type[Filter]
+
+#     def __init__(self, parent=None):
+#         super().__init__(parent)
+#         self.setMinimumSize(QSize(self.size().width(), 200))
+
+#     def get(self):
+#         super().get()
 
 
-class OutputView(InputView):
-    bound_item = Output
+TOOLTIPS = {
+    "blur_range": "Range of values for blur kernel size or standard deviation (e.g., 1,10)",
+    "blur_scale": "Adjusts the scaling of the blur range. For average and gaussian, this will add 1 when the new value is even",
+    "noise_range": "Range of values for noise intensity (e.g., 0,50)",
+    "scale_factor": "Adjusts the scaling of the noise range",
+}
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.setMouseTracking(True)
-        self.setMinimumHeight(400)
-        self.previous_position = None
 
-    def configure_settings_group(self):
-        self.format_str = QLineEdit(self)
+def mult_100(val):
+    return val * 100
 
-        self.overwrite = QCheckBox(self)
-        self.overwrite.setText("overwrite existing files")
 
-        self.list = FilterList(self)
+def div_100(val):
+    return val / 100
 
-        self.list.register_item()
-        self.group_grid.addWidget(self.overwrite, 1, 0, 1, 3)
-        self.group_grid.addWidget(QLabel("format text: ", self), 2, 0, 1, 3)
-        self.group_grid.addWidget(self.format_str, 3, 0, 1, 3)
-        self.group_grid.addWidget(self.list, 4, 0, 1, 3)
 
-    def reset_settings_group(self):
-        self.format_str.setText("{relative_path}/{file}.{ext}")
-        self.overwrite.setChecked(False)
-        self.list.items.clear()
-
-    def get(self) -> Output:
-        return Output.from_cfg(self.get_config())
-
-    def get_config(self) -> OutputData:
-        return {
-            "folder": self.text.text(),
-            "output_format": self.format_str.text() or self.format_str.placeholderText(),
-            "lst": self.list.get_config(),
-            "overwrite": self.overwrite.isChecked(),
+ResizeFilterView_ = ItemDeclaration(
+    "Resize",
+    resizer.Resize,
+    settings=ItemSettings(
+        {
+            "mode": (
+                DropdownInput(list(resizer.ResizeMode.__members__.values())).label("Resize mode: ")  # type: ignore
+            ),
+            "scale": (
+                DoubleInput((1, 100_000), default=100)
+                .label("Scale: ")
+                .from_config_modification(mult_100)
+                .to_config_modification(div_100)
+            ),
         }
+    ),
+)
 
-    @classmethod
-    def from_config(cls, cfg: OutputData, parent=None):
-        self = cls(parent)
-        self.text.setText(cfg["folder"])
-        self.format_str.setText(cfg["output_format"])
-        self.list.add_from_cfg(cfg["lst"])
-        self.overwrite.setChecked(cfg["overwrite"])
-        return self
+CropFilterView_ = ItemDeclaration(
+    "Crop",
+    resizer.Crop,
+    desc="Crop the image to the specified size. If the item is 0, it will not be considered",
+    settings=ItemSettings(
+        {
+            "left": NumberInput((0, 9_999_999)).label("Left:").set_optional(),
+            "top": NumberInput((0, 9_999_999)).label("Top:").set_optional(),
+            "width": NumberInput((0, 9_999_999)).label("Width:").set_optional(),
+            "height": NumberInput((0, 9_999_999)).label("Height").set_optional(),
+        }
+    ),
+)
 
 
-class OutputList(FlowList):
-    items: list[OutputView]
+BlurFilterView_ = ItemDeclaration(
+    "Blur",
+    destroyers.Blur,
+    settings=ItemSettings(
+        {
+            "algorithms": EnumChecklistInput(destroyers.BlurAlgorithm),
+            "scale": DoubleInput((0, 100), default=0.25, step=0.1).label("Scale:").tooltip(TOOLTIPS["blur_scale"]),
+            "blur_range": (RangeInput(min_and_max_correlate=True).label("Blur Range:").tooltip(TOOLTIPS["blur_range"])),
+        },
+    ),
+)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.set_text("Outputs")
-        self.register_item(OutputView)
+NoiseFilterView_ = ItemDeclaration(
+    "Noise",
+    destroyers.Noise,
+    settings=ItemSettings(
+        {
+            "algorithms": EnumChecklistInput(destroyers.NoiseAlgorithm),
+            "intensity_range": RangeInput().label("Intensity Range:").tooltip(TOOLTIPS["noise_range"]),
+            "scale": (
+                NumberInput((1, 1_000), default=25)
+                .label("Scale:")
+                .from_config_modification(mult_100)
+                .to_config_modification(div_100)
+            ),
+        },
+    ),
+)
+
+
+CompressionFilterView_ = ItemDeclaration(
+    "Compression",
+    destroyers.Compression,
+    settings=ItemSettings(
+        {
+            "algorithms": EnumChecklistInput(destroyers.CompressionAlgorithms),
+            "jpeg_quality_range": RangeInput(default=(0, 100)).label("JPEG quality:"),
+            "webp_quality_range": RangeInput(default=(1, 100)).label("WebP quality:"),
+            "h264_crf_range": RangeInput(default=(20, 28)).label("H.264 CRF"),
+            "hevc_crf_range": RangeInput(default=(25, 33)).label("HEVC CRF"),
+            "mpeg_bitrate": NumberInput((0, 1_000_000_000)).label("MPEG bitrate:"),
+            "mpeg2_bitrate": NumberInput((0, 1_000_000_000)).label("MPEG2 bitrate:"),
+        },
+    ),
+)
+
+RandomFlipFilterView_ = ItemDeclaration(
+    "Random Flip",
+    bound_item=resizer.RandomFlip,
+    settings=ItemSettings(
+        {
+            "flip_x_chance": (
+                DoubleInput((0, 100), default=50, slider=Qt.Orientation.Horizontal)
+                .label("horizontal flip chance:")
+                .from_config_modification(mult_100)
+                .to_config_modification(div_100)
+            ),
+            "flip_y_chance": (
+                DoubleInput((0, 100), default=50, slider=Qt.Orientation.Horizontal)
+                .label("vertical flip chance:")
+                .from_config_modification(mult_100)
+                .to_config_modification(div_100)
+            ),
+        },
+    ),
+)
+
+RandomRotateFilterView_ = ItemDeclaration(
+    "Random Rotate",
+    bound_item=resizer.RandomRotate,
+    settings=ItemSettings(
+        {
+            "rotate_direction": (EnumChecklistInput(resizer.RandomRotateDirections)),
+            "rotate_chance": (
+                DoubleInput((0, 100), default=50, slider=Qt.Orientation.Horizontal)
+                .from_config_modification(mult_100)
+                .to_config_modification(div_100)
+                .label("Rotation chance:")
+            ),
+        },
+    ),
+)
+
+OutputView_ = ItemDeclaration(
+    "Output",
+    Output,
+    settings=ItemSettings(
+        {
+            "folder": DirectoryInput().label("Folder: "),
+            "output_format": TextInput(default="{relative_path}/{file}.{ext}"),
+            "overwrite": BoolInput(default=False).label("overwrite existing files"),
+            "lst": ProceduralFlowListInput(
+                ResizeFilterView_,
+                CropFilterView_,
+                BlurFilterView_,
+                NoiseFilterView_,
+                CompressionFilterView_,
+                RandomFlipFilterView_,
+                RandomRotateFilterView_,
+            ),
+        }
+    ),
+)
+
+
+def OutputList(parent=None):
+    return ProceduralConfigList(OutputView_, parent=parent)

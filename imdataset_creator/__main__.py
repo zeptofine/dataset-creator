@@ -25,19 +25,31 @@ from . import (
 )
 
 CPU_COUNT = int(cpu_count())
-logging.basicConfig(level=logging.INFO, format="%(message)s", datefmt="[%X]", handlers=[RichHandler()])
+logging.basicConfig(
+    level=logging.INFO, format="%(message)s", datefmt="[%X]", handlers=[RichHandler()]
+)
 app = typer.Typer(pretty_exceptions_show_locals=True, pretty_exceptions_short=True)
 log = logging.getLogger()
 
 
 @app.command()
 def main(
-    config_path: Annotated[Path, Option(help="Where the dataset config is placed")] = Path("config.json"),
-    database_path: Annotated[Path, Option(help="Where the database is placed")] = Path("filedb.arrow"),
-    threads: Annotated[int, Option(help="multiprocessing threads")] = CPU_COUNT * 3 // 4,
+    config_path: Annotated[
+        Path, Option(help="Where the dataset config is placed")
+    ] = Path("config.json"),
+    database_path: Annotated[Path, Option(help="Where the database is placed")] = Path(
+        "filedb.arrow"
+    ),
+    threads: Annotated[int, Option(help="multiprocessing threads")] = CPU_COUNT
+    * 3
+    // 4,
     chunksize: Annotated[int, Option(help="imap chunksize")] = 5,
-    population_chunksize: Annotated[int, Option(help="chunksize when populating the df")] = 100,
-    population_interval: Annotated[int, Option(help="save interval in secs when populating the df")] = 60,
+    population_chunksize: Annotated[
+        int, Option(help="chunksize when populating the df")
+    ] = 100,
+    population_interval: Annotated[
+        int, Option(help="save interval in secs when populating the df")
+    ] = 60,
     simulate: Annotated[bool, Option(help="stops before conversion")] = False,
     verbose: Annotated[bool, Option(help="prints converted files")] = False,
     sort_by: Annotated[str, Option(help="Which database column to sort by")] = "path",
@@ -147,12 +159,16 @@ def main(
         files: list[File]
         if db_cfg.rules:
             filter_t = p.add_task("filtering", total=0)
-            files = [resolved[file] for file in db.filter(set(resolved)).get_column("path")]
+            files = [
+                resolved[file] for file in db.filter(set(resolved)).get_column("path")
+            ]
             p.update(filter_t, total=len(files), completed=len(files))
         else:
             files = list(resolved.values())
 
-        scenarios = list(db_cfg.parse_files(p.track(files, description="parsing files")))
+        scenarios = list(
+            db_cfg.parse_files(p.track(files, description="parsing files"))
+        )
         if len(scenarios) != len(files):
             p.log(f"{len(files) - len(scenarios)} files are completed")
 
