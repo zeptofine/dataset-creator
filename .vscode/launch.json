@@ -5,7 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Module",
+            "name": "Main module",
+            "type": "python",
+            "request": "launch",
+            "module": "imdataset_creator",
+            "justMyCode": true
+        },
+        {
+            "name": "GUI module",
             "type": "python",
             "request": "launch",
             "module": "imdataset_creator.gui",
