@@ -58,16 +58,11 @@ class Blur(Filter):
             ksize = ksize + (ksize % 2 == 0)  # ensure ksize is odd
             return cv2.GaussianBlur(img, (ksize, ksize), 0)
 
-        if (
-            algorithm == BlurAlgorithm.ISOTROPIC
-            or algorithm == BlurAlgorithm.ANISOTROPIC
-        ):
+        if algorithm == BlurAlgorithm.ISOTROPIC or algorithm == BlurAlgorithm.ANISOTROPIC:
             sigma1: float = ri * self.scale
             ksize1: int = 2 * int(4 * sigma1 + 0.5) + 1
             if algorithm == BlurAlgorithm.ANISOTROPIC:
-                return cv2.GaussianBlur(
-                    img, (ksize1, ksize1), sigmaX=sigma1, sigmaY=sigma1
-                )
+                return cv2.GaussianBlur(img, (ksize1, ksize1), sigmaX=sigma1, sigmaY=sigma1)
 
             sigma2: float = ri * self.scale
             ksize2: int = 2 * int(4 * sigma2 + 0.5) + 1
@@ -179,16 +174,12 @@ class Compression(Filter):
         enc_img: ndarray
         if algorithm == CompressionAlgorithms.JPEG:
             quality = randint(*self.jpeg_quality_range)
-            enc_img = cv2.imencode(
-                ".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), quality]
-            )[1]
+            enc_img = cv2.imencode(".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), quality])[1]
             return cv2.imdecode(enc_img, 1)
 
         if algorithm == CompressionAlgorithms.WEBP:
             quality = randint(*self.webp_quality_range)
-            enc_img = cv2.imencode(
-                ".webp", img, [int(cv2.IMWRITE_WEBP_QUALITY), quality]
-            )[1]
+            enc_img = cv2.imencode(".webp", img, [int(cv2.IMWRITE_WEBP_QUALITY), quality])[1]
             return cv2.imdecode(enc_img, 1)
 
         if algorithm in [
@@ -218,9 +209,7 @@ class Compression(Filter):
                 codec = "mpeg2video"
 
             compressor = (
-                ffmpeg.input(
-                    "pipe:", format="rawvideo", pix_fmt="bgr24", s=f"{width}x{height}"
-                )
+                ffmpeg.input("pipe:", format="rawvideo", pix_fmt="bgr24", s=f"{width}x{height}")
                 .output("pipe:", format=container, vcodec=codec, **output_args)
                 .global_args("-loglevel", "error")
                 .global_args("-max_muxing_queue_size", "300000")
@@ -241,9 +230,7 @@ class Compression(Filter):
                 newimg = np.frombuffer(out, np.uint8)
                 if len(newimg) != height * width * 3:
                     log.warning("New image size does not match")
-                    newimg = newimg[
-                        : height * width * 3
-                    ]  # idrk why i need this sometimes
+                    newimg = newimg[: height * width * 3]  # idrk why i need this sometimes
 
                 return newimg.reshape((height, width, 3))
             except subprocess.TimeoutExpired as e:

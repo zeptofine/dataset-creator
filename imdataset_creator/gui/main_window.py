@@ -232,7 +232,6 @@ class MainWidget(QWidget):
         self.locks += 1
         if self.locks == 1:
             log.info("locked")
-        ...
 
     @Slot()
     def remove_lock(self):
@@ -240,7 +239,6 @@ class MainWidget(QWidget):
         self.locks -= 1
         if self.locks == 0:
             log.info("unlocked")
-        ...
 
     @catch_building
     @Slot()

@@ -4,7 +4,7 @@ import contextlib
 import functools
 from copy import deepcopy as objcopy
 
-from PySide6.QtCore import QRect, QSize, Qt, Signal, Slot
+from PySide6.QtCore import QMimeData, QRect, QSize, Qt, Signal, Slot
 from PySide6.QtGui import QAction, QDrag, QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QMouseEvent
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -140,6 +140,17 @@ class ProceduralConfigItem(QFrame):
     def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
         self.toggle_group()
         event.accept()
+
+    # def mousePressEvent(self, event: QMouseEvent):
+    #     print(event)
+    #     if event.button() == Qt.MouseButton.LeftButton:
+    #         drag = QDrag(self)
+    #         mimedata = QMimeData()
+    #         mimedata.setText(self.checkbox.text())
+    #         drag.setMimeData(mimedata)
+    #         drop_action = drag.exec()
+
+    #     event.accept()
 
     @property
     def n(self) -> int:

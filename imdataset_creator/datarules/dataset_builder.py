@@ -282,7 +282,9 @@ class DatasetBuilder:
             )
 
         vdf: DataFrame = self.__df.filter(pl.col("path").is_in(lst))
-        for matcher in combine_matchers([rule.matcher for rule in self.rules]):
+        for matcher in combine_matchers(rule.matcher for rule in self.rules):
+            if not len(vdf):
+                break
             vdf = matcher(vdf, self.__df) if isinstance(matcher, DataFrameMatcher) else vdf.filter(matcher)
         return vdf
 

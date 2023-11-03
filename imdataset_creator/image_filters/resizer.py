@@ -156,7 +156,5 @@ class RandomRotate(Filter):
     def from_cfg(cls, cfg: RandomRotateData):
         return cls(
             rotate_chance=cfg["rotate_chance"],
-            rotate_directions=[
-                RandomRotateDirections[d] for d in cfg["rotate_directions"]
-            ],
+            rotate_directions=[RandomRotateDirections[d] for d in cfg["rotate_directions"]],
         )
