@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import textwrap
 from abc import abstractmethod
 from collections import defaultdict
@@ -14,9 +15,9 @@ import numpy as np
 import wcmatch.glob as wglob
 from polars import DataFrame, DataType, Expr, PolarsDataType
 
-from ..configs import FilterData, Keyworded
+from ..configs import Keyworded
 from ..configs.configtypes import InputData, OutputData
-from ..file import File
+from ..file import File, SafeFormatter
 
 PartialDataFrame = DataFrame
 FullDataFrame = DataFrame
@@ -125,7 +126,7 @@ class Rule(Keyworded):
         return self.__class__.__name__
 
 
-@dataclass(frozen=True, repr=False)
+@dataclass(frozen=True)
 class Filter(Keyworded):
     """EVERY FILTER MUST BE A FROZEN DATACLASS.
     Define your arguments just like how you'd define a dataclass, and run() defines the Filter action.
@@ -147,7 +148,7 @@ flags: int = wglob.BRACE | wglob.SPLIT | wglob.EXTMATCH | wglob.IGNORECASE | wgl
 PathGenerator = Generator[Path, None, None]
 
 
-@dataclass(repr=False)
+@dataclass
 class Input(Keyworded):
     """
     A dataclass representing the input configuration.
@@ -180,20 +181,6 @@ class Input(Keyworded):
             yield self.folder / file
 
 
-class InvalidFormatError(Exception):
-    def __init__(self, disallowed: str):
-        super().__init__(f"invalid format string. '{disallowed}' is not allowed.")
-
-
-class SafeFormatter(Formatter):
-    def get_field(self, field_name: str, args: Sequence[Any], kwargs: Mapping[str, Any]) -> Any:
-        # the goal is to make sure `property`s and indexing is still available, while dunders and things are not
-        if "__" in field_name:
-            raise InvalidFormatError("__")
-
-        return super().get_field(field_name, args, kwargs)
-
-
 output_formatter = SafeFormatter()
 
 
@@ -202,7 +189,7 @@ PLACEHOLDER_FORMAT_FILE = File.from_src(Path("/folder"), Path("/folder/subfolder
 PLACEHOLDER_FORMAT_KWARGS = PLACEHOLDER_FORMAT_FILE.to_dict()
 
 
-@dataclass(repr=False)
+@dataclass
 class Output(Keyworded):
     """
     A dataclass representing the output configuration.
@@ -257,7 +244,26 @@ class Output(Keyworded):
         str
             The formatted string.
         """
-        return output_formatter.format(self.output_format, **file.to_dict())
+        return self.folder / output_formatter.format(self.output_format, **file.to_dict())
+
+    def check_validity(self, file: File):
+        """
+        Formats the file, and if it's valid, returns it. If not, returns None.
+
+        Parameters
+        ----------
+        file : File
+            The file to format
+
+        Returns
+        -------
+        Path | None
+            if it should be used, the Path is returned. otherwise None
+        """
+        p = self.format_file(file)
+        if not p.exists() or self.overwrite:
+            return p
+        return None
 
     @classmethod
     def from_cfg(cls, cfg: OutputData):

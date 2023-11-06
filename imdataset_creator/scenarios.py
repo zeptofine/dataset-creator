@@ -5,20 +5,19 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from .configs.keyworded import fancy_repr
 from .datarules import Filter
 from .file import File
 
 # IDK Wtf to call these things other than scenarios
 
 
-@fancy_repr
 @dataclass
 class OutputScenario:
     path: str
     filters: list[Filter]
 
     def run(self, img: np.ndarray, stat: os.stat_result):
+        print(self.path)
         for f in self.filters:
             img = f.run(img=img)
 
@@ -27,7 +26,6 @@ class OutputScenario:
         os.utime(self.path, (stat.st_atime, stat.st_mtime))
 
 
-@fancy_repr
 @dataclass
 class FileScenario:
     file: File

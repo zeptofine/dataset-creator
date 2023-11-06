@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..configs.configtypes import ItemConfig, ItemData
-from ..configs.keyworded import Keyworded, fancy_repr
+from ..configs.keyworded import Keyworded
 from .frames import apply_tooltip
 from .settings_inputs import BaseInput, ItemSettings, SettingsBox, SettingsItem
 
@@ -445,7 +445,6 @@ class ProceduralFlowListInput(BaseInput):
         return ProceduralFlowListSettings(*self.items, parent=self.parent)
 
 
-@fancy_repr
 class ItemDeclaration:
     def __init__(
         self,

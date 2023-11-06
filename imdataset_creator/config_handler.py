@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import overload
 
 from .alphanumeric_sort import alphanumeric_sort
-from .configs import MainConfig, _repr_indent
+from .configs import MainConfig
 from .datarules import Input, Output, Producer, Rule
 from .datarules.base_rules import PathGenerator
 from .file import File
@@ -49,16 +49,19 @@ class ConfigHandler:
 
     def get_outputs(self, file: File) -> list[OutputScenario]:
         return [
-            OutputScenario(str(pth), output.filters)
+            OutputScenario(
+                str(pth),
+                output.filters,
+            )
             for output in self.outputs
-            if not (pth := output.folder / Path(output.format_file(file))).exists() or output.overwrite
+            if (pth := output.check_validity(file))
         ]
 
     def parse_files(self, files: Iterable[File]) -> Generator[FileScenario, None, None]:
-        for file in files:
-            if out_s := self.get_outputs(file):
-                yield FileScenario(file, out_s)
+        return (FileScenario(file, out_s) for file in files if (out_s := self.get_outputs(file)))
 
-    def __repr__(self):
-        attrs = ",".join(str(x) for x in (self.inputs, self.outputs, self.producers, self.rules))
-        return "\n".join([f"{self.__class__.__name__}(", attrs, ")"])
+    def __repr__(self) -> str:
+        attrlist: list[str] = [
+            f"{key}={val!r}" for key, val in vars(self).items() if all(k not in key for k in ("__",))
+        ]
+        return f"{self.__class__.__name__}({', '.join(attrlist)})"

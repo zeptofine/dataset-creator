@@ -1,29 +1,11 @@
 import inspect
 import sys
-import textwrap
-from dataclasses import dataclass
 from enum import Enum, EnumType
 from typing import Self
 
 from .configtypes import ItemData, SpecialItemData
 
 
-def _repr_indent(t: str) -> str:
-    return textwrap.indent(t, "    ")
-
-
-def _fancy_repr(self) -> str:
-    attrs = ",\n".join([f"{key}={val!r}" for key, val in vars(self).items()])
-    a = f"\n{_repr_indent(attrs)}\n" if attrs else ""
-    return f"{self.__class__.__name__}({a})"
-
-
-def fancy_repr(cls):
-    cls.__repr__ = _fancy_repr
-    return cls
-
-
-@fancy_repr
 class Keyworded:
     @classmethod
     def cfg_kwd(cls):
@@ -55,3 +37,9 @@ class Keyworded:
         if hasattr(obj, "__metadata__"):
             return str(obj.__metadata__[0])
         return ""
+
+    def __repr__(self) -> str:
+        attrlist: list[str] = [
+            f"{key}={val!r}" for key, val in vars(self).items() if all(k not in key for k in ("__",))
+        ]
+        return f"{self.__class__.__name__}({', '.join(attrlist)})"

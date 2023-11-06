@@ -3,7 +3,6 @@ import logging
 from datetime import datetime
 from multiprocessing import Pool, cpu_count, freeze_support
 from pathlib import Path
-from pprint import pformat
 from typing import Annotated
 
 import typer
@@ -74,7 +73,7 @@ def main(
         chunk_t: TaskID
 
         if verbose:
-            p.log(pformat(db_cfg))
+            p.log(db_cfg)
         # Gather images
         resolved: dict[str, File] = {}
         count_t = p.add_task("Gathering", total=None)
@@ -162,7 +161,7 @@ def main(
             p.log("Finished. No images remain")
             return 0
         if simulate:
-            p.log(f"Simulated. {len(scenarios)} images remain")
+            p.log("last 10 scenarios: ", scenarios[-10:], f"Simulated. {len(scenarios)} images remain")
             return 0
 
         try:

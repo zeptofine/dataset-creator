@@ -156,7 +156,7 @@ class CompressionData(FilterData):
     mpeg2_bitrate: int
 
 
-@dataclass(frozen=True, repr=False)
+@dataclass(frozen=True)
 class Compression(Filter):
     algorithms: list[CompressionAlgorithms] | None = None
     jpeg_quality_range: tuple[int, int] = (0, 100)

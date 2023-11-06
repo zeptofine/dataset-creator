@@ -98,7 +98,7 @@ class CropData(FilterData):
     height: int | None
 
 
-@dataclass(frozen=True, repr=False)
+@dataclass(frozen=True)
 class Crop(Filter):
     top: int | None
     left: int | None
@@ -116,7 +116,7 @@ class RandomFlipData(FilterData):
     flip_y_chance: float
 
 
-@dataclass(frozen=True, repr=False)
+@dataclass(frozen=True)
 class RandomFlip(Filter):
     flip_x_chance: float
     flip_y_chance: float
@@ -140,7 +140,7 @@ class RandomRotateData(FilterData):
     rotate_directions: list[str]
 
 
-@dataclass(frozen=True, repr=False)
+@dataclass(frozen=True)
 class RandomRotate(Filter):
     rotate_chance: float
     rotate_directions: list[RandomRotateDirections]

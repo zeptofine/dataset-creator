@@ -32,7 +32,6 @@ from PySide6.QtWidgets import (
 )
 from rich import print as rprint
 
-from ..configs.keyworded import fancy_repr
 from .frames import MiniCheckList, apply_tooltip
 
 
@@ -110,7 +109,6 @@ class SettingsRow(QHBoxLayout):
         self.item.reset()
 
 
-@fancy_repr
 class BaseInput(ABC):
     _label: str | None
     _tooltip: str | None
@@ -627,7 +625,6 @@ class SettingsBox(QFrame):
         return super().mousePressEvent(event)
 
 
-# @fancy_repr
 # class ItemSettings(dict[str | tuple[str, ...], BaseSettingsInput]):
 #     def from_cfg(self, cfg: dict):
 #         for key, setting in self.items():

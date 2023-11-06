@@ -8,4 +8,4 @@ from .configtypes import (
     ProducerData,
     SpecialItemData,
 )
-from .keyworded import Keyworded, _repr_indent
+from .keyworded import Keyworded
