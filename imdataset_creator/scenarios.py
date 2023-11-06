@@ -34,19 +34,8 @@ class FileScenario:
     outputs: list[OutputScenario]
 
     def run(self):
-        try:
-            return self._run()
-        except Exception as e:
-            raise ScenarioFailureError(self) from e
-
-    def _run(self):
         img: np.ndarray = cv2.imread(str(self.file.absolute_pth), cv2.IMREAD_UNCHANGED)
         stat: os.stat_result = os.stat(str(self.file.absolute_pth))
         for output in self.outputs:
             output.run(img, stat)
         return self
-
-
-class ScenarioFailureError(Exception):
-    def __init__(self, s: FileScenario):
-        super().__init__(f"Scenario failed: {s}")

@@ -106,9 +106,8 @@ class Crop(Filter):
     height: int | None
 
     def run(self, img: np.ndarray) -> np.ndarray:
-        newheight = None if self.height is None else (self.top or 0) + self.height
-        newwidth = None if self.width is None else (self.left or 0) + self.width
-
+        newheight = (self.top or 0) + self.height if self.height else None
+        newwidth = (self.left or 0) + self.width if self.width else None
         return img[self.top : newheight, self.left : newwidth]
 
 
