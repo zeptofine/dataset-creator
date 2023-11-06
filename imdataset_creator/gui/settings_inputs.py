@@ -1,9 +1,10 @@
 # from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from PySide6.QtCore import QDate, QDateTime, QRect, QSize, Qt, QTime, Signal, Slot
 from PySide6.QtGui import QAction, QIcon, QMouseEvent

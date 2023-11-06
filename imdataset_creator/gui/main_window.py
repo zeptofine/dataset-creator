@@ -27,10 +27,10 @@ from .. import DatasetBuilder, File
 from ..configs import MainConfig
 from ..datarules import chunk_split
 from .err_dialog import catch_errors
-from .input_view import InputList
-from .output_view import OutputList
-from .producer_views import ProducerList
-from .rule_views import RuleList
+from .input_view import input_list
+from .output_view import output_list
+from .producer_views import producer_list
+from .rule_views import rule_list
 
 log = logging.getLogger()
 
@@ -70,13 +70,13 @@ class MainWidget(QWidget):
         # self.set_builder_button = QPushButton("Create builder", self)
         # self.set_builder_button.clicked.connect(self.set_builder)
 
-        self.input_list = InputList(self)
+        self.input_list = input_list(self)
         # self.run_all_inputs_button = QPushButton("Gather all inputs", self)
         # self.run_all_inputs_button.clicked.connect(self.input_list.gather_all)
 
-        self.producer_list = ProducerList(self)
+        self.producer_list = producer_list(self)
 
-        self.rule_list = RuleList(self)
+        self.rule_list = rule_list(self)
 
         self.producers_rules = QSplitter(self)
         self.producers_rules.addWidget(self.producer_list)
@@ -95,7 +95,7 @@ class MainWidget(QWidget):
         # self.populator_thread.population_chunksize = 100
         # self.run_population_button.clicked.connect(self.run_population)
 
-        self.output_list = OutputList(self)
+        self.output_list = output_list(self)
 
         self.lists = QSplitter(self)
         self.lists.addWidget(self.input_list)
@@ -192,7 +192,7 @@ class MainWidget(QWidget):
             )[0]
         )
         if file:
-            log.info(f"Opening {file}")
+            log.info("Opening", file)
             self.cfg_path = Path(file)
             self.load_config()
 
@@ -250,7 +250,7 @@ class MainWidget(QWidget):
 
         builder.add_producers(*producers)
         builder.add_rules(*rules)
-        log.info(f"built builder: {builder}")
+        log.info("built builder", builder)
         return builder
 
     @property
@@ -299,7 +299,7 @@ class PopulatorThread(QThread):
     def run(self):
         log.info("started")
         if finished := self.db.remove_finished_producers():
-            log.warning(f"Skipping finished producers: {finished}")
+            log.warning("Skipping finished producers", finished)
         collected: list[DataFrame] = []
         save_timer: datetime = datetime.now()
         chunk: DataFrame

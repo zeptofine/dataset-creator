@@ -109,7 +109,7 @@ class ChannelRule(Rule):
     def __init__(self, min_channels=1, max_channels=4) -> None:
         super().__init__()
         self.requires = DataColumn("channels", int)
-        self.matcher = ExprMatcher((min_channels <= col("channels")) & (col("channels") <= max_channels))
+        self.matcher = ExprMatcher(min_channels <= col("channels"), col("channels") <= max_channels)
 
 
 def get_size(pth):

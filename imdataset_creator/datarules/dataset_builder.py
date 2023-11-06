@@ -2,10 +2,11 @@ import inspect
 import os
 import textwrap
 import warnings
-from collections.abc import Collection, Iterable
+from collections.abc import Collection, Generator, Iterable
 from datetime import datetime
+from io import BytesIO
 from pathlib import Path
-from typing import Generator, Literal, TypeVar, overload
+from typing import BinaryIO, Literal, TypeVar, overload
 
 import polars as pl
 from polars import DataFrame, Expr, LazyFrame
@@ -52,9 +53,11 @@ def chunk_split(
     """
     return (
         part.drop(col_name)
-        for _, part in df.with_row_count(col_name)
-        .with_columns(pl.col(col_name) // chunksize)
-        .groupby(col_name, maintain_order=True)
+        for _, part in (
+            df.with_row_count(col_name)
+            .with_columns(pl.col(col_name) // chunksize)
+            .groupby(col_name, maintain_order=True)
+        )
     )
 
 
@@ -133,7 +136,7 @@ class DatasetBuilder:
         for kwd, dct in cfg.items():
             if kwd in self.unready_rules:
                 rule = self.unready_rules.pop(kwd)
-                sig: inspect.Signature = inspect.signature(rule)
+                sig = inspect.signature(rule)
 
                 params = {k: v for k, v in dct.items() if k in sig.parameters and k != "self"}
                 self.add_rule(rule(**params))
@@ -288,9 +291,9 @@ class DatasetBuilder:
             vdf = matcher(vdf, self.__df) if isinstance(matcher, DataFrameMatcher) else vdf.filter(matcher)
         return vdf
 
-    def save_df(self, pth: str | Path | None = None) -> None:
-        """saves the dataframe to self.filepath"""
-        self.__df.write_ipc(pth or self.filepath)
+    def save_df(self, file: BinaryIO | BytesIO | str | Path | None = None) -> None:
+        """saves the dataframe to a file"""
+        self.__df.write_ipc(file if file is not None else self.filepath)
 
     def update(self, df: DataFrame, on="path", how: Literal["left", "inner", "outer"] = "left"):
         self.__df = self.__df.update(df, on=on, how=how)

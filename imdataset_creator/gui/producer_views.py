@@ -34,7 +34,7 @@ HashProducerView = ItemDeclaration(
 )
 
 
-def ProducerList(parent=None) -> ProceduralConfigList:
+def producer_list(parent=None) -> ProceduralConfigList:
     return ProceduralConfigList(
         FileInfoProducerView,
         ImShapeProducerView,

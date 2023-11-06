@@ -121,7 +121,7 @@ HashRuleView_ = ItemDeclaration(
 )
 
 
-def RuleList(parent=None):
+def rule_list(parent=None):
     return ProceduralConfigList(
         StatRuleView_,
         BlacklistWhitelistView_,

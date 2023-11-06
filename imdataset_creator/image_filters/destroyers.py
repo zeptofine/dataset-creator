@@ -235,7 +235,7 @@ class Compression(Filter):
                 return newimg.reshape((height, width, 3))
             except subprocess.TimeoutExpired as e:
                 compressor.send_signal("SIGINT")
-                log.warning(f"{e}")
+                log.warning(e)
 
         return img
 

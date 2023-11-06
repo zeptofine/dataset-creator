@@ -41,7 +41,7 @@ class Keyworded:
                 cfg[key] = val.default.value
             else:
                 cfg[key] = val.default
-            if val.annotation is not inspect._empty:
+            if val.default is not val.empty:
                 annotation = eval(val.annotation, sys.modules[cls.__module__].__dict__)
                 comment = Keyworded._obj_to_comment(annotation)
                 if comment:
@@ -51,7 +51,7 @@ class Keyworded:
     @staticmethod
     def _obj_to_comment(obj) -> str:
         if type(obj) is EnumType:
-            return " | ".join(obj._member_map_.values())  # type: ignore
+            return " | ".join(obj.__members__.values())  # type: ignore
         if hasattr(obj, "__metadata__"):
             return str(obj.__metadata__[0])
         return ""

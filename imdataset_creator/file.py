@@ -1,4 +1,3 @@
-import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -17,10 +16,9 @@ class MalleablePath(str):
                 else:
                     raise ValueError(f"Unknown format specifier: {key}")
             elif fmt == "underscores":
-                newfmt = MalleablePath("_".join(self.split(" ")))
+                newfmt = MalleablePath("_".join(newfmt.split(" ")))
             elif fmt == "underscore_path":
-                newfmt = MalleablePath("_".join(Path(self).parts))
-
+                newfmt = MalleablePath("_".join(Path(newfmt).parts))
         return str(newfmt)
 
 

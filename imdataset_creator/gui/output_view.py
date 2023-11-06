@@ -185,5 +185,5 @@ OutputView_ = ItemDeclaration(
 )
 
 
-def OutputList(parent=None):
+def output_list(parent=None):
     return ProceduralConfigList(OutputView_, parent=parent)

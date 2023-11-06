@@ -34,7 +34,7 @@ InputView_ = ItemDeclaration(
 )
 
 
-def InputList(parent=None):
+def input_list(parent=None):
     return ProceduralConfigList(InputView_, parent=parent).label("Inputs")
 
 

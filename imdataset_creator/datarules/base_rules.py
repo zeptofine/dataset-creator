@@ -3,12 +3,12 @@ from __future__ import annotations
 import textwrap
 from abc import abstractmethod
 from collections import defaultdict
-from collections.abc import Callable, Generator, Mapping, Sequence
+from collections.abc import Callable, Generator, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from string import Formatter
 from types import MappingProxyType
-from typing import Any, ClassVar, Iterable
+from typing import Any, ClassVar
 
 import numpy as np
 import wcmatch.glob as wglob
@@ -180,7 +180,7 @@ class Input(Keyworded):
             yield self.folder / file
 
 
-class InvalidFormatException(Exception):
+class InvalidFormatError(Exception):
     def __init__(self, disallowed: str):
         super().__init__(f"invalid format string. '{disallowed}' is not allowed.")
 
@@ -189,7 +189,7 @@ class SafeFormatter(Formatter):
     def get_field(self, field_name: str, args: Sequence[Any], kwargs: Mapping[str, Any]) -> Any:
         # the goal is to make sure `property`s and indexing is still available, while dunders and things are not
         if "__" in field_name:
-            raise InvalidFormatException("__")
+            raise InvalidFormatError("__")
 
         return super().get_field(field_name, args, kwargs)
 

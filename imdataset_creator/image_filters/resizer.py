@@ -1,7 +1,7 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum
 from random import choice
-from typing import Sequence
 
 import cv2
 import numpy as np

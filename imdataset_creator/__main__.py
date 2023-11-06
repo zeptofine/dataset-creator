@@ -4,16 +4,16 @@ from datetime import datetime
 from multiprocessing import Pool, cpu_count, freeze_support
 from pathlib import Path
 from pprint import pformat
+from typing import Annotated
 
-import rich.progress as progress
 import typer
 from polars import DataFrame, concat
 from rich import print as rprint
+from rich import progress
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.progress import Progress, TaskID
 from typer import Option
-from typing_extensions import Annotated
 
 from . import (
     ConfigHandler,
@@ -32,9 +32,7 @@ log = logging.getLogger()
 
 @app.command()
 def main(
-    config_path: Annotated[Path, Option(help="Where the dataset config is placed")] = Path(
-        "config.json"
-    ),
+    config_path: Annotated[Path, Option(help="Where the dataset config is placed")] = Path("config.json"),
     database_path: Annotated[Path, Option(help="Where the database is placed")] = Path("filedb.arrow"),
     threads: Annotated[int, Option(help="multiprocessing threads")] = CPU_COUNT * 3 // 4,
     chunksize: Annotated[int, Option(help="imap chunksize")] = 5,
@@ -120,7 +118,9 @@ def main(
                         print(chunk)
                     old_collected = collected
                     save_timer, collected = db.trigger_save_via_time(
-                        save_timer, collected, interval=population_interval
+                        save_timer,
+                        collected,
+                        interval=population_interval,
                     )
                     if old_collected is not collected:
                         p.log(f"Saved at {save_timer}")
@@ -149,7 +149,7 @@ def main(
         files: list[File]
         if db_cfg.rules:
             filter_t = p.add_task("filtering", total=0)
-            files = [resolved[file] for file in db.filter(set(resolved)).get_column("path")]
+            files = [resolved[file] for file in (db.filter(set(resolved)).sort(sort_by).get_column("path"))]
             p.update(filter_t, total=len(files), completed=len(files))
         else:
             files = list(resolved.values())
