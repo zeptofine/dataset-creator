@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, StrEnum
 from random import choice
 
 import cv2
@@ -25,10 +25,10 @@ class ResizeAlgos(Enum):
 DownUpAlgos = [e for e in ResizeAlgos if e != ResizeAlgos.DOWN_UP]
 
 
-class ResizeMode(Enum):
-    VALUE = 0
-    MAX_RESOLUTION = 1
-    MIN_RESOLUTION = 2
+class ResizeMode(StrEnum):
+    VALUE = "percent"
+    MAX_RESOLUTION = "max resolution"
+    MIN_RESOLUTION = "min resolution"
 
 
 class ResizeData(SpecialItemData):

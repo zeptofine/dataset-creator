@@ -97,7 +97,7 @@ ResRuleView_ = ItemDeclaration(
     image_rules.ResRule,
     settings=ItemSettings(
         {
-            ("min", "max"): RangeInput(default=(128, 2048), min_and_max_correlate=True).label("Min / Max:"),
+            ("min_res", "max_res"): RangeInput(default=(128, 2048), min_and_max_correlate=True).label("Min / Max:"),
             "crop": BoolInput(default=True).label("Try to crop:"),
             "scale": NumberInput((0, 128), default=4).label("Scale:"),
         }

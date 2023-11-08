@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-import re
 import textwrap
 from abc import abstractmethod
 from collections import defaultdict
-from collections.abc import Callable, Generator, Iterable, Mapping, Sequence
+from collections.abc import Callable, Generator, Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from string import Formatter
 from types import MappingProxyType
-from typing import Any, ClassVar
+from typing import ClassVar
 
 import numpy as np
 import wcmatch.glob as wglob
+from pathvalidate import validate_filepath
 from polars import DataFrame, DataType, Expr, PolarsDataType
 
 from ..configs import Keyworded
@@ -224,8 +223,11 @@ class Output(Keyworded):
         output_format: str = DEFAULT_OUTPUT_FORMAT,
     ):
         self.folder = path
+
         # try to format. If it fails, it will raise InvalidFormatException
-        output_formatter.format(output_format, **PLACEHOLDER_FORMAT_KWARGS)
+        test_pth = output_formatter.format(output_format, **PLACEHOLDER_FORMAT_KWARGS)
+        validate_filepath(test_pth, platform="auto")
+
         self.output_format = output_format
         self.overwrite = overwrite
         self.filters = filters

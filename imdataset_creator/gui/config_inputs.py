@@ -380,8 +380,10 @@ class ProceduralConfigList(QGroupBox):  # TODO: Better name lmao
 
     def duplicate_item(self, item: ProceduralConfigItem):
         """duplicates an item"""
+        item_copy = self.bound_item(item.declaration, self)
+        item_copy.from_cfg(item.get_cfg())
         self.add_item(
-            item,
+            item_copy,
             self.box.indexOf(item) + 1,
         )
 
