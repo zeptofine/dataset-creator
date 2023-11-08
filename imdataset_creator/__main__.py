@@ -3,6 +3,7 @@ import logging
 from datetime import datetime
 from multiprocessing import Pool, cpu_count, freeze_support
 from pathlib import Path
+from random import sample
 from typing import Annotated
 
 import typer
@@ -161,7 +162,7 @@ def main(
             p.log("Finished. No images remain")
             return 0
         if simulate:
-            p.log("last 10 scenarios: ", scenarios[-10:], f"Simulated. {len(scenarios)} images remain")
+            p.log("10 random scenarios: ", sample(scenarios, 10), f"Simulated. {len(scenarios)} images remain")
             return 0
 
         try:
