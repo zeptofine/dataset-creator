@@ -162,7 +162,11 @@ def main(
             p.log("Finished. No images remain")
             return 0
         if simulate:
-            p.log("10 random scenarios: ", sample(scenarios, 10), f"Simulated. {len(scenarios)} images remain")
+            p.log(
+                "10 random scenarios: ",
+                sample(scenarios, min(len(scenarios), 10)),
+                f"Simulated. {len(scenarios)} images remain",
+            )
             return 0
 
         try:

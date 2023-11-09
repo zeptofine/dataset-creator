@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
-from pathlib import Path
 from types import MappingProxyType
 from typing import Self
 
@@ -17,7 +16,6 @@ from .base_rules import (
     Producer,
     ProducerSchema,
     Rule,
-    combine_expr_conds,
 )
 
 STAT_TRACKED = ("st_size", "st_atime", "st_mtime", "st_ctime")

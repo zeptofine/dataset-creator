@@ -5,7 +5,6 @@ import logging
 import os
 from datetime import datetime
 from pathlib import Path
-from pprint import pprint
 
 from polars import DataFrame, concat
 from PySide6.QtCore import Qt, QThread, Signal, Slot
@@ -15,15 +14,12 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QMainWindow,
     QMenu,
-    QMenuBar,
-    QProgressBar,
-    QPushButton,
     QSplitter,
     QWidget,
 )
 from rich import print as rprint
 
-from .. import DatasetBuilder, File
+from .. import DatasetBuilder
 from ..configs import MainConfig
 from ..datarules import chunk_split
 from .err_dialog import catch_errors

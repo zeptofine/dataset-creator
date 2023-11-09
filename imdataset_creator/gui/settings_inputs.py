@@ -623,29 +623,3 @@ class SettingsBox(QFrame):
     def mousePressEvent(self, event: QMouseEvent) -> None:
         self.previous_position = event.position()
         return super().mousePressEvent(event)
-
-
-# class ItemSettings(dict[str | tuple[str, ...], BaseSettingsInput]):
-#     def from_cfg(self, cfg: dict):
-#         for key, setting in self.items():
-#             if isinstance(key, tuple):
-#                 vals = [cfg[k] for k in key]  # sort based on key order
-#                 setting.from_cfg(vals)
-#             else:
-#                 if key in cfg:
-#                     setting.from_cfg(cfg[key])
-
-#     def get_cfg(self) -> dict:
-#         dct = {}
-#         for key, setting in self.items():
-#             val = setting.get_cfg()
-
-#             if isinstance(key, tuple):
-#                 for k, v in zip(key, val):
-#                     dct[k] = v
-#             else:
-#                 dct[key] = val
-#         return dct
-
-#     def get_widgets(self) -> list[list[QWidget]]:
-#         return [setting.create_widgets() for setting in self.values()]

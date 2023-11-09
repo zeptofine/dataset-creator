@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from string import Formatter
-from typing import Any
+from typing import Any, ClassVar
 
 from typing_extensions import SupportsIndex
 
@@ -14,12 +16,12 @@ class InvalidFormatError(Exception):
 
 
 str_slice = re.compile(r"\[(?P<start>[-\d]*):(?P<stop>[-\d]*):?(?P<step>[-\d]*)\]")
-str_cond = re.compile(r"^(?P<prompt>[^\?:]+)\?(?P<true>(?:[^:])*):?(?P<false>.*)$")  # present?yes:no
 
 
 class SafeFormatter(Formatter):
     def get_field(self, field_name: str, _: Sequence[Any], kwargs: Mapping[str, Any]) -> tuple[Any, Any]:
         # the goal is to make sure `property`s and indexing is still available, while dunders and things are not
+
         if "__" in field_name:
             raise InvalidFormatError("__")
 
@@ -37,30 +39,55 @@ class SafeFormatter(Formatter):
         return super().get_field(field_name, _, kwargs)
 
 
+escaped_split = re.compile(r"[^\\],")
+condition_fmt = re.compile(r"^(?P<prompt>[^\?:]+)\?(?P<true>(?:[^:])*):?(?P<false>.*)$")  # present?yes:no
+replacement_fmt = re.compile(r"'(?P<from>[^']+)'='(?P<to>[^']*)'")
+
+
+def condition_format(pth: str, match: re.Match) -> str:
+    """
+    Inline if condition. (if?then:else)
+    """
+    p = match.group("prompt")
+
+    if (p := match.group("prompt")) in pth:
+        return match.group("true") or p
+    return match.group("false")
+
+
 class MalleablePath(str):
+    mpath_format_conditions: ClassVar[dict[re.Pattern, Callable[[str, re.Match], str]]] = {
+        re.compile(r"^(?P<prompt>[^\?:]+)\?(?P<true>(?:[^:!])*):?(?P<false>.*)$"): (condition_format),
+        re.compile(r"^'(?P<from>[^']+)'='(?P<to>[^']*)'$"): (  # replaces <from> to <to>
+            lambda pth, m: pth.replace(m.group("from"), m.group("to"))
+        ),
+    }
+
     def __format__(self, format_spec: str):
-        formats = format_spec.split(",")
-        newfmt: MalleablePath = self
+        if not format_spec:
+            return self
+
+        formats = [s.replace(r"\,", ",") for s in escaped_split.split(format_spec)]
+        newpth: str = str(self)
         for fmt in formats:
-            # if "=" in fmt:
-            #     key, val = fmt.split("=")
-            #     if key == "maxlen":
-            #         newfmt = MalleablePath(newfmt[: int(val)])
-            #     else:
-            #         raise ValueError(f"Unknown format specifier: {key}")
-            matches = list(str_cond.finditer(fmt))
-            if matches:
-                match = matches[0]
-                if (p := match.group("prompt")) in newfmt:
-                    newfmt = MalleablePath(t if (t := match.group("true")) else p)
-                else:
-                    newfmt = MalleablePath(match.group("false"))
+            if not fmt:
+                continue
+
+            patterns_used = False
+            for pattern, func in self.mpath_format_conditions.items():
+                if any(match := list(pattern.finditer(fmt))):
+                    patterns_used = True
+                    newpth = func(newpth, match[0])
 
             if fmt == "underscores":
-                newfmt = MalleablePath("_".join(newfmt.split(" ")))
-            elif fmt == "underscore_path":
-                newfmt = MalleablePath("_".join(Path(newfmt).parts))
-        return str(newfmt)
+                newpth = "_".join(newpth.split(" "))
+            elif fmt == "underscore_parts":
+                newpth = "_".join(Path(newpth).parts)
+
+            elif not patterns_used:
+                raise ValueError(f"Unknown format specifier: {fmt!r}")
+
+        return str(newpth)
 
     def __getitem__(self, __key: SupportsIndex | slice) -> str:
         return MalleablePath(super().__getitem__(__key))
