@@ -293,7 +293,7 @@ def combine_expr_conds(exprs: Iterable[Expr]) -> Expr:
     """
     comp: Expr | None = None
     for e in exprs:
-        comp = comp & e if comp is None else e
+        comp = comp & e if comp is not None else e
     assert comp is not None
 
     return comp
