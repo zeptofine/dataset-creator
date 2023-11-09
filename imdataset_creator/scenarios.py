@@ -17,7 +17,6 @@ class OutputScenario:
     filters: list[Filter]
 
     def run(self, img: np.ndarray, stat: os.stat_result):
-        print(self.path)
         for f in self.filters:
             img = f.run(img=img)
 
