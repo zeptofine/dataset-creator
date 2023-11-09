@@ -7,6 +7,7 @@ from pathlib import Path
 from string import Formatter
 from typing import Any, ClassVar
 
+from pathvalidate import sanitize_filename, sanitize_filepath
 from typing_extensions import SupportsIndex
 
 
@@ -39,7 +40,7 @@ class SafeFormatter(Formatter):
         return super().get_field(field_name, _, kwargs)
 
 
-escaped_split = re.compile(r"[^\\],")
+escaped_split = re.compile(r"(?<!\\),")
 condition_fmt = re.compile(r"^(?P<prompt>[^\?:]+)\?(?P<true>(?:[^:])*):?(?P<false>.*)$")  # present?yes:no
 replacement_fmt = re.compile(r"'(?P<from>[^']+)'='(?P<to>[^']*)'")
 
@@ -83,11 +84,13 @@ class MalleablePath(str):
                 newpth = "_".join(newpth.split(" "))
             elif fmt == "underscore_parts":
                 newpth = "_".join(Path(newpth).parts)
+            elif fmt == "sanitize":
+                newpth = sanitize_filename(newpth, platform="auto")
 
             elif not patterns_used:
                 raise ValueError(f"Unknown format specifier: {fmt!r}")
 
-        return str(newpth)
+        return newpth
 
     def __getitem__(self, __key: SupportsIndex | slice) -> str:
         return MalleablePath(super().__getitem__(__key))
@@ -117,5 +120,5 @@ class File:
             src=MalleablePath(src),
             relative_path=MalleablePath(pth.relative_to(src).parent),
             file=MalleablePath(pth.stem),
-            ext=pth.suffix[1:],
+            ext=pth.suffix[1:],  # Can't think of a MP usecase here. If anyone does, I'm happy to change this
         )
