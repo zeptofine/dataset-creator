@@ -69,4 +69,4 @@ venv.bak/
 
 filedb.arrow
 config*.json
-imdataset_creator/gui/.recent_files
+.recent_files

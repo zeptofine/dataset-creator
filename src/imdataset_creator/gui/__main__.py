@@ -22,7 +22,7 @@ def main():
 
     # check all recent files exist
 
-    save_recent_files([file for file in get_recent_files() if os.path.exists(file)])
+    save_recent_files(file for file in get_recent_files() if os.path.exists(file))
 
     app = QApplication([])
     central_window = MainWindow(Path(args.cfg_path)) if args.cfg_path else MainWindow()

@@ -1,27 +1,12 @@
 from __future__ import annotations
 
-from abc import abstractmethod
 from collections.abc import Collection
 
-from PySide6.QtCore import QRect, QSize, Qt, Signal, Slot
-from PySide6.QtGui import QAction, QFont, QMouseEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QFrame,
     QGridLayout,
-    QGroupBox,
-    QLabel,
-    QMenu,
-    QProgressBar,
-    QScrollArea,
-    QSizePolicy,
-    QToolButton,
-    QVBoxLayout,
-    QWidget,
 )
-
-from ..configs.configtypes import ItemConfig, ItemData
-from ..configs.keyworded import Keyworded
 
 
 class MiniCheckList(QFrame):
@@ -54,12 +39,3 @@ class MiniCheckList(QFrame):
     def update_items(self, dct: dict[str, bool]):
         for item, val in dct.items():
             self.items[item].setChecked(val)
-
-
-TooltipFont = QFont()
-TooltipFont.setUnderline(True)
-
-
-def apply_tooltip(widget: QWidget, txt: str):
-    widget.setToolTip(txt)
-    widget.setFont(TooltipFont)

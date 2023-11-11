@@ -7,7 +7,7 @@ from collections.abc import Callable, Generator, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import numpy as np
 import wcmatch.glob as wglob
@@ -72,10 +72,21 @@ class DataColumn:
     dtype: PolarsDataType | type | None = None
 
 
+@dataclass(frozen=True)
+class Production:
+    """
+    dtype: the type associated.
+    template: the example output of the production.
+    """
+
+    dtype: PolarsDataType | type
+    template: Any
+
+
 class Producer(Keyworded):
     """A class that produces a certain column in a dataframe"""
 
-    produces: MappingProxyType[str, PolarsDataType | type]
+    produces: MappingProxyType[str, Production]
     all_producers: ClassVar[dict[str, type[Producer]]] = {}
 
     def __init__(self):
@@ -104,7 +115,7 @@ class ProducerSet(set[Producer]):
 
     @property
     def type_schema(self) -> DataTypeSchema:
-        return {col: dtype for producer in self for col, dtype in producer.produces.items()}
+        return {col: production.dtype for producer in self for col, production in producer.produces.items()}
 
 
 class Rule(Keyworded):
@@ -165,7 +176,7 @@ class Input(Keyworded):
 
     @classmethod
     def from_cfg(cls, cfg: InputData):
-        return cls(Path(cfg["folder"]), cfg["expressions"])
+        return cls(Path(cfg["folder"]).expanduser(), cfg["expressions"])
 
     def run(self) -> PathGenerator:
         """
@@ -221,11 +232,16 @@ class Output(Keyworded):
         filters: list[Filter],
         overwrite: bool = False,
         output_format: str = DEFAULT_OUTPUT_FORMAT,
+        format_kwargs: dict[str, Any] | None = None,
     ):
         self.folder = path
 
         # try to format. If it fails, it will raise InvalidFormatException
-        test_pth = output_formatter.format(output_format, **PLACEHOLDER_FORMAT_KWARGS)
+        test_kwargs = PLACEHOLDER_FORMAT_KWARGS.copy()
+        if format_kwargs is not None:
+            test_kwargs.update(format_kwargs)
+
+        test_pth = output_formatter.format(output_format, **test_kwargs)
         validate_filepath(test_pth, platform="auto")
 
         self.output_format = output_format
@@ -268,12 +284,13 @@ class Output(Keyworded):
         return None
 
     @classmethod
-    def from_cfg(cls, cfg: OutputData):
+    def from_cfg(cls, cfg: OutputData, kwargs=None):
         return cls(
             Path(cfg["folder"]),
             [Filter.all_filters[filter_["name"]].from_cfg(filter_["data"]) for filter_ in cfg["lst"]],
             cfg["overwrite"],
             cfg["output_format"],
+            format_kwargs=kwargs,
         )
 
 

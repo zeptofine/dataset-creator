@@ -15,6 +15,7 @@ from .base_rules import (
     ExprMatcher,
     Producer,
     ProducerSchema,
+    Production,
     Rule,
 )
 
@@ -33,10 +34,10 @@ def stat(pth):
 class FileInfoProducer(Producer):
     produces = MappingProxyType(
         {
-            "mtime": Datetime("ms"),
-            "atime": Datetime("ms"),
-            "ctime": Datetime("ms"),
-            "size": int,
+            "mtime": Production(Datetime("ms"), 0),
+            "atime": Production(Datetime("ms"), 0),
+            "ctime": Production(Datetime("ms"), 0),
+            "size": Production(int, 0),
         }
     )
 

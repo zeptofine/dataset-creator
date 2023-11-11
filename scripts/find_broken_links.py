@@ -5,9 +5,7 @@ from rich.progress import track
 src = "/mnt/Toshiba/.Grabber/"
 
 gen = Path(src).rglob("*")
-gen_ = (
-    x for x in track(gen) if not ((resolved := x.resolve()) == x or resolved.exists())
-)
+gen_ = (x for x in track(gen) if not ((resolved := x.resolve()) == x or resolved.exists()))
 
 lst = []
 for p in gen_:

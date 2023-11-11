@@ -4,8 +4,8 @@ import contextlib
 import functools
 from copy import deepcopy as objcopy
 
-from PySide6.QtCore import QMimeData, QRect, QSize, Qt, Signal, Slot
-from PySide6.QtGui import QAction, QDrag, QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QMouseEvent
+from PySide6.QtCore import QRect, Qt, Signal, Slot
+from PySide6.QtGui import QAction, QMouseEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QFrame,
@@ -23,8 +23,7 @@ from PySide6.QtWidgets import (
 
 from ..configs.configtypes import ItemConfig, ItemData
 from ..configs.keyworded import Keyworded
-from .frames import apply_tooltip
-from .settings_inputs import BaseInput, ItemSettings, SettingsBox, SettingsItem
+from .settings_inputs import BaseInput, ItemSettings, SettingsBox, SettingsItem, apply_tooltip
 
 JSON_SERIALIZABLE = dict | list | tuple | str | int | float | bool | None
 
@@ -37,7 +36,7 @@ def copy_before_exec(f):
     return func
 
 
-class ProceduralConfigItem(QFrame):
+class ProceduralConfigItem(QGroupBox):
     movable: bool = True
 
     move_down = Signal()
@@ -56,15 +55,13 @@ class ProceduralConfigItem(QFrame):
     def __init__(self, item: ItemDeclaration, parent: QWidget | None = None):
         super().__init__(parent)
         self.declaration = item
-        self.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
-        self.setLineWidth(2)
+        # self.setFrameStyle(QFrame.Shape.Panel | QFrame.Shadow.Raised)
+        # self.setLineWidth(2)
 
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.ActionsContextMenu)
-        (collapse_action := QAction("collapse", self)).triggered.connect(self.toggle_group)
-        (duplicate_action := QAction("duplicate", self)).triggered.connect(self.duplicate.emit)
-        (revert_action := QAction("revert to defaults", self)).triggered.connect(self.reverted.emit)
-        self.addActions([collapse_action, duplicate_action, revert_action])
-
+        if self.declaration.duplicable:
+            (duplicate_action := QAction("duplicate", self)).triggered.connect(self.duplicate.emit)
+            self.addAction(duplicate_action)
         # self._minimum_size = self.size()
         self.previous_position = None
 
@@ -91,7 +88,9 @@ class ProceduralConfigItem(QFrame):
             self.settings_box = self.declaration.create_settings_widget(self)
             for row in self.settings_box.rows.values():
                 self.reverted.connect(row.reset)
-
+            (collapse_action := QAction("collapse", self)).triggered.connect(self.toggle_group)
+            (revert_action := QAction("revert to defaults", self)).triggered.connect(self.reverted.emit)
+            self.addActions((collapse_action, revert_action))
             self._layout.addWidget(self.settings_box)
         else:
             self.settings_box = None
@@ -454,11 +453,13 @@ class ItemDeclaration:
         bound_item: type[Keyworded],
         desc: str | None = None,
         settings: ItemSettings | None = None,
+        duplicable=True,
     ):
         self.title: str = title
         self.description: str | None = desc
         self.bound_item = bound_item
         self.settings: ItemSettings | None = settings
+        self.duplicable = duplicable
 
     def create_settings_widget(self, parent=None):
         assert self.settings is not None

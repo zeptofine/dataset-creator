@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QDate, QDateTime, QRect, QSize, Qt, QTime, Signal, Slot
-from PySide6.QtGui import QAction, QIcon, QMouseEvent
+from PySide6.QtGui import QAction, QFont, QIcon, QMouseEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -32,7 +32,15 @@ from PySide6.QtWidgets import (
 )
 from rich import print as rprint
 
-from .frames import MiniCheckList, apply_tooltip
+from .minichecklist import MiniCheckList
+
+TooltipFont = QFont()
+TooltipFont.setUnderline(True)
+
+
+def apply_tooltip(widget: QWidget, txt: str):
+    widget.setToolTip(txt)
+    widget.setFont(TooltipFont)
 
 
 class SettingsItem(ABC):

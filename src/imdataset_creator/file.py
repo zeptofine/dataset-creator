@@ -7,7 +7,7 @@ from pathlib import Path
 from string import Formatter
 from typing import Any, ClassVar
 
-from pathvalidate import sanitize_filename, sanitize_filepath
+from pathvalidate import sanitize_filename
 from typing_extensions import SupportsIndex
 
 

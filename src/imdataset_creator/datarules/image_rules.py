@@ -19,6 +19,7 @@ from .base_rules import (
     ExprMatcher,
     Producer,
     ProducerSchema,
+    Production,
     Rule,
     combine_expr_conds,
 )
@@ -34,7 +35,13 @@ def get_hwc(pth):
 
 
 class ImShapeProducer(Producer):
-    produces = MappingProxyType({"width": int, "height": int, "channels": int})
+    produces = MappingProxyType(
+        {
+            "width": Production(int, 0),
+            "height": Production(int, 0),
+            "channels": Production(int, 0),
+        }
+    )
 
     def __call__(self) -> ProducerSchema:
         return [
@@ -146,7 +153,7 @@ class HASHERS(StrEnum):
 
 
 class HashProducer(Producer):
-    produces = MappingProxyType({"hash": str})
+    produces = MappingProxyType({"hash": Production(str, "87ffe7c991e08800")})
 
     def __init__(self, hash_type: HASHERS = HASHERS.AVERAGE):
         self.hasher: Callable[[Image.Image], imagehash.ImageHash] = _HASHERS[hash_type]

@@ -8,6 +8,11 @@ from .config_inputs import (
 )
 from .settings_inputs import DropdownInput
 
+
+def producer_item(*args, **kwargs):
+    return ItemDeclaration(*args, **kwargs, duplicable=False)
+
+
 # class ProducerView(FlowItem):
 #     title = "Producer"
 #     movable = False
@@ -22,9 +27,9 @@ from .settings_inputs import DropdownInput
 #         self.description_widget.setText(self.desc)
 
 
-FileInfoProducerView = ItemDeclaration("File Info Producer", data_rules.FileInfoProducer)
-ImShapeProducerView = ItemDeclaration("Image shape", image_rules.ImShapeProducer)
-HashProducerView = ItemDeclaration(
+FileInfoProducerView = producer_item("File Info Producer", data_rules.FileInfoProducer)
+ImShapeProducerView = producer_item("Image shape", image_rules.ImShapeProducer)
+HashProducerView = producer_item(
     "Hash Producer",
     image_rules.HashProducer,
     desc="gets a hash for the contents of an image",
