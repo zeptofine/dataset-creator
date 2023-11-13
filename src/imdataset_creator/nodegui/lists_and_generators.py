@@ -29,10 +29,6 @@ from .base_types import (
 )
 
 
-class UnreadyError(Exception):
-    ...
-
-
 def get_text_bounds(text: str, font: QFont):
     return QFontMetrics(font).size(0, text, 0)
 
