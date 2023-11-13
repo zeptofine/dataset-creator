@@ -8,6 +8,9 @@
       120
     ]
   },
+  "files.associations": {
+    "*.flow": "json"
+  },
   "pylint.args": [
     "--extension-pkg-whitelist=cv2",
     "--good-names=i,j,k,p,s,t,ex,Run,df",

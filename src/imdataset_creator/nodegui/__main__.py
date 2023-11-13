@@ -60,15 +60,12 @@ from .base_types import (
     generator_to_list_converter,
     list_to_generator_converter,
 )
-from .image_models import (
-    ImageReaderDataModel,
-)
+from .image_models import ALL_MODELS as IMAGE_MODELS
 from .lists_and_generators import (
     FileGlobber,
     GeneratorResolverDataModel,
     GeneratorSplitterDataModel,
     GeneratorStepper,
-    ListBufferDataModel,
     ListHeadDataModel,
     ListShufflerDataModel,
     get_text_bounds,
@@ -95,6 +92,32 @@ class PrinterDataModel(NodeDataModel):
         return self._label
 
 
+class BufferDataModel(NodeDataModel):
+    caption = "Buffer"
+    all_data_types = AnyData.data_type
+
+    def __init__(self, style=None, parent=None):
+        super().__init__(style, parent)
+        self._item = None
+        self._buffer_button = QToolButton()
+        self._buffer_button.setText("release")
+        self._buffer_button.clicked.connect(lambda: self.data_updated.emit(0))
+
+    def out_data(self, port: int) -> AnyData | None:
+        if self._item is None:
+            return None
+        return AnyData(self._item)
+
+    def set_in_data(self, node_data: AnyData | None, port: Port):
+        if node_data is None:
+            self._item = None
+            return
+        self._item = node_data.item
+
+    def embedded_widget(self) -> QWidget:
+        return self._buffer_button
+
+
 def register_type(registry: ne.DataModelRegistry, from_: NodeDataType, to_: NodeDataType, converter: Callable):
     registry.register_type_converter(from_, to_, TypeConverter(from_, to_, converter))
 
@@ -110,15 +133,14 @@ def main(app):
             GeneratorResolverDataModel,
         ],
         "lists": [
-            ListBufferDataModel,
+            BufferDataModel,
             ListHeadDataModel,
             ListShufflerDataModel,
         ],
-        "images": [
-            ImageReaderDataModel,
-        ],
+        "images": IMAGE_MODELS,
         "misc": [
             PrinterDataModel,
+            BufferDataModel,
         ],
     }
     for category, models in model_dct.items():
@@ -131,6 +153,13 @@ def main(app):
     register_type(registry, ListData.data_type, AnyData.data_type, lambda item: AnyData(item.list))
     register_type(registry, PathData.data_type, AnyData.data_type, lambda item: AnyData(str(item.path)))
     register_type(registry, ImageData.data_type, AnyData.data_type, lambda item: AnyData(item.image))
+    register_type(registry, AnyData.data_type, ImageData.data_type, lambda item: ImageData(item.item))
+    register_type(
+        registry,
+        AnyData.data_type,
+        PathGeneratorData.data_type,
+        lambda item: PathGeneratorData(Path(p) for p in item.item),
+    )
 
     scene = ne.FlowScene(registry=registry)
     view = ne.FlowView(scene)

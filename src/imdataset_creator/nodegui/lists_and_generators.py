@@ -4,7 +4,6 @@ from collections.abc import Generator
 from pathlib import Path
 from queue import Empty, Queue
 
-import wcmatch.glob as wglob
 from qtpy.QtGui import QFont, QFontMetrics
 from qtpy.QtWidgets import (
     QLabel,
@@ -22,9 +21,7 @@ from qtpynodeeditor import (
     PortCount,
 )
 
-from ..datarules.base_rules import flags
-from ..gui.input_view import DEFAULT_IMAGE_FORMATS
-from ..gui.settings_inputs import DirectoryInput, MultilineInput, SettingsBox
+from ..gui.input_view import InputView_
 from .base_types import (
     ListData,
     PathData,
@@ -47,18 +44,12 @@ class FileGlobber(NodeDataModel):
 
     def __init__(self, style=None, parent=None):
         super().__init__(style, parent)
-        self._widget = SettingsBox(
-            {
-                "path": DirectoryInput().label("Folder"),
-                "expressions": MultilineInput(
-                    default="\n".join(f"**/*{ext}" for ext in DEFAULT_IMAGE_FORMATS), is_list=True
-                ),
-            }
-        )
+        self._item = InputView_
+        self._settings = self._item.create_settings_widget()
         self._start_button = QToolButton()
         self._start_button.clicked.connect(lambda: self.get_generator())
         self._start_button.setText("gather")
-        self._widget.layout().addWidget(self._start_button)
+        self._settings.layout().addWidget(self._start_button)
         self._result = None
         self._saved_generator = None
 
@@ -68,21 +59,26 @@ class FileGlobber(NodeDataModel):
         return PathGeneratorData(self._saved_generator)
 
     def get_generator(self):
-        cfg = self._widget.get_cfg()
-        path = cfg["path"]
-        expressions = cfg["expressions"]
-        self._saved_generator = self._generator(Path(path), expressions)
+        in_ = self._item.get(self._settings)
+
+        self._saved_generator = in_.run()
         self.data_updated.emit(0)
 
-    def _generator(self, path: Path, expressions):
-        for file in wglob.iglob(expressions, flags=flags, root_dir=path):
-            yield path / file
-
     def embedded_widget(self) -> QWidget:
-        return self._widget
+        return self._settings
 
     def port_out_connection_policy(self, _: int) -> ConnectionPolicy:
         return ConnectionPolicy.one
+
+    def save(self) -> dict:
+        doc = super().save()
+        if self._settings is not None:
+            doc["settings"] = self._settings.get_cfg()
+        return doc
+
+    def restore(self, doc: dict):
+        with contextlib.suppress(KeyError):
+            self._settings.from_cfg(doc["settings"])
 
 
 class GeneratorStepper(NodeDataModel):
@@ -103,7 +99,7 @@ class GeneratorStepper(NodeDataModel):
         self._step_button.clicked.connect(self.pop_data)
         self._next_item = None
 
-    def out_data(self, port: int) -> PathData | None:
+    def out_data(self, _: int) -> PathData | None:
         if self._next_item is None:
             return None
         return PathData(self._next_item or Path())
@@ -118,7 +114,7 @@ class GeneratorStepper(NodeDataModel):
             self._step_button.setEnabled(False)
             self.invalidate()
 
-    def set_in_data(self, node_data: PathGeneratorData | None, port: Port):
+    def set_in_data(self, node_data: PathGeneratorData | None, _: Port):
         if node_data is None:
             self.invalidate()
             self._step_button.setEnabled(False)
@@ -228,12 +224,12 @@ class GeneratorResolverDataModel(NodeDataModel):
         super().__init__(style, parent)
         self._list = None
 
-    def out_data(self, port: int) -> NodeData | None:
+    def out_data(self, _: int) -> NodeData | None:
         if self._list is None:
             return None
         return ListData(self._list)
 
-    def set_in_data(self, node_data: PathGeneratorData | None, port: Port):
+    def set_in_data(self, node_data: PathGeneratorData | None, _: Port):
         if node_data is None:
             return
         self._list = list(node_data.generator)
@@ -251,12 +247,12 @@ class ListHeadDataModel(NodeDataModel):
         self._num.valueChanged.connect(lambda: self.data_updated.emit(0))
         self._in_list = []
 
-    def out_data(self, port: int) -> NodeData | None:
+    def out_data(self, _: int) -> NodeData | None:
         if self._in_list is None:
             return None
         return ListData(self._in_list[: self._num.value()])
 
-    def set_in_data(self, node_data: ListData | None, port: Port):
+    def set_in_data(self, node_data: ListData | None, _: Port):
         if node_data is None:
             return
 
@@ -275,40 +271,14 @@ class ListShufflerDataModel(NodeDataModel):
         super().__init__(style, parent)
         self._list = []
 
-    def out_data(self, port: int) -> NodeData | None:
+    def out_data(self, _: int) -> NodeData | None:
         if self._list is None:
             return None
         return ListData(sorted(self._list, key=lambda _: random.random()))
 
-    def set_in_data(self, node_data: ListData | None, port: Port):
+    def set_in_data(self, node_data: ListData | None, _: Port):
         if node_data is None:
             self._list = None
             return
         self._list = node_data.list
         self.data_updated.emit(0)
-
-
-class ListBufferDataModel(NodeDataModel):
-    caption = "List Buffer"
-    all_data_types = ListData.data_type
-
-    def __init__(self, style=None, parent=None):
-        super().__init__(style, parent)
-        self._list = None
-        self._buffer_button = QToolButton()
-        self._buffer_button.setText("release")
-        self._buffer_button.clicked.connect(lambda: self.data_updated.emit(0))
-
-    def out_data(self, port: int) -> NodeData | None:
-        if self._list is None:
-            return None
-        return ListData(self._list)
-
-    def set_in_data(self, node_data: ListData | None, port: Port):
-        if node_data is None:
-            self._list = None
-            return
-        self._list = node_data.list
-
-    def embedded_widget(self) -> QWidget:
-        return self._buffer_button

@@ -3,6 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 
 from ..datarules import Output
+from ..datarules.base_rules import Filter
 from ..image_filters import destroyers, resizer
 from .config_inputs import ItemDeclaration, ProceduralConfigList, ProceduralFlowListInput
 from .settings_inputs import (
@@ -47,7 +48,10 @@ def div_100(val):
     return val / 100
 
 
-ResizeFilterView_ = ItemDeclaration(
+FilterDeclaration = ItemDeclaration[Filter]
+
+
+ResizeFilterView_ = FilterDeclaration(
     "Resize",
     resizer.Resize,
     settings=ItemSettings(
@@ -65,7 +69,7 @@ ResizeFilterView_ = ItemDeclaration(
     ),
 )
 
-CropFilterView_ = ItemDeclaration(
+CropFilterView_ = FilterDeclaration(
     "Crop",
     resizer.Crop,
     desc="Crop the image to the specified size. If the item is 0, it will not be considered",
@@ -80,7 +84,7 @@ CropFilterView_ = ItemDeclaration(
 )
 
 
-BlurFilterView_ = ItemDeclaration(
+BlurFilterView_ = FilterDeclaration(
     "Blur",
     destroyers.Blur,
     settings=ItemSettings(
@@ -92,7 +96,7 @@ BlurFilterView_ = ItemDeclaration(
     ),
 )
 
-NoiseFilterView_ = ItemDeclaration(
+NoiseFilterView_ = FilterDeclaration(
     "Noise",
     destroyers.Noise,
     settings=ItemSettings(
@@ -110,7 +114,7 @@ NoiseFilterView_ = ItemDeclaration(
 )
 
 
-CompressionFilterView_ = ItemDeclaration(
+CompressionFilterView_ = FilterDeclaration(
     "Compression",
     destroyers.Compression,
     settings=ItemSettings(
@@ -126,7 +130,7 @@ CompressionFilterView_ = ItemDeclaration(
     ),
 )
 
-RandomFlipFilterView_ = ItemDeclaration(
+RandomFlipFilterView_ = FilterDeclaration(
     "Random Flip",
     bound_item=resizer.RandomFlip,
     settings=ItemSettings(
@@ -147,7 +151,7 @@ RandomFlipFilterView_ = ItemDeclaration(
     ),
 )
 
-RandomRotateFilterView_ = ItemDeclaration(
+RandomRotateFilterView_ = FilterDeclaration(
     "Random Rotate",
     bound_item=resizer.RandomRotate,
     settings=ItemSettings(
