@@ -17,6 +17,13 @@
             "request": "launch",
             "module": "imdataset_creator.gui",
             "justMyCode": true
+        },
+        {
+            "name": "Node GUI module",
+            "type": "python",
+            "request": "launch",
+            "module": "imdataset_creator.nodegui",
+            "justMyCode": false
         }
     ]
 }

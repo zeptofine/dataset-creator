@@ -1,5 +1,3 @@
-# this is one of those words that look weird when you hear it a lot
-
 import logging
 import os
 import sys
