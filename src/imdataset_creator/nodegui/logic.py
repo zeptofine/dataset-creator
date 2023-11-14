@@ -114,7 +114,55 @@ class SwitchCaseNode(NodeDataModel):
             self._bool = node_data.value
 
 
+class DistributorNode(NodeDataModel):
+    num_ports = PortCount(1, 2)
+    all_data_types = AnyData.data_type
+
+    def __init__(self, style=None, parent=None):
+        super().__init__(style, parent)
+        self._n = 0
+        self._item = None
+        self._released = False
+
+    def out_data(self, port: int) -> NodeData | None:
+        if self._item is None:
+            return None
+        if self._released:
+            self._released = False
+            return AnyData(self._item)
+        return None
+
+    def set_in_data(self, node_data: AnyData | None, port: Port):
+        if node_data is None:
+            return
+
+        self._item = node_data.item
+        self._released = True
+        self.data_updated.emit(self._n)
+        self._n = (self._n + 1) % 2
+
+
+class MergeLaneNode(NodeDataModel):
+    num_ports = PortCount(2, 1)
+    all_data_types = AnyData.data_type
+
+    def __init__(self, style=None, parent=None):
+        super().__init__(style, parent)
+        self._result = None
+
+    def out_data(self, port: int) -> NodeData | None:
+        return AnyData(self._result)
+
+    def set_in_data(self, node_data: AnyData | None, port: Port):
+        if node_data is None:
+            return
+        self._result = node_data.item
+        self.data_updated.emit(0)
+
+
 ALL_MODELS = [
     BufferNode,
     SwitchCaseNode,
+    DistributorNode,
+    MergeLaneNode,
 ]

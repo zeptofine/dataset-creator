@@ -42,7 +42,7 @@ class SignalHandler(QThread):
 SIGNALS_HANDLER = SignalHandler()
 
 
-class SignalSourceModel(NodeDataModel):
+class SignalSource(NodeDataModel):
     all_data_types = SignalData.data_type
     num_ports = PortCount(0, 1)
 
@@ -90,7 +90,7 @@ class SignalSourceModel(NodeDataModel):
         return self._widget
 
 
-class SignalSinkModel(NodeDataModel):
+class SignalSink(NodeDataModel):
     all_data_types = SignalData.data_type
     num_ports = PortCount(1, 0)
 
@@ -122,4 +122,4 @@ class SignalSinkModel(NodeDataModel):
             self._slider.setValue(doc["slot"])
 
 
-ALL_MODELS = [SignalSourceModel, SignalSinkModel]
+ALL_MODELS = [SignalSource, SignalSink]
