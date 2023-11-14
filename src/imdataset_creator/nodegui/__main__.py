@@ -144,7 +144,7 @@ def main(app):
     return scene, view, signal_handler
 
 
-if __name__ == "__main__":
+def app_main():
     logging.basicConfig(level="DEBUG")
     app = QApplication([])
     scene, view, sh = main(app)
@@ -152,3 +152,7 @@ if __name__ == "__main__":
     app.exec_()
     scene.save("text.flow")
     sh.signal_queue.put(None)
+
+
+if __name__ == "__main__":
+    app_main()

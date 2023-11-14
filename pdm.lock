@@ -295,11 +295,11 @@ files = [
 
 [[package]]
 name = "pyside6nodeeditor"
-version = "0.3.2.dev14+g3336b76"
+version = "0.3.2.dev15+g5adc09d"
 requires_python = ">=3.11"
 git = "https://github.com/zeptofine/qtpynodeeditor"
 ref = "pyside6"
-revision = "3336b7601c75c7e296428d6ae311c93f3cbdb5ce"
+revision = "5adc09d63ac7a44d0936f2b241d0debf52184a83"
 summary = "Python Qt node editor"
 dependencies = [
     "PySide6",

@@ -30,6 +30,7 @@ version = "0.1.0"
 [project.scripts]
 imdataset-creator = "imdataset_creator.__main__:app"
 imdataset-creator-gui = "imdataset_creator.gui.__main__:main"
+imdataset-creator-nodegui = "imdataset_creator.nodegui.__main__:app_main"
 
 [tool.pdm.build]
 includes = ["imdataset_creator"]
