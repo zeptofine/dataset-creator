@@ -108,7 +108,7 @@ class SwitchCaseNode(NodeDataModel):
         if port.index == 0 and isinstance(node_data, AnyData):
             self._item = node_data.item
             if self._bool is not None:
-                self.data_updated.emit(int(self._bool))
+                self.data_updated.emit(int(not self._bool))
                 self._item = None
         elif port.index == 1 and isinstance(node_data, BoolData):
             self._bool = node_data.value
