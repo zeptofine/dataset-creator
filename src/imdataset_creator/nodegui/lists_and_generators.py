@@ -12,6 +12,7 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 from qtpynodeeditor import (
+    CaptionOverride,
     ConnectionPolicy,
     DataTypes,
     NodeData,
@@ -23,6 +24,7 @@ from qtpynodeeditor import (
 
 from ..gui.input_view import InputView_
 from .base_types import (
+    IntegerData,
     ListData,
     PathData,
     PathGeneratorData,
@@ -34,7 +36,7 @@ def get_text_bounds(text: str, font: QFont):
     return QFontMetrics(font).size(0, text, 0)
 
 
-class FileGlobber(NodeDataModel):
+class FileGlobberNode(NodeDataModel):
     num_ports = PortCount(0, 1)
 
     all_data_types = PathGeneratorData.data_type
@@ -78,7 +80,7 @@ class FileGlobber(NodeDataModel):
             self._settings.from_cfg(doc["settings"])
 
 
-class GeneratorStepper(NodeDataModel):
+class GeneratorStepperNode(NodeDataModel):
     num_ports = PortCount(2, 1)
     data_types = DataTypes(
         {
@@ -136,7 +138,87 @@ class GeneratorStepper(NodeDataModel):
         return self._validation_message
 
 
-class GeneratorSplitterDataModel(NodeDataModel):
+class EnumerateNode(NodeDataModel):
+    num_ports = PortCount(3, 2)
+    data_types = DataTypes(
+        {
+            0: PathGeneratorData.data_type,  # Generator
+            1: SignalData.data_type,  # to iterate
+            2: SignalData.data_type,  # to reset counter
+        },
+        {
+            0: IntegerData.data_type,  # index
+            1: PathData.data_type,
+        },
+    )
+    caption_override = CaptionOverride(
+        {
+            0: "Generator",
+            1: "Iterate",
+            2: "Reset counter",
+        },
+        {
+            0: "Index",
+            1: "Path",
+        },
+    )
+
+    def __init__(self, style=None, parent=None):
+        super().__init__(style, parent)
+        self._generator = None
+        self._validation_state = NodeValidationState.warning
+        self._validation_message = "Uninitialized"
+        self._next_item = None
+
+    def out_data(self, port: int) -> PathData | IntegerData | None:
+        if self._next_item is None:
+            return None
+        if port == 0:
+            return IntegerData(self._index)
+        return PathData(self._next_item or Path())
+
+    def pop_data(self):
+        if self._generator is None:
+            return
+        try:
+            self._next_item = next(self._generator)
+            self.data_updated.emit(0)
+            self.data_updated.emit(1)
+            self._index += 1
+        except StopIteration:
+            self.invalidate()
+
+    def set_in_data(self, node_data: PathGeneratorData | SignalData | None, port: Port):
+        if port.index == 0:
+            if node_data is None:
+                self.invalidate()
+                return
+            assert isinstance(node_data, PathGeneratorData)
+            self._generator = node_data.generator
+            self.revalidate()
+
+        elif port.index == 1:
+            if isinstance(node_data, SignalData):
+                self.pop_data()
+        elif port.index == 2:
+            self._index = 0
+
+    def invalidate(self):
+        self._validation_state = NodeValidationState.error
+        self._validation_message = "input generator is empty"
+
+    def revalidate(self):
+        self._validation_state = NodeValidationState.valid
+        self._validation_message = ""
+
+    def validation_state(self) -> NodeValidationState:
+        return self._validation_state
+
+    def validation_message(self) -> str:
+        return self._validation_message
+
+
+class GeneratorSplitterNode(NodeDataModel):
     """splits a generator using two deques"""
 
     all_data_types = PathGeneratorData.data_type
@@ -206,7 +288,7 @@ class GeneratorSplitterDataModel(NodeDataModel):
         return self._label
 
 
-class GeneratorResolverDataModel(NodeDataModel):
+class GeneratorResolverNode(NodeDataModel):
     num_ports = PortCount(1, 1)
     data_types = DataTypes(
         {
@@ -233,7 +315,7 @@ class GeneratorResolverDataModel(NodeDataModel):
         self.data_updated.emit(0)
 
 
-class ListHeadDataModel(NodeDataModel):
+class ListHeadNode(NodeDataModel):
     num_ports = PortCount(1, 1)
     all_data_types = ListData.data_type
 
@@ -260,7 +342,7 @@ class ListHeadDataModel(NodeDataModel):
         return self._num
 
 
-class ListShufflerDataModel(NodeDataModel):
+class ListShufflerNode(NodeDataModel):
     caption = "Shuffle List"
     all_data_types = ListData.data_type
 
@@ -282,12 +364,13 @@ class ListShufflerDataModel(NodeDataModel):
 
 
 ALL_GENERATORS = [
-    GeneratorStepper,
-    GeneratorSplitterDataModel,
-    GeneratorResolverDataModel,
+    GeneratorStepperNode,
+    GeneratorSplitterNode,
+    GeneratorResolverNode,
+    EnumerateNode,
 ]
 ALL_LIST_MODELS = [
-    FileGlobber,
-    ListShufflerDataModel,
-    ListHeadDataModel,
+    FileGlobberNode,
+    ListShufflerNode,
+    ListHeadNode,
 ]

@@ -77,6 +77,15 @@ class SignalSourceModel(NodeDataModel):
         self.clicked = True
         self.data_updated.emit(0)
 
+    def save(self) -> dict:
+        dct = super().save()
+        dct["slot"] = self._slider.value()
+        return dct
+
+    def restore(self, doc: dict):
+        if "slot" in doc:
+            self._slider.setValue(doc["slot"])
+
     def embedded_widget(self) -> QWidget:
         return self._widget
 
@@ -102,6 +111,15 @@ class SignalSinkModel(NodeDataModel):
 
     def embedded_widget(self) -> QWidget:
         return self._widget
+
+    def save(self) -> dict:
+        dct = super().save()
+        dct["slot"] = self._slider.value()
+        return dct
+
+    def restore(self, doc: dict):
+        if "slot" in doc:
+            self._slider.setValue(doc["slot"])
 
 
 ALL_MODELS = [SignalSourceModel, SignalSinkModel]

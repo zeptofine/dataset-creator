@@ -43,6 +43,7 @@ from ..gui.settings_inputs import DirectoryInput, DirectoryInputSettings, Multil
 from .base_types import (
     AnyData,
     ImageData,
+    IntegerData,
     ListData,
     PathData,
     PathGeneratorData,
@@ -51,7 +52,7 @@ from .base_types import (
 )
 
 
-class ImageReaderDataModel(NodeDataModel):
+class ImageReaderNode(NodeDataModel):
     name = "Read Image"
     data_types = DataTypes(
         {0: PathData.data_type},
@@ -78,7 +79,7 @@ class ImageReaderDataModel(NodeDataModel):
         self.data_updated.emit(0)
 
 
-class ImageViewerDataModel(NodeDataModel):
+class ImageViewerNode(NodeDataModel):
     name = "View Image"
     num_ports = PortCount(1, 0)
     all_data_types = ImageData.data_type
@@ -131,6 +132,51 @@ class ImageViewerDataModel(NodeDataModel):
 
     def embedded_widget(self) -> QWidget:
         return self._pixmap_label
+
+
+def get_h_w_c(image: np.ndarray) -> tuple[int, int, int]:
+    """Returns the height, width, and number of channels."""
+    h, w = image.shape[:2]
+    c = 1 if image.ndim == 2 else image.shape[2]
+    return h, w, c
+
+
+class ImageShapeNode(NodeDataModel):
+    num_ports = PortCount(1, 3)
+    data_types = DataTypes(
+        {
+            0: ImageData.data_type,
+        },
+        {
+            0: IntegerData.data_type,
+            1: IntegerData.data_type,
+            2: IntegerData.data_type,
+        },
+    )
+    caption_override = CaptionOverride(
+        outputs={
+            0: "Height",
+            1: "Width",
+            2: "Channels",
+        }
+    )
+
+    def __init__(self, style=None, parent=None):
+        super().__init__(style, parent)
+        self._result: tuple[int, int, int] | None = None
+
+    def out_data(self, port: int) -> IntegerData | None:
+        if self._result is None:
+            return None
+        return IntegerData(self._result[port])
+
+    def set_in_data(self, node_data: ImageData | None, port: Port):
+        if node_data is None:
+            self._result = None
+            return
+
+        self._result = get_h_w_c(node_data.image)
+        self.data_updated.emit(0)
 
 
 class ImageConverterThread(QThread):
@@ -211,7 +257,11 @@ def new_converter_model(filter_view: ItemDeclaration):
     )
 
 
-ALL_MODELS = [ImageReaderDataModel, ImageViewerDataModel] + [
+ALL_MODELS = [
+    ImageReaderNode,
+    ImageViewerNode,
+    ImageShapeNode,
+] + [
     new_converter_model(item)
     for item in (
         BlurFilterView_,

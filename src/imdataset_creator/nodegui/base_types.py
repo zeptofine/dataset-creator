@@ -29,8 +29,60 @@ class PathGeneratorData(NodeData):
         return self._generator
 
 
+class RandomNumberGeneratorData(NodeData):
+    """Node data holding a generator"""
+
+    data_type = NodeDataType("random_number_generator", "Random Number Generator")
+
+    def __init__(self, generator: Callable[[], float]):
+        self._generator: Callable[[], float] = generator
+        self._lock = threading.RLock()
+
+    @property
+    def lock(self):
+        return self._lock
+
+    @property
+    def generator(self) -> Callable[[], float]:
+        return self._generator
+
+
+class IntegerData(NodeData):
+    data_type = NodeDataType("integer", "Integer")
+
+    def __init__(self, value: int):
+        self._value = value
+
+    @property
+    def value(self) -> int:
+        return self._value
+
+
+class FloatData(NodeData):
+    data_type = NodeDataType("float", "Float")
+
+    def __init__(self, value: float):
+        self._value = value
+
+    @property
+    def value(self) -> float:
+        return self._value
+
+
 class SignalData(NodeData):
     data_type = NodeDataType("signal", "Signal")
+
+
+class BoolData(NodeData):
+    data_type = NodeDataType("bool", "Boolean")
+
+    def __init__(self, v: bool) -> None:
+        super().__init__()
+        self._value = v
+
+    @property
+    def value(self) -> bool:
+        return self._value
 
 
 class ListData(NodeData):
@@ -103,6 +155,9 @@ def register_type(registry: ne.DataModelRegistry, from_: NodeDataType, to_: Node
 def register_types(registry: ne.DataModelRegistry):
     register_type(registry, PathGeneratorData.data_type, ListData.data_type, generator_to_list_converter)
     register_type(registry, ListData.data_type, PathGeneratorData.data_type, list_to_generator_converter)
+    register_type(registry, AnyData.data_type, PathGeneratorData.data_type, any_to_generator_converter)
+
+    # I hate Any
     register_type(registry, AnyData.data_type, ListData.data_type, lambda item: ListData(list(item.item)))
     register_type(registry, AnyData.data_type, ImageData.data_type, lambda item: ImageData(item.item))
     register_type(registry, AnyData.data_type, PathData.data_type, lambda item: PathData(item.item))
@@ -110,7 +165,27 @@ def register_types(registry: ne.DataModelRegistry):
     register_type(registry, PathData.data_type, AnyData.data_type, lambda item: AnyData(str(item.path)))
     register_type(registry, ImageData.data_type, AnyData.data_type, lambda item: AnyData(item.image))
     register_type(registry, SignalData.data_type, AnyData.data_type, lambda item: AnyData(True))
-    register_type(registry, AnyData.data_type, PathGeneratorData.data_type, any_to_generator_converter)
-
+    register_type(registry, IntegerData.data_type, FloatData.data_type, lambda item: FloatData(float(item.value)))
+    register_type(registry, FloatData.data_type, IntegerData.data_type, lambda item: IntegerData(int(item.value)))
+    register_type(registry, IntegerData.data_type, AnyData.data_type, lambda item: AnyData(item.value))
+    register_type(registry, FloatData.data_type, AnyData.data_type, lambda item: AnyData(item.value))
+    register_type(registry, AnyData.data_type, IntegerData.data_type, lambda item: IntegerData(int(item.item)))
+    register_type(registry, AnyData.data_type, FloatData.data_type, lambda item: FloatData(float(item.item)))
+    register_type(
+        registry,
+        IntegerData.data_type,
+        RandomNumberGeneratorData.data_type,
+        lambda item: RandomNumberGeneratorData(lambda: float(item.value)),
+    )
+    register_type(
+        registry,
+        FloatData.data_type,
+        RandomNumberGeneratorData.data_type,
+        lambda item: RandomNumberGeneratorData(lambda: item.value),
+    )
+    register_type(registry, BoolData.data_type, SignalData.data_type, lambda item: SignalData() if item.value else None)
+    register_type(registry, BoolData.data_type, IntegerData.data_type, lambda item: IntegerData(int(item.value)))
+    register_type(registry, BoolData.data_type, FloatData.data_type, lambda item: FloatData(float(item.value)))
+    register_type(registry, BoolData.data_type, AnyData.data_type, lambda item: AnyData(item.value))
     for data in (PathGeneratorData, ListData, AnyData, ImageData, PathData):
         register_type(registry, data.data_type, SignalData.data_type, anything_to_signal_converter)
