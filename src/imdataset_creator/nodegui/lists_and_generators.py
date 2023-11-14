@@ -26,6 +26,7 @@ from .base_types import (
     ListData,
     PathData,
     PathGeneratorData,
+    SignalData,
 )
 
 
@@ -78,10 +79,11 @@ class FileGlobber(NodeDataModel):
 
 
 class GeneratorStepper(NodeDataModel):
-    num_ports = PortCount(1, 1)
+    num_ports = PortCount(2, 1)
     data_types = DataTypes(
         {
             0: PathGeneratorData.data_type,
+            1: SignalData.data_type,
         },
         {0: PathData.data_type},
     )
@@ -91,8 +93,6 @@ class GeneratorStepper(NodeDataModel):
         self._generator = None
         self._validation_state = NodeValidationState.error
         self._validation_message = "Uninitialized"
-        self._step_button = QToolButton()
-        self._step_button.clicked.connect(self.pop_data)
         self._next_item = None
 
     def out_data(self, _: int) -> PathData | None:
@@ -107,18 +107,19 @@ class GeneratorStepper(NodeDataModel):
             self._next_item = next(self._generator)
             self.data_updated.emit(0)
         except StopIteration:
-            self._step_button.setEnabled(False)
             self.invalidate()
 
-    def set_in_data(self, node_data: PathGeneratorData | None, _: Port):
-        if node_data is None:
-            self.invalidate()
-            self._step_button.setEnabled(False)
-            return
+    def set_in_data(self, node_data: PathGeneratorData | None, port: Port):
+        if port.index == 0:
+            if node_data is None:
+                self.invalidate()
+                return
 
-        self._generator = node_data.generator
-        self._step_button.setEnabled(True)
-        self.revalidate()
+            self._generator = node_data.generator
+            self.revalidate()
+        elif port.index == 1:
+            if isinstance(node_data, SignalData):
+                self.pop_data()
 
     def invalidate(self):
         self._validation_state = NodeValidationState.error
@@ -133,9 +134,6 @@ class GeneratorStepper(NodeDataModel):
 
     def validation_message(self) -> str:
         return self._validation_message
-
-    def embedded_widget(self) -> QWidget:
-        return self._step_button
 
 
 class GeneratorSplitterDataModel(NodeDataModel):
@@ -172,13 +170,16 @@ class GeneratorSplitterDataModel(NodeDataModel):
         self.data_updated.emit(1)
 
     def get_next_item(self):
-        assert self._in_gen is not None
+        if self._in_gen is None:
+            return
         with contextlib.suppress(StopIteration):
             next_item = next(self._in_gen)
             self._first_q.put(next_item)
             self._last_q.put(next_item)
 
     def _generator(self, q: Queue):
+        if self._in_gen is None:
+            return None
         assert self._in_gen is not None
         while True:
             if q.empty():
@@ -278,3 +279,15 @@ class ListShufflerDataModel(NodeDataModel):
             return
         self._list = node_data.list
         self.data_updated.emit(0)
+
+
+ALL_GENERATORS = [
+    GeneratorStepper,
+    GeneratorSplitterDataModel,
+    GeneratorResolverDataModel,
+]
+ALL_LIST_MODELS = [
+    FileGlobber,
+    ListShufflerDataModel,
+    ListHeadDataModel,
+]

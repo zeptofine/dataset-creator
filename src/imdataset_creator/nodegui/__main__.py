@@ -53,23 +53,62 @@ from qtpynodeeditor.type_converter import TypeConverter
 from ..gui.settings_inputs import DirectoryInput, DirectoryInputSettings, MultilineInput, SettingsBox, SettingsRow
 from .base_types import (
     AnyData,
-    ImageData,
-    ListData,
-    PathData,
-    PathGeneratorData,
-    generator_to_list_converter,
-    list_to_generator_converter,
+    register_types,
 )
 from .image_models import ALL_MODELS as IMAGE_MODELS
 from .lists_and_generators import (
-    FileGlobber,
-    GeneratorResolverDataModel,
-    GeneratorSplitterDataModel,
-    GeneratorStepper,
-    ListHeadDataModel,
-    ListShufflerDataModel,
+    ALL_GENERATORS,
+    ALL_LIST_MODELS,
     get_text_bounds,
 )
+from .signals import ALL_MODELS as SIGNAL_MODELS
+from .signals import SignalHandler
+
+
+class OrDataModel(NodeDataModel):
+    num_ports = PortCount(2, 1)
+    all_data_types = AnyData.data_type
+
+    def __init__(self, style=None, parent=None):
+        super().__init__(style, parent)
+        self._result = None
+
+    def out_data(self, port: int) -> NodeData | None:
+        return AnyData(self._result)
+
+    def set_in_data(self, node_data: AnyData | None, port: Port):
+        if node_data is None:
+            return
+        self._result = node_data.item
+        self.data_updated.emit(0)
+
+
+class DistributorDataModel(NodeDataModel):
+    num_ports = PortCount(1, 2)
+    all_data_types = AnyData.data_type
+
+    def __init__(self, style=None, parent=None):
+        super().__init__(style, parent)
+        self._n = 0
+        self._item = None
+        self._released = False
+
+    def out_data(self, port: int) -> NodeData | None:
+        if self._item is None:
+            return None
+        if self._released:
+            self._released = False
+            return AnyData(self._item)
+        return None
+
+    def set_in_data(self, node_data: AnyData | None, port: Port):
+        if node_data is None:
+            return
+
+        self._item = node_data.item
+        self._released = True
+        self.data_updated.emit(self._n)
+        self._n = (self._n + 1) % 2
 
 
 class PrinterDataModel(NodeDataModel):
@@ -90,6 +129,16 @@ class PrinterDataModel(NodeDataModel):
 
     def embedded_widget(self) -> QWidget:
         return self._label
+
+
+class DebugPrinterDataModel(NodeDataModel):
+    name = "Debug print"
+    num_ports = PortCount(1, 0)
+    all_data_types = AnyData.data_type
+
+    def set_in_data(self, node_data: AnyData | None, port: Port):
+        if node_data is not None:
+            print(node_data.item)
 
 
 class BufferDataModel(NodeDataModel):
@@ -126,55 +175,45 @@ def main(app):
     registry = ne.DataModelRegistry()
 
     model_dct = {
-        "generators": [
-            FileGlobber,
-            GeneratorStepper,
-            GeneratorSplitterDataModel,
-            GeneratorResolverDataModel,
-        ],
+        "generators": ALL_GENERATORS,
         "lists": [
             BufferDataModel,
-            ListHeadDataModel,
-            ListShufflerDataModel,
+            *ALL_LIST_MODELS,
         ],
         "images": IMAGE_MODELS,
         "misc": [
+            DistributorDataModel,
             PrinterDataModel,
+            DebugPrinterDataModel,
             BufferDataModel,
+            OrDataModel,
         ],
     }
     for category, models in model_dct.items():
         for model in models:
             registry.register_model(model, category)
 
-    register_type(registry, PathGeneratorData.data_type, ListData.data_type, generator_to_list_converter)
-    register_type(registry, ListData.data_type, PathGeneratorData.data_type, list_to_generator_converter)
-    register_type(registry, AnyData.data_type, ListData.data_type, lambda item: ListData(list(item.item)))
-    register_type(registry, ListData.data_type, AnyData.data_type, lambda item: AnyData(item.list))
-    register_type(registry, PathData.data_type, AnyData.data_type, lambda item: AnyData(str(item.path)))
-    register_type(registry, ImageData.data_type, AnyData.data_type, lambda item: AnyData(item.image))
-    register_type(registry, AnyData.data_type, ImageData.data_type, lambda item: ImageData(item.item))
-    register_type(
-        registry,
-        AnyData.data_type,
-        PathGeneratorData.data_type,
-        lambda item: PathGeneratorData(Path(p) for p in item.item),
-    )
+    signal_handler = SignalHandler()
+    for model in SIGNAL_MODELS:
+        registry.register_model(model, "signals", signal_handler=signal_handler)
+
+    register_types(registry)
 
     scene = ne.FlowScene(registry=registry)
     view = ne.FlowView(scene)
     view.setWindowTitle("Generator ui")
-    view.resize(1920, 600)
+    view.resize(2560, 600)
     view.show()
-
+    signal_handler.start()
     scene.load("text.flow")
-    return scene, view
+    return scene, view, signal_handler
 
 
 if __name__ == "__main__":
     logging.basicConfig(level="DEBUG")
     app = QApplication([])
-    scene, view = main(app)
+    scene, view, sh = main(app)
     scene.load("text.flow")
     app.exec_()
     scene.save("text.flow")
+    sh.signal_queue.put(None)

@@ -6,7 +6,8 @@ import cv2
 import numpy as np
 import PySide6.QtCore
 from PIL import Image
-from qtpy.QtCore import QEvent, QObject, Qt
+from PySide6.QtCore import Signal, Slot
+from qtpy.QtCore import QEvent, QObject, Qt, QThread
 from qtpy.QtGui import QImage, QPixmap
 from qtpy.QtWidgets import (
     QLabel,
@@ -70,7 +71,8 @@ class ImageReaderDataModel(NodeDataModel):
         if node_data is None:
             return
 
-        self._img = cv2.imread(str(node_data.path))
+        pth = str(node_data.path)
+        self._img = cv2.imread(pth)
         if self._img is None:
             self._img = np.ndarray((0, 0, 3))
         self.data_updated.emit(0)
@@ -112,6 +114,8 @@ class ImageViewerDataModel(NodeDataModel):
         self._node_data = node_data
         if node_data is not None:
             im = node_data.image
+            if not len(im):
+                return
             im: np.ndarray = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
             im = im.astype(np.uint32)
             shape = im.shape
@@ -129,6 +133,16 @@ class ImageViewerDataModel(NodeDataModel):
         return self._pixmap_label
 
 
+class ImageConverterThread(QThread):
+    f: Filter
+    img: np.ndarray
+
+    completed_data = Signal(np.ndarray)
+
+    def run(self):
+        self.completed_data.emit(self.f.run(self.img))
+
+
 class BasicImageConverterModel(NodeDataModel):
     all_data_types = ImageData.data_type
     num_ports = PortCount(1, 1)
@@ -138,6 +152,8 @@ class BasicImageConverterModel(NodeDataModel):
     def __init__(self, style=None, parent=None):
         super().__init__(style, parent)
         self._output: ImageData | None = None
+        self._thread = ImageConverterThread(parent)
+        self._thread.completed_data.connect(self.set_output)
         self._settings = self.get_widget()
 
     def out_data(self, port: int) -> NodeData | None:
@@ -148,9 +164,17 @@ class BasicImageConverterModel(NodeDataModel):
     def set_in_data(self, node_data: ImageData | None, port: Port):
         if node_data is None:
             return
-        obj: Filter = self.item.get(self._settings)
+        f: Filter = self.item.get(self._settings)
+        self._thread.f = f
+        self._thread.img = node_data.image
+        self._thread.start()
 
-        self._output = ImageData(obj.run(node_data.image))
+        # self._output = ImageData(obj.run(node_data.image))
+        # self.data_updated.emit(0)
+
+    @Slot(np.ndarray)
+    def set_output(self, img: np.ndarray):
+        self._output = ImageData(img)
         self.data_updated.emit(0)
 
     def compute(self, img: ImageData):

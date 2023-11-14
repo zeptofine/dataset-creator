@@ -1,12 +1,14 @@
 import threading
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from pathlib import Path
 
 import numpy as np
+import qtpynodeeditor as ne
 from qtpynodeeditor import (
     NodeData,
     NodeDataType,
 )
+from qtpynodeeditor.type_converter import TypeConverter
 
 
 class PathGeneratorData(NodeData):
@@ -25,6 +27,10 @@ class PathGeneratorData(NodeData):
     @property
     def generator(self) -> Generator:
         return self._generator
+
+
+class SignalData(NodeData):
+    data_type = NodeDataType("signal", "Signal")
 
 
 class ListData(NodeData):
@@ -80,3 +86,31 @@ def generator_to_list_converter(data: PathGeneratorData) -> ListData:
 
 def list_to_generator_converter(data: ListData) -> PathGeneratorData:
     return PathGeneratorData(x for x in data.list)
+
+
+def any_to_generator_converter(data: AnyData):
+    return PathGeneratorData(Path(p) for p in data.item)
+
+
+def anything_to_signal_converter(_: NodeData) -> SignalData:
+    return SignalData()
+
+
+def register_type(registry: ne.DataModelRegistry, from_: NodeDataType, to_: NodeDataType, converter: Callable):
+    registry.register_type_converter(from_, to_, TypeConverter(from_, to_, converter))
+
+
+def register_types(registry: ne.DataModelRegistry):
+    register_type(registry, PathGeneratorData.data_type, ListData.data_type, generator_to_list_converter)
+    register_type(registry, ListData.data_type, PathGeneratorData.data_type, list_to_generator_converter)
+    register_type(registry, AnyData.data_type, ListData.data_type, lambda item: ListData(list(item.item)))
+    register_type(registry, AnyData.data_type, ImageData.data_type, lambda item: ImageData(item.item))
+    register_type(registry, AnyData.data_type, PathData.data_type, lambda item: PathData(item.item))
+    register_type(registry, ListData.data_type, AnyData.data_type, lambda item: AnyData(item.list))
+    register_type(registry, PathData.data_type, AnyData.data_type, lambda item: AnyData(str(item.path)))
+    register_type(registry, ImageData.data_type, AnyData.data_type, lambda item: AnyData(item.image))
+    register_type(registry, SignalData.data_type, AnyData.data_type, lambda item: AnyData(True))
+    register_type(registry, AnyData.data_type, PathGeneratorData.data_type, any_to_generator_converter)
+
+    for data in (PathGeneratorData, ListData, AnyData, ImageData, PathData):
+        register_type(registry, data.data_type, SignalData.data_type, anything_to_signal_converter)
