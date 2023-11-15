@@ -28,7 +28,7 @@ from .base_types import (
 
 
 class SignalHandler(QThread):
-    signal_queue: Queue[int | None] = Queue()
+    signal_queue: Queue[int | None] = Queue(5)
     signalled = Signal(int)
 
     def run(self):
@@ -37,9 +37,6 @@ class SignalHandler(QThread):
             if signal is None:
                 break
             self.signalled.emit(signal)
-
-
-SIGNALS_HANDLER = SignalHandler()
 
 
 class SignalSource(NodeDataModel):

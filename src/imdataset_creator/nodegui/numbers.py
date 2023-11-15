@@ -99,7 +99,63 @@ class FloatNode(NodeDataModel):
         return self._widget
 
 
+class MathNode(NodeDataModel):
+    all_data_types = FloatData.data_type
+
+    num_ports = PortCount(2, 1)
+
+    caption_override = CaptionOverride(
+        {0: "A", 1: "B"},
+        {0: "Out"},
+    )
+
+    def __init__(self, style=None, parent=None):
+        super().__init__(style, parent)
+        self._widget = QComboBox(parent)
+        self.operators: dict[str, Callable[[float, float], float]] = {
+            "+": operator.add,
+            "-": operator.sub,
+            "*": operator.mul,
+            "/": operator.truediv,
+            "//": operator.floordiv,
+            "%": operator.mod,
+            "**": operator.pow,
+            "max": max,
+            "min": min,
+        }
+        self._widget.addItems(list(self.operators.keys()))
+        self.first: float | None = None
+        self.second: float | None = None
+        self._result: FloatData | None = None
+
+    def out_data(self, port: int) -> NodeData | None:
+        return self._result
+
+    def set_in_data(self, node_data: FloatData | None, port: Port):
+        if port.index == 0:
+            self.first = node_data.value if node_data is not None else None
+        elif port.index == 1:
+            self.second = node_data.value if node_data is not None else None
+
+        if self.first is not None and self.second is not None:
+            self._result = FloatData(self.operators[self._widget.currentText()](self.first, self.second))
+            self.data_updated.emit(0)
+
+    def save(self) -> dict:
+        dct = super().save()
+        dct["operator"] = self._widget.currentText()
+        return dct
+
+    def restore(self, doc: dict):
+        if "operator" in doc:
+            self._widget.setCurrentText(doc["operator"])
+
+    def embedded_widget(self) -> QWidget:
+        return self._widget
+
+
 class ComparisonNode(NodeDataModel):
+    caption_visible = False
     # all_data_types = FloatData.data_type
     data_types = DataTypes(
         {
@@ -108,13 +164,17 @@ class ComparisonNode(NodeDataModel):
         },
         {0: BoolData.data_type},
     )
+    caption_override = CaptionOverride(
+        {0: "A", 1: "B"},
+        {0: "Out"},
+    )
 
     num_ports = PortCount(2, 1)
 
     def __init__(self, style=None, parent=None):
         super().__init__(style, parent)
         self._widget = QComboBox(parent)
-        self.operators = {
+        self.operators: dict[str, Callable[[float, float], bool]] = {
             ">": operator.gt,
             ">=": operator.ge,
             "<": operator.lt,
@@ -265,6 +325,7 @@ class NumberGeneratorResolverNode(NodeDataModel):
 ALL_MODELS = [
     IntegerNode,
     FloatNode,
+    MathNode,
     ComparisonNode,
     RandomRangeNode,
     NumberGeneratorResolverNode,

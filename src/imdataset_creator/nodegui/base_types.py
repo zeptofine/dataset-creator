@@ -121,6 +121,18 @@ class PathData(NodeData):
         return self._path
 
 
+class StringData(NodeData):
+    data_type = NodeDataType("str", "String")
+
+    def __init__(self, s: str) -> None:
+        super().__init__()
+        self._str = s
+
+    @property
+    def string(self):
+        return self._str
+
+
 class ImageData(NodeData):
     data_type = NodeDataType("image", "Image")
 
@@ -152,19 +164,29 @@ def register_type(registry: ne.DataModelRegistry, from_: NodeDataType, to_: Node
     registry.register_type_converter(from_, to_, TypeConverter(from_, to_, converter))
 
 
+def bool_to_signal_generator(item: BoolData) -> SignalData | None:
+    return SignalData() if item.value else None
+
+
 def register_types(registry: ne.DataModelRegistry):
     register_type(registry, PathGeneratorData.data_type, ListData.data_type, generator_to_list_converter)
     register_type(registry, ListData.data_type, PathGeneratorData.data_type, list_to_generator_converter)
     register_type(registry, AnyData.data_type, PathGeneratorData.data_type, any_to_generator_converter)
 
+    register_type(registry, PathData.data_type, StringData.data_type, lambda item: StringData(str(item.path)))
+    register_type(registry, StringData.data_type, PathData.data_type, lambda item: PathData(Path(item.string)))
+    register_type(registry, StringData.data_type, AnyData.data_type, lambda item: AnyData(item.string))
+    register_type(registry, AnyData.data_type, StringData.data_type, lambda item: StringData(item.item))
     # I hate Any
     register_type(registry, AnyData.data_type, ListData.data_type, lambda item: ListData(list(item.item)))
     register_type(registry, AnyData.data_type, ImageData.data_type, lambda item: ImageData(item.item))
     register_type(registry, AnyData.data_type, PathData.data_type, lambda item: PathData(item.item))
     register_type(registry, ListData.data_type, AnyData.data_type, lambda item: AnyData(item.list))
-    register_type(registry, PathData.data_type, AnyData.data_type, lambda item: AnyData(str(item.path)))
+    register_type(registry, PathData.data_type, AnyData.data_type, lambda item: AnyData(item.path))
     register_type(registry, ImageData.data_type, AnyData.data_type, lambda item: AnyData(item.image))
     register_type(registry, SignalData.data_type, AnyData.data_type, lambda item: AnyData(True))
+    register_type(registry, SignalData.data_type, BoolData.data_type, lambda item: BoolData(True))
+    register_type(registry, AnyData.data_type, BoolData.data_type, lambda item: BoolData(item.item))
     register_type(registry, IntegerData.data_type, FloatData.data_type, lambda item: FloatData(float(item.value)))
     register_type(registry, FloatData.data_type, IntegerData.data_type, lambda item: IntegerData(int(item.value)))
     register_type(registry, IntegerData.data_type, AnyData.data_type, lambda item: AnyData(item.value))
@@ -183,9 +205,18 @@ def register_types(registry: ne.DataModelRegistry):
         RandomNumberGeneratorData.data_type,
         lambda item: RandomNumberGeneratorData(lambda: item.value),
     )
-    register_type(registry, BoolData.data_type, SignalData.data_type, lambda item: SignalData() if item.value else None)
+    register_type(registry, BoolData.data_type, SignalData.data_type, bool_to_signal_generator)
     register_type(registry, BoolData.data_type, IntegerData.data_type, lambda item: IntegerData(int(item.value)))
     register_type(registry, BoolData.data_type, FloatData.data_type, lambda item: FloatData(float(item.value)))
     register_type(registry, BoolData.data_type, AnyData.data_type, lambda item: AnyData(item.value))
-    for data in (PathGeneratorData, ListData, AnyData, ImageData, PathData):
+    for data in (
+        PathGeneratorData,
+        ListData,
+        AnyData,
+        ImageData,
+        PathData,
+        StringData,
+        FloatData,
+        IntegerData,
+    ):
         register_type(registry, data.data_type, SignalData.data_type, anything_to_signal_converter)

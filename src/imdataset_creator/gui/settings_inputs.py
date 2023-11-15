@@ -4,9 +4,9 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-from PySide6.QtCore import QDate, QDateTime, QRect, QSize, Qt, QTime, Signal, Slot
+from PySide6.QtCore import QDate, QDateTime, QObject, QRect, QSize, Qt, QTime, Signal, Slot
 from PySide6.QtGui import QAction, QFont, QIcon, QMouseEvent
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -85,7 +85,8 @@ class SettingsRow(QHBoxLayout):
         self.from_config_mod = from_config_mod
         self.to_config_mod = to_config_mod
         self.item: SettingsItem = item
-        for widget in self.create_widgets():
+        self.widgets = self.create_widgets()
+        for widget in self.widgets:
             self.addWidget(widget)
 
     @abstractmethod
@@ -523,10 +524,17 @@ class DateTimeInput(BaseInput):
         return DateTimeInputSettings(self.format, self.default, self.calendar_popup)
 
 
-class DirectoryInputSettings(SettingsItem):
-    def __init__(self, default: str = ""):
+class FileInputSettings(SettingsItem):
+    def __init__(self, default: str = "", mode: Literal["directory", "file"] = "directory"):
         super().__init__()
         self.default = default
+        self.filemode = {
+            "directory": QFileDialog.FileMode.Directory,
+            "file": QFileDialog.FileMode.ExistingFile,
+        }.get(
+            mode,
+            QFileDialog.FileMode.Directory,
+        )
 
     def create(self):
         self.text_widget: QLineEdit = QLineEdit()
@@ -537,9 +545,9 @@ class DirectoryInputSettings(SettingsItem):
         self.folder_select.setIcon(QIcon.fromTheme("folder-open"))
         self.folder_select.clicked.connect(self.select_folder)
         self.filedialog = QFileDialog()
-        self.filedialog.setFileMode(QFileDialog.FileMode.Directory)
-        self.filedialog.setOption(QFileDialog.Option.ShowDirsOnly, True)
-        self.filedialog.setOption(QFileDialog.Option.DontResolveSymlinks, True)
+        self.filedialog.setFileMode(self.filemode)
+        if self.filemode is QFileDialog.FileMode.Directory:
+            self.filedialog.setOption(QFileDialog.Option.ShowDirsOnly, True)
 
         return [self.text_widget, self.folder_select]
 
@@ -576,7 +584,12 @@ class DirectoryInput(BaseInput):
         self.default = default
 
     def get_settings(self):
-        return DirectoryInputSettings(self.default)
+        return FileInputSettings(self.default, mode="directory")
+
+
+class FileInput(DirectoryInput):
+    def get_settings(self):
+        return FileInputSettings(self.default, mode="file")
 
 
 ItemSettings = dict[str | tuple[str, ...], BaseInput]

@@ -1,44 +1,27 @@
-import contextlib
 import logging
-import random
-import threading
-from collections.abc import Callable, Generator
-from itertools import chain
-from pathlib import Path
+from collections.abc import Callable
 from pprint import pformat
-from queue import Empty, Queue
 
-import cv2
-import numpy as np
 import qtpynodeeditor as ne
-import wcmatch.glob as wglob
 from qtpy.QtWidgets import (
     QApplication,
     QLabel,
     QTextEdit,
-    QToolButton,
     QWidget,
 )
 from qtpynodeeditor import (
-    CaptionOverride,
-    ConnectionPolicy,
-    DataTypes,
-    NodeData,
     NodeDataModel,
     NodeDataType,
-    NodeValidationState,
     Port,
     PortCount,
-    PortType,
 )
 from qtpynodeeditor.type_converter import TypeConverter
 
-from ..gui.settings_inputs import DirectoryInput, DirectoryInputSettings, MultilineInput, SettingsBox, SettingsRow
 from .base_types import (
     AnyData,
-    SignalData,
     register_types,
 )
+from .custom_flow_view import CustomFlowView
 from .image_models import ALL_MODELS as IMAGE_MODELS
 from .lists_and_generators import (
     ALL_GENERATORS,
@@ -47,6 +30,7 @@ from .lists_and_generators import (
 )
 from .logic import ALL_MODELS as LOGIC_MODELS
 from .numbers import ALL_MODELS as NUMBER_MODELS
+from .paths import ALL_MODELS as PATH_MODELS
 from .signals import ALL_MODELS as SIGNAL_MODELS
 from .signals import SignalHandler
 
@@ -123,6 +107,7 @@ def main(app):
             NoteNode,
         ],
         "logic": LOGIC_MODELS,
+        "paths": PATH_MODELS,
     }
     for category, models in model_dct.items():
         for model in models:
@@ -135,9 +120,14 @@ def main(app):
     register_types(registry)
 
     scene = ne.FlowScene(registry=registry)
-    view = ne.FlowView(scene)
+
+    connection_style = scene.style_collection.connection
+
+    # Configure the style collection to use colors based on data types:
+    connection_style.use_data_defined_colors = True
+    view = CustomFlowView(scene)
     view.setWindowTitle("Generator ui")
-    view.resize(2560, 600)
+    view.resize(1920, 600)
     view.show()
     signal_handler.start()
     scene.load("text.flow")
@@ -145,7 +135,7 @@ def main(app):
 
 
 def app_main():
-    logging.basicConfig(level="DEBUG")
+    # logging.basicConfig(level="DEBUG")
     app = QApplication([])
     scene, view, sh = main(app)
     scene.load("text.flow")

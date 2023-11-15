@@ -176,7 +176,7 @@ class Input(Keyworded):
 
     @classmethod
     def from_cfg(cls, cfg: InputData):
-        return cls(Path(cfg["folder"]).expanduser(), cfg["expressions"])
+        return cls(Path(cfg.get("folder", ".")).expanduser(), cfg["expressions"])
 
     def run(self) -> PathGenerator:
         """

@@ -22,7 +22,10 @@ from qtpynodeeditor import (
     PortCount,
 )
 
-from ..gui.input_view import InputView_
+from ..datarules.base_rules import Input
+from ..gui.config_inputs import ItemDeclaration
+from ..gui.input_view import DEFAULT_IMAGE_FORMATS, InputView_
+from ..gui.settings_inputs import DirectoryInput, ItemSettings, MultilineInput
 from .base_types import (
     IntegerData,
     ListData,
@@ -36,30 +39,51 @@ def get_text_bounds(text: str, font: QFont):
     return QFontMetrics(font).size(0, text, 0)
 
 
-class FileGlobberNode(NodeDataModel):
-    num_ports = PortCount(0, 1)
+GlobberItem = ItemDeclaration[Input](
+    "Input",
+    Input,
+    settings=ItemSettings(
+        {
+            "expressions": MultilineInput(
+                default="\n".join(f"**/*{ext}" for ext in DEFAULT_IMAGE_FORMATS),
+                is_list=True,
+            ),
+        }
+    ),
+)
 
-    all_data_types = PathGeneratorData.data_type
+
+class GlobberNode(NodeDataModel):
+    num_ports = PortCount(2, 1)
+    data_types = DataTypes(
+        {0: PathData.data_type, 1: SignalData.data_type},
+        {0: PathGeneratorData.data_type},
+    )
 
     def __init__(self, style=None, parent=None):
         super().__init__(style, parent)
-        self._item = InputView_
+        self._item = GlobberItem
         self._settings = self._item.create_settings_widget()
-        self._start_button = QToolButton()
-        self._start_button.clicked.connect(lambda: self.get_generator())
-        self._start_button.setText("gather")
-        self._settings.layout().addWidget(self._start_button)
         self._result = None
         self._saved_generator = None
+        self._pth = None
 
     def out_data(self, _: int) -> NodeData | None:
         if self._saved_generator is None:
             return None
         return PathGeneratorData(self._saved_generator)
 
-    def get_generator(self):
-        in_ = self._item.get(self._settings)
+    def set_in_data(self, node_data: PathData | None, port: Port):
+        if node_data is None:
+            return
+        if port.index == 0:
+            self._pth = node_data.path
+        if port.index == 1 and self._pth is not None:
+            self.set_generator(self._pth)
 
+    def set_generator(self, pth: Path):
+        in_ = self._item.get(self._settings)
+        in_.folder = pth
         self._saved_generator = in_.run()
         self.data_updated.emit(0)
 
@@ -194,6 +218,7 @@ class EnumerateNode(NodeDataModel):
                 self.invalidate()
                 return
             assert isinstance(node_data, PathGeneratorData)
+            self._index = 0
             self._generator = node_data.generator
             self.revalidate()
 
@@ -291,12 +316,8 @@ class GeneratorSplitterNode(NodeDataModel):
 class GeneratorResolverNode(NodeDataModel):
     num_ports = PortCount(1, 1)
     data_types = DataTypes(
-        {
-            0: PathGeneratorData.data_type,
-        },
-        {
-            0: ListData.data_type,
-        },
+        {0: PathGeneratorData.data_type},
+        {0: ListData.data_type},
     )
 
     def __init__(self, style=None, parent=None):
@@ -370,7 +391,7 @@ ALL_GENERATORS = [
     EnumerateNode,
 ]
 ALL_LIST_MODELS = [
-    FileGlobberNode,
+    GlobberNode,
     ListShufflerNode,
     ListHeadNode,
 ]

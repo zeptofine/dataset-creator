@@ -1,6 +1,7 @@
 import contextlib
 import threading
 from abc import abstractmethod
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -28,6 +29,7 @@ from qtpynodeeditor import (
 from qtpynodeeditor.type_converter import TypeConverter
 
 from ..datarules.base_rules import Filter
+from ..datarules.image_rules import _get_hwc
 from ..gui.config_inputs import ItemDeclaration
 from ..gui.output_view import (
     BlurFilterView_,
@@ -39,7 +41,7 @@ from ..gui.output_view import (
     RandomRotateFilterView_,
     ResizeFilterView_,
 )
-from ..gui.settings_inputs import DirectoryInput, DirectoryInputSettings, MultilineInput, SettingsBox, SettingsRow
+from ..gui.settings_inputs import DirectoryInput, FileInputSettings, MultilineInput, SettingsBox, SettingsRow
 from .base_types import (
     AnyData,
     ImageData,
@@ -52,6 +54,16 @@ from .base_types import (
 )
 
 
+class ImageReaderThread(QThread):
+    pth: Path
+    image_read = Signal(np.ndarray)
+
+    def run(self):
+        img = cv2.imread(str(self.pth))
+        if img is not None:
+            self.image_read.emit(img)
+
+
 class ImageReaderNode(NodeDataModel):
     name = "Read Image"
     data_types = DataTypes(
@@ -62,6 +74,8 @@ class ImageReaderNode(NodeDataModel):
     def __init__(self, style=None, parent=None):
         super().__init__(style, parent)
         self._img = None
+        self._reader_thread = ImageReaderThread()
+        self._reader_thread.image_read.connect(self.set_image)
 
     def out_data(self, port: int) -> ImageData | None:
         if self._img is None:
@@ -72,10 +86,12 @@ class ImageReaderNode(NodeDataModel):
         if node_data is None:
             return
 
-        pth = str(node_data.path)
-        self._img = cv2.imread(pth)
-        if self._img is None:
-            self._img = np.ndarray((0, 0, 3))
+        self._reader_thread.pth = node_data.path
+        self._reader_thread.start()
+        self._reader_thread.wait()
+
+    def set_image(self, img):
+        self._img = img
         self.data_updated.emit(0)
 
 
@@ -115,7 +131,7 @@ class ImageViewerNode(NodeDataModel):
         self._node_data = node_data
         if node_data is not None:
             im = node_data.image
-            if not len(im):
+            if im is None:
                 return
             im: np.ndarray = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
             im = im.astype(np.uint32)
@@ -177,6 +193,33 @@ class ImageShapeNode(NodeDataModel):
 
         self._result = get_h_w_c(node_data.image)
         self.data_updated.emit(0)
+        self.data_updated.emit(1)
+        self.data_updated.emit(2)
+
+
+class FastImageShapeNode(ImageShapeNode):
+    name = "Fast Image Shape"
+    caption = "Fast Image Shape"
+    data_types = DataTypes(
+        {
+            0: PathData.data_type,
+        },
+        {
+            0: IntegerData.data_type,
+            1: IntegerData.data_type,
+            2: IntegerData.data_type,
+        },
+    )
+
+    def set_in_data(self, node_data: PathData | None, port: Port):
+        if node_data is None:
+            self._result = None
+            return
+
+        self._result = _get_hwc(node_data.path)
+        self.data_updated.emit(0)
+        self.data_updated.emit(1)
+        self.data_updated.emit(2)
 
 
 class ImageConverterThread(QThread):
@@ -211,9 +254,12 @@ class BasicImageConverterModel(NodeDataModel):
         if node_data is None:
             return
         f: Filter = self.item.get(self._settings)
+        # self._thread.wait()
         self._thread.f = f
         self._thread.img = node_data.image
+
         self._thread.start()
+        self._thread.wait()
 
         # self._output = ImageData(obj.run(node_data.image))
         # self.data_updated.emit(0)
@@ -261,6 +307,7 @@ ALL_MODELS = [
     ImageReaderNode,
     ImageViewerNode,
     ImageShapeNode,
+    FastImageShapeNode,
 ] + [
     new_converter_model(item)
     for item in (
