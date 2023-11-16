@@ -17,10 +17,7 @@ from qtpynodeeditor import (
 )
 from qtpynodeeditor.type_converter import TypeConverter
 
-from .base_types import (
-    AnyData,
-    register_types,
-)
+from .base_types import AnyData, register_types
 from .custom_flow_view import CustomFlowView
 from .image_models import ALL_MODELS as IMAGE_MODELS
 from .lists_and_generators import (

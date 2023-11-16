@@ -26,7 +26,7 @@ from ..datarules.base_rules import Input
 from ..gui.config_inputs import ItemDeclaration
 from ..gui.input_view import DEFAULT_IMAGE_FORMATS, InputView_
 from ..gui.settings_inputs import DirectoryInput, ItemSettings, MultilineInput
-from .base_types import (
+from .base_types.base_types import (
     IntegerData,
     ListData,
     PathData,

@@ -1,50 +1,28 @@
 import shutil
-import threading
 from abc import abstractmethod
 from collections.abc import Callable
-from operator import attrgetter, itemgetter
-from pathlib import Path, PurePath
+from operator import attrgetter
+from pathlib import Path
 from typing import Any
 
-import cv2
-import numpy as np
 from PySide6.QtCore import Slot
-from qtpy.QtWidgets import QLineEdit, QToolButton, QWidget
+from qtpy.QtWidgets import QLineEdit, QWidget
 from qtpynodeeditor import (
-    CaptionOverride,
-    ConnectionPolicy,
     DataTypes,
     NodeData,
     NodeDataModel,
-    NodeDataType,
     NodeValidationState,
     Port,
     PortCount,
-    PortType,
 )
-from qtpynodeeditor.type_converter import TypeConverter
 
 from ..datarules.base_rules import Input
 from ..gui.config_inputs import ItemDeclaration
 from ..gui.settings_inputs import (
     DirectoryInput,
     FileInput,
-    SettingsBox,
-    SettingsRow,
 )
-from .base_types import (
-    AnyData,
-    BoolData,
-    ImageData,
-    IntegerData,
-    ListData,
-    PathData,
-    PathGeneratorData,
-    SignalData,
-    StringData,
-    generator_to_list_converter,
-    list_to_generator_converter,
-)
+from .base_types.base_types import BoolData, PathData, SignalData, StringData
 
 
 class FileNode(NodeDataModel):

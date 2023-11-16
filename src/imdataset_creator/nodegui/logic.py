@@ -30,7 +30,7 @@ from qtpynodeeditor import (
     PortCount,
 )
 
-from .base_types import (
+from .base_types.base_types import (
     AnyData,
     BoolData,
     FloatData,
