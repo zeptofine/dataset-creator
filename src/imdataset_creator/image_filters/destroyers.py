@@ -45,7 +45,6 @@ class Blur(Filter):
     ) -> np.ndarray:
         algorithms = self.algorithms or [BlurAlgorithm.AVERAGE]
         algorithm: BlurAlgorithm = choice(algorithms)
-
         start, stop = self.blur_range
         ri = randint(start, stop)
         ksize: int

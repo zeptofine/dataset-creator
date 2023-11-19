@@ -19,7 +19,7 @@ DEFAULT_IMAGE_FORMATS = (
     ".tif",
 )
 
-InputView_ = ItemDeclaration(
+InputView_ = ItemDeclaration[Input](
     "Input",
     Input,
     settings=ItemSettings(

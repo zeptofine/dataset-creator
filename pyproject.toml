@@ -71,3 +71,11 @@ target-version = "py311"
 
 [tool.isort]
 profile = "black"
+
+[tool.pylint]
+disable = [
+  "C0114", # missing-module-docstring
+  "C0115", # missing-class-docstring
+  "C0116", # missing-function-docstring
+]
+max-line-length = 120

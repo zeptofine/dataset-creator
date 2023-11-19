@@ -29,9 +29,18 @@ def whash_db4(img) -> imagehash.ImageHash:
     return imagehash.whash(img, mode="db4")
 
 
-def get_hwc(pth):
+def _get_hwc(pth):
     img = Image.open(pth)
-    return {"width": img.width, "height": img.height, "channels": len(img.getbands())}
+    return img.height, img.width, len(img.getbands())
+
+
+def get_hwc(pth):
+    h, w, c = _get_hwc(pth)
+    return {
+        "height": h,
+        "width": w,
+        "channels": c,
+    }
 
 
 class ImShapeProducer(Producer):

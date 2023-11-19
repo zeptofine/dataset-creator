@@ -176,7 +176,7 @@ class Input(Keyworded):
 
     @classmethod
     def from_cfg(cls, cfg: InputData):
-        return cls(Path(cfg["folder"]).expanduser(), cfg["expressions"])
+        return cls(Path(cfg.get("folder", ".")).expanduser(), cfg["expressions"])
 
     def run(self) -> PathGenerator:
         """
@@ -300,7 +300,7 @@ def combine_expr_conds(exprs: Iterable[Expr]) -> Expr:
 
     Parameters
     ----------
-    exprs : list[Expr]
+    exprs : Iterable[Expr]
         A list of `Expr` objects to be combined.
 
     Returns
