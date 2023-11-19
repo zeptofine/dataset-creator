@@ -1,19 +1,26 @@
+from __future__ import annotations
+
 import threading
 from collections.abc import Callable, Generator
 from pathlib import Path
-from random import Random
-from typing import TypeVar
+from typing import Any
 
 import numpy as np
-import qtpynodeeditor as ne
 from qtpynodeeditor import (
     NodeData,
     NodeDataType,
 )
-from qtpynodeeditor.type_converter import TypeConverter
 
 
-class PathGeneratorData(NodeData):
+class ValuedNodeData(NodeData):
+    value: property
+
+    @staticmethod
+    def check(s: ValuedNodeData | None) -> Any | None:
+        return s.value if s is not None else None
+
+
+class PathGeneratorData(ValuedNodeData):
     """Node data holding a generator"""
 
     data_type = NodeDataType("path_generator", "Path Generator")
@@ -27,11 +34,11 @@ class PathGeneratorData(NodeData):
         return self._lock
 
     @property
-    def generator(self) -> Generator:
+    def value(self) -> Generator:
         return self._generator
 
 
-class RandomNumberGeneratorData(NodeData):
+class RandomNumberGeneratorData(ValuedNodeData):
     """Node data holding a generator"""
 
     data_type = NodeDataType("random_number_generator", "Random Number Generator")
@@ -45,11 +52,11 @@ class RandomNumberGeneratorData(NodeData):
         return self._lock
 
     @property
-    def generator(self) -> Callable[[], float]:
+    def value(self) -> Callable[[], float]:
         return self._generator
 
 
-class IntegerData(NodeData):
+class IntegerData(ValuedNodeData):
     data_type = NodeDataType("integer", "Integer")
 
     def __init__(self, value: int):
@@ -60,7 +67,7 @@ class IntegerData(NodeData):
         return self._value
 
 
-class FloatData(NodeData):
+class FloatData(ValuedNodeData):
     data_type = NodeDataType("float", "Float")
 
     def __init__(self, value: float):
@@ -75,7 +82,7 @@ class SignalData(NodeData):
     data_type = NodeDataType("signal", "Signal")
 
 
-class BoolData(NodeData):
+class BoolData(ValuedNodeData):
     data_type = NodeDataType("bool", "Boolean")
 
     def __init__(self, v: bool) -> None:
@@ -87,7 +94,7 @@ class BoolData(NodeData):
         return self._value
 
 
-class ListData(NodeData):
+class ListData(ValuedNodeData):
     """Node data holding a list"""
 
     data_type = NodeDataType("list", "List")
@@ -96,22 +103,22 @@ class ListData(NodeData):
         self._list = lst
 
     @property
-    def list(self):  # noqa: A003
+    def value(self):
         return self._list
 
 
-class AnyData(NodeData):
+class AnyData(ValuedNodeData):
     data_type = NodeDataType("any", "Any")
 
     def __init__(self, item) -> None:
         self._item = item
 
     @property
-    def item(self):
+    def value(self):
         return self._item
 
 
-class PathData(NodeData):
+class PathData(ValuedNodeData):
     data_type = NodeDataType("path", "Path")
 
     def __init__(self, p: Path) -> None:
@@ -119,11 +126,11 @@ class PathData(NodeData):
         self._path = p
 
     @property
-    def path(self):
+    def value(self):
         return self._path
 
 
-class StringData(NodeData):
+class StringData(ValuedNodeData):
     data_type = NodeDataType("str", "String")
 
     def __init__(self, s: str) -> None:
@@ -131,16 +138,16 @@ class StringData(NodeData):
         self._str = s
 
     @property
-    def string(self):
+    def value(self):
         return self._str
 
 
-class ImageData(NodeData):
+class ImageData(ValuedNodeData):
     data_type = NodeDataType("image", "Image")
 
     def __init__(self, im: np.ndarray) -> None:
         self._image = im
 
     @property
-    def image(self):
+    def value(self):
         return self._image

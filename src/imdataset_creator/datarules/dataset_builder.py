@@ -2,7 +2,7 @@ import inspect
 import os
 import textwrap
 import warnings
-from collections.abc import Collection, Generator, Iterable
+from collections.abc import Collection, Container, Generator, Iterable, Mapping
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
@@ -80,7 +80,7 @@ def combine_matchers(
         yield combination
 
 
-def blacklist_schema(schema: ProducerSchema, blacklist: Collection) -> ProducerSchema:
+def blacklist_schema(schema: ProducerSchema, blacklist: Container[str]) -> ProducerSchema:
     return [out for dct in schema if (out := {k: v for k, v in dct.items() if k not in blacklist})]
 
 
@@ -129,7 +129,7 @@ class DatasetBuilder:
         for producer in producers:
             self.add_producer(producer)
 
-    def fill_from_config(self, cfg: dict[str, dict], no_warn=False):
+    def fill_from_config(self, cfg: Mapping[str, dict], no_warn=False):
         if not len(self.unready_rules):
             return
 
@@ -277,7 +277,7 @@ class DatasetBuilder:
     def get_unfinished_existing(self) -> LazyFrame:
         return self.get_unfinished().filter(pl.col("path").apply(os.path.exists))
 
-    def filter(self, lst) -> DataFrame:  # noqa: A003
+    def filter(self, lst: Collection[str]) -> DataFrame:  # noqa: A003
         if len(self.unready_rules):
             warnings.warn(
                 f"{len(self.unready_rules)} filters are not initialized and will not be populated",

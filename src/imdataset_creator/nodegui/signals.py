@@ -1,28 +1,10 @@
-import contextlib
-import random
-from collections.abc import Generator
-from pathlib import Path
-from queue import Empty, Queue
-from time import sleep
+from queue import Queue
 
 from PySide6.QtCore import QThread, Signal, Slot
-from qtpy.QtCore import QObject
 from qtpy.QtWidgets import QSpinBox, QToolButton, QVBoxLayout, QWidget
-from qtpynodeeditor import (
-    ConnectionPolicy,
-    DataModelRegistry,
-    DataTypes,
-    NodeData,
-    NodeDataModel,
-    NodeValidationState,
-    Port,
-    PortCount,
-)
+from qtpynodeeditor import DataTypes, NodeData, NodeDataModel, Port, PortCount
 
 from .base_types.base_types import (
-    ListData,
-    PathData,
-    PathGeneratorData,
     SignalData,
 )
 

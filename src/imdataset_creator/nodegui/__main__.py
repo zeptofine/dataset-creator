@@ -1,4 +1,3 @@
-import logging
 from collections.abc import Callable
 from pprint import pformat
 
@@ -40,11 +39,11 @@ class PrinterNode(NodeDataModel):
         super().__init__(style, parent)
         self._label = QLabel()
 
-    def set_in_data(self, node_data: AnyData | None, port: Port):
+    def set_in_data(self, node_data: AnyData | None, _: Port):
         if node_data is None:
             return
 
-        txt = pformat(node_data.item)
+        txt = pformat(node_data.value)
         self._label.setText(txt)
         self._label.setFixedSize(get_text_bounds(txt, self._label.font()))
 
@@ -57,9 +56,9 @@ class DebugPrinterNode(NodeDataModel):
     num_ports = PortCount(1, 0)
     all_data_types = AnyData.data_type
 
-    def set_in_data(self, node_data: AnyData | None, port: Port):
+    def set_in_data(self, node_data: AnyData | None, _: Port):
         if node_data is not None:
-            print(node_data.item)
+            print(node_data.value)
 
 
 class NoteNode(NodeDataModel):
@@ -90,7 +89,7 @@ def register_type(registry: ne.DataModelRegistry, from_: NodeDataType, to_: Node
     registry.register_type_converter(from_, to_, TypeConverter(from_, to_, converter))
 
 
-def main(app):
+def main():
     registry = ne.DataModelRegistry()
 
     model_dct = {
@@ -134,7 +133,7 @@ def main(app):
 def app_main():
     # logging.basicConfig(level="DEBUG")
     app = QApplication([])
-    scene, view, sh = main(app)
+    scene, _, sh = main()
     scene.load("text.flow")
     app.exec_()
     scene.save("text.flow")

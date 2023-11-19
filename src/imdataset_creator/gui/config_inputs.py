@@ -3,7 +3,7 @@ from __future__ import annotations
 import contextlib
 import functools
 from copy import deepcopy as objcopy
-from typing import Generic, TypeVar
+from typing import Generic, Iterable, TypeVar
 
 from PySide6.QtCore import QRect, Qt, Signal, Slot
 from PySide6.QtGui import QAction, QMouseEvent
@@ -404,7 +404,7 @@ class ProceduralConfigList(QGroupBox):  # TODO: Better name lmao
             for item in self.items
         ]
 
-    def add_from_cfg(self, lst: list[ItemConfig]):
+    def add_from_cfg(self, lst: Iterable[ItemConfig]):
         for new_item in lst:
             item: ProceduralConfigItem = ProceduralConfigItem(self.registered_items[new_item["name"]], self)
             item.from_cfg(new_item["data"])

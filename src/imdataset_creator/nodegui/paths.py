@@ -1,3 +1,4 @@
+import contextlib
 import shutil
 from abc import abstractmethod
 from collections.abc import Callable
@@ -119,22 +120,26 @@ class BasicPathAttrGetterNode(NodeDataModel):
             self._validation_message = ""
             return
 
-        try:
-            attr = self.compute(node_data.path)
-        except Exception as e:
-            self._validation_state = NodeValidationState.error
-            self._validation_message = str(e)
-            return
-        else:
-            self._validation_state = NodeValidationState.valid
-            self._validation_message = ""
-
-        self._output = StringData(str(attr))
-        self.data_updated.emit(0)
+        with self.validatable_context():
+            attr = self.compute(node_data.value)
+            self._output = StringData(str(attr))
+            self.data_updated.emit(0)
 
     @staticmethod
     def compute(path: Path) -> str:
         ...
+
+    @contextlib.contextmanager
+    def validatable_context(self):
+        try:
+            yield
+        except Exception as e:
+            self._validation_state = NodeValidationState.error
+            self._validation_message = str(e)
+            raise
+        else:
+            self._validation_state = NodeValidationState.valid
+            self._validation_message = ""
 
     def validation_state(self) -> NodeValidationState:
         return self._validation_state
@@ -154,21 +159,13 @@ class BasicPathRelativeGetterNode(BasicPathAttrGetterNode):
         if node_data is None:
             return
 
-        try:
-            attr = self.compute(node_data.path)
-        except Exception as e:
-            self._validation_state = NodeValidationState.error
-            self._validation_message = str(e)
-            return
-        else:
-            self._validation_state = NodeValidationState.valid
-            self._validation_message = ""
-
-        self._output = PathData(attr)
-        self.data_updated.emit(0)
+        with self.validatable_context():
+            attr = self.compute(node_data.value)
+            self._output = PathData(attr)
+            self.data_updated.emit(0)
 
     @staticmethod
-    def compute(p: Path) -> Path:
+    def compute(path: Path) -> Path:
         ...
 
 
@@ -180,21 +177,12 @@ class BasicPathCheckerNode(BasicPathRelativeGetterNode):
     _output: BoolData | None
 
     def set_in_data(self, node_data: PathData | None, _: Port):
-        if node_data is None or node_data.path is None:
+        if node_data is None or node_data.value is None:
             return
-
-        try:
-            attr = self.compute(node_data.path)
-        except Exception as e:
-            self._validation_state = NodeValidationState.error
-            self._validation_message = str(e)
-            return
-        else:
-            self._validation_state = NodeValidationState.valid
-            self._validation_message = ""
-
-        self._output = BoolData(attr)
-        self.data_updated.emit(0)
+        with self.validatable_context():
+            attr = self.compute(node_data.value)
+            self._output = BoolData(attr)
+            self.data_updated.emit(0)
 
     @staticmethod
     def compute(p: Path) -> bool:
@@ -215,19 +203,12 @@ class BasicPathSingleComputerNode(BasicPathRelativeGetterNode):
         if node_data is None:
             return
         if port.index == 0:
-            self._first = node_data.path
+            self._first = node_data.value
 
         if port.index == 1 and self._first is not None:
-            try:
+            with self.validatable_context():
                 self.compute(self._first)
                 self.data_updated.emit(0)
-            except Exception as e:
-                self._validation_state = NodeValidationState.error
-                self._validation_message = str(e)
-                return
-            else:
-                self._validation_state = NodeValidationState.valid
-                self._validation_message = ""
 
     @staticmethod
     def compute(p: Path) -> None:
@@ -254,23 +235,15 @@ class BasicPathTransformerNode(BasicPathRelativeGetterNode):
                 self._second = None
             return
         if port.index == 0:
-            self._first = node_data.path
+            self._first = node_data.value
         if port.index == 1:
-            self._second = node_data.path
+            self._second = node_data.value
 
         if self._first is not None and self._second is not None:
-            try:
+            with self.validatable_context():
                 out = self.compute(self._first, self._second)
-            except Exception as e:
-                self._validation_state = NodeValidationState.error
-                self._validation_message = str(e)
-                return
-            else:
-                self._validation_state = NodeValidationState.valid
-                self._validation_message = ""
-
-            self._output = PathData(out)
-            self.data_updated.emit(0)
+                self._output = PathData(out)
+                self.data_updated.emit(0)
 
     @staticmethod
     def compute(first: Path, second: Path) -> Path:
@@ -297,21 +270,17 @@ class BasicPathMoverNode(BasicPathTransformerNode):
         if node_data is None:
             return
         if port.index == 0:
-            self._first = node_data.path
+            self._first = node_data.value
         if port.index == 1:
-            self._second = node_data.path
+            self._second = node_data.value
 
         if port.index == 2 and self._first is not None and self._second is not None:
             try:
-                self.compute(self._first, self._second)
+                with self.validatable_context():
+                    self.compute(self._first, self._second)
             except Exception as e:
-                self._validation_state = NodeValidationState.error
-                self._validation_message = str(e)
                 self.success = False
-                return
             else:
-                self._validation_state = NodeValidationState.valid
-                self._validation_message = ""
                 self.success = True
 
             self.data_updated.emit(0)

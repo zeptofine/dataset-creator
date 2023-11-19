@@ -16,6 +16,7 @@ from qtpynodeeditor import (
     DataTypes,
     NodeData,
     NodeDataModel,
+    NodeValidationState,
     Port,
     PortCount,
 )
@@ -38,6 +39,7 @@ from .base_types.base_types import (
     ImageData,
     IntegerData,
     PathData,
+    SignalData,
 )
 
 
@@ -72,14 +74,55 @@ class ImageReaderNode(NodeDataModel):
     def set_in_data(self, node_data: PathData | None, port: Port):
         if node_data is None:
             return
-
-        self._reader_thread.pth = node_data.path
+        if self._reader_thread.isRunning():
+            self._reader_thread.wait()
+        self._reader_thread.pth = node_data.value
         self._reader_thread.start()
-        self._reader_thread.wait()
 
     def set_image(self, img):
         self._img = img
         self.data_updated.emit(0)
+
+
+class SaverThread(QThread):
+    pth: Path
+    img: np.ndarray
+
+    def run(self):
+        cv2.imwrite(str(self.pth), self.img)
+
+
+class ImageSaverNode(NodeDataModel):
+    name = "Save Image"
+    num_ports = PortCount(3, 1)
+    data_types = DataTypes(
+        {0: ImageData.data_type, 1: PathData.data_type, 2: SignalData.data_type},
+        {0: SignalData.data_type},
+    )
+
+    def __init__(self, style=None, parent=None):
+        super().__init__(style, parent)
+        self._img = None
+        self._path = None
+        self._saver_thread = SaverThread(parent)
+        self._saver_thread.finished.connect(lambda: self.data_updated.emit(0))
+
+    def out_data(self, port: int) -> NodeData | None:
+        return SignalData()
+
+    def set_in_data(self, node_data: ImageData | PathData | SignalData | None, port: Port):
+        if node_data is None:
+            return
+        if port.index == 0 and isinstance(node_data, ImageData):
+            self._img = node_data.value
+        if port.index == 1 and isinstance(node_data, PathData):
+            self._path = node_data.value
+        if port.index == 2 and self._img is not None and self._path is not None:
+            if self._saver_thread.isRunning():
+                self._saver_thread.wait()
+            self._saver_thread.img = self._img
+            self._saver_thread.pth = self._path
+            self._saver_thread.start()
 
 
 class ImageViewerNode(NodeDataModel):
@@ -117,10 +160,10 @@ class ImageViewerNode(NodeDataModel):
     def set_in_data(self, node_data: ImageData | None, port: Port):
         self._node_data = node_data
         if node_data is not None:
-            im = node_data.image
+            im = node_data.value
             if im is None:
                 return
-            im: np.ndarray = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+            im: np.ndarray = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)  # type: ignore
             im = im.astype(np.uint32)
             shape = im.shape
             im = (255 << 24 | im[:, :, 0] << 16 | im[:, :, 1] << 8 | im[:, :, 2]).flatten()  # pack RGB values
@@ -178,7 +221,7 @@ class ImageShapeNode(NodeDataModel):
             self._result = None
             return
 
-        self._result = get_h_w_c(node_data.image)
+        self._result = get_h_w_c(node_data.value)
         self.data_updated.emit(0)
         self.data_updated.emit(1)
         self.data_updated.emit(2)
@@ -203,7 +246,7 @@ class FastImageShapeNode(ImageShapeNode):
             self._result = None
             return
 
-        self._result = _get_hwc(node_data.path)
+        self._result = _get_hwc(node_data.value)
         self.data_updated.emit(0)
         self.data_updated.emit(1)
         self.data_updated.emit(2)
@@ -216,7 +259,8 @@ class ImageConverterThread(QThread):
     completed_data = Signal(np.ndarray)
 
     def run(self):
-        self.completed_data.emit(self.f.run(self.img))
+        img = self.f.run(self.img)
+        self.completed_data.emit(img)
 
 
 class BasicImageConverterModel(NodeDataModel):
@@ -230,7 +274,11 @@ class BasicImageConverterModel(NodeDataModel):
         self._output: ImageData | None = None
         self._thread = ImageConverterThread(parent)
         self._thread.completed_data.connect(self.set_output)
+        self._thread.started.connect(self.on_starting)
+        self._thread.finished.connect(self.on_finished)
         self._settings = self.get_widget()
+        self._validation_state = NodeValidationState.valid
+        self._validation_message = ""
 
     def out_data(self, port: int) -> NodeData | None:
         if self._output is None:
@@ -241,23 +289,27 @@ class BasicImageConverterModel(NodeDataModel):
         if node_data is None:
             return
         f: Filter = self.item.get(self._settings)
-        # self._thread.wait()
+
+        if self._thread.isRunning():
+            self._thread.wait()
         self._thread.f = f
-        self._thread.img = node_data.image
-
+        self._thread.img = node_data.value
         self._thread.start()
-        self._thread.wait()
 
-        # self._output = ImageData(obj.run(node_data.image))
-        # self.data_updated.emit(0)
+    @Slot()
+    def on_starting(self):
+        self._validation_state = NodeValidationState.warning
+        self._validation_message = "Working..."
+
+    @Slot()
+    def on_finished(self):
+        self._validation_state = NodeValidationState.valid
+        self._validation_message = ""
 
     @Slot(np.ndarray)
     def set_output(self, img: np.ndarray):
         self._output = ImageData(img)
         self.data_updated.emit(0)
-
-    def compute(self, img: ImageData):
-        self._output = img
 
     def embedded_widget(self) -> QWidget:
         return self._settings
@@ -276,6 +328,12 @@ class BasicImageConverterModel(NodeDataModel):
         with contextlib.suppress(KeyError):
             self._settings.from_cfg(doc["settings"])
 
+    def validation_state(self) -> NodeValidationState:
+        return self._validation_state
+
+    def validation_message(self) -> str:
+        return self._validation_message
+
 
 def new_converter_model(filter_view: ItemDeclaration):
     return type(
@@ -292,6 +350,7 @@ def new_converter_model(filter_view: ItemDeclaration):
 
 ALL_MODELS = [
     ImageReaderNode,
+    ImageSaverNode,
     ImageViewerNode,
     ImageShapeNode,
     FastImageShapeNode,

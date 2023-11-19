@@ -300,7 +300,7 @@ def combine_expr_conds(exprs: Iterable[Expr]) -> Expr:
 
     Parameters
     ----------
-    exprs : list[Expr]
+    exprs : Iterable[Expr]
         A list of `Expr` objects to be combined.
 
     Returns

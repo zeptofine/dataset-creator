@@ -8,7 +8,6 @@ from qtpy.QtGui import QFont, QFontMetrics
 from qtpy.QtWidgets import (
     QLabel,
     QSpinBox,
-    QToolButton,
     QWidget,
 )
 from qtpynodeeditor import (
@@ -24,8 +23,8 @@ from qtpynodeeditor import (
 
 from ..datarules.base_rules import Input
 from ..gui.config_inputs import ItemDeclaration
-from ..gui.input_view import DEFAULT_IMAGE_FORMATS, InputView_
-from ..gui.settings_inputs import DirectoryInput, ItemSettings, MultilineInput
+from ..gui.input_view import DEFAULT_IMAGE_FORMATS
+from ..gui.settings_inputs import ItemSettings, MultilineInput
 from .base_types.base_types import (
     IntegerData,
     ListData,
@@ -77,7 +76,7 @@ class GlobberNode(NodeDataModel):
         if node_data is None:
             return
         if port.index == 0:
-            self._pth = node_data.path
+            self._pth = node_data.value
         if port.index == 1 and self._pth is not None:
             self.set_generator(self._pth)
 
@@ -141,7 +140,7 @@ class GeneratorStepperNode(NodeDataModel):
                 self.invalidate()
                 return
 
-            self._generator = node_data.generator
+            self._generator = node_data.value
             self.revalidate()
         elif port.index == 1:
             if isinstance(node_data, SignalData):
@@ -219,7 +218,7 @@ class EnumerateNode(NodeDataModel):
                 return
             assert isinstance(node_data, PathGeneratorData)
             self._index = 0
-            self._generator = node_data.generator
+            self._generator = node_data.value
             self.revalidate()
 
         elif port.index == 1:
@@ -272,7 +271,7 @@ class GeneratorSplitterNode(NodeDataModel):
             self._first_q.queue.clear()
             self._last_q.queue.clear()
 
-        self._in_gen = node_data.generator
+        self._in_gen = node_data.value
         self.data_updated.emit(0)
         self.data_updated.emit(1)
 
@@ -332,7 +331,7 @@ class GeneratorResolverNode(NodeDataModel):
     def set_in_data(self, node_data: PathGeneratorData | None, _: Port):
         if node_data is None:
             return
-        self._list = list(node_data.generator)
+        self._list = list(node_data.value)
         self.data_updated.emit(0)
 
 
@@ -356,7 +355,7 @@ class ListHeadNode(NodeDataModel):
         if node_data is None:
             return
 
-        self._in_list = node_data.list
+        self._in_list = node_data.value
         self.data_updated.emit(0)
 
     def embedded_widget(self) -> QWidget:
@@ -380,7 +379,7 @@ class ListShufflerNode(NodeDataModel):
         if node_data is None:
             self._list = None
             return
-        self._list = node_data.list
+        self._list = node_data.value
         self.data_updated.emit(0)
 
 

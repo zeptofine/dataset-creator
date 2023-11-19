@@ -2,14 +2,17 @@ import difflib
 import logging
 
 import qtpynodeeditor as ne
-from qtpy.QtCore import QLineF, QPoint, QRectF, Qt
-from qtpy.QtGui import QContextMenuEvent, QKeyEvent, QKeySequence, QMouseEvent, QPainter, QPen, QShowEvent, QWheelEvent
+from qtpy.QtCore import QPoint, Qt
 from qtpy.QtWidgets import QLineEdit, QMenu, QTreeWidget, QTreeWidgetItem, QWidgetAction
 
 logger = logging.getLogger(__name__)
 
 
 class CustomFlowView(ne.FlowView):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._parent: QTreeWidgetItem
+
     def generate_context_menu(self, pos: QPoint):
         """
         Generate a context menu for contextMenuEvent

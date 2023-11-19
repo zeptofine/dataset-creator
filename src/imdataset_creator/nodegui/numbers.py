@@ -1,41 +1,30 @@
 import operator
 import random
-import threading
 from collections.abc import Callable
-from decimal import Decimal
 
-import cv2
-import numpy as np
-import PySide6.QtCore
-from PIL import Image
-from qtpy.QtCore import QEvent, QObject, Qt, QThread
-from qtpy.QtGui import QImage, QPixmap
 from qtpy.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
-    QLabel,
     QSpinBox,
     QWidget,
 )
 from qtpynodeeditor import (
     CaptionOverride,
-    ConnectionPolicy,
     DataTypes,
     NodeData,
     NodeDataModel,
-    NodeDataType,
     NodeValidationState,
     Port,
     PortCount,
 )
 
 from .base_types.base_types import (
-    AnyData,
     BoolData,
     FloatData,
     IntegerData,
     RandomNumberGeneratorData,
     SignalData,
+    ValuedNodeData,
 )
 
 
@@ -133,9 +122,9 @@ class MathNode(NodeDataModel):
 
     def set_in_data(self, node_data: FloatData | None, port: Port):
         if port.index == 0:
-            self.first = node_data.value if node_data is not None else None
+            self.first = ValuedNodeData.check(node_data)
         elif port.index == 1:
-            self.second = node_data.value if node_data is not None else None
+            self.second = ValuedNodeData.check(node_data)
 
         if self.first is not None and self.second is not None:
             self._result = FloatData(self.operators[self._widget.currentText()](self.first, self.second))
@@ -195,9 +184,9 @@ class ComparisonNode(NodeDataModel):
 
     def set_in_data(self, node_data: FloatData | None, port: Port):
         if port.index == 0:
-            self.first = node_data.value if node_data is not None else None
+            self.first = ValuedNodeData.check(node_data)
         elif port.index == 1:
-            self.second = node_data.value if node_data is not None else None
+            self.second = ValuedNodeData.check(node_data)
 
         if self.first is not None and self.second is not None:
             self._result = self.operators[self._widget.currentText()](self.first, self.second)
@@ -253,11 +242,11 @@ class RandomRangeNode(NodeDataModel):
 
     def set_in_data(self, node_data: FloatData | None, port: Port):
         if port.index == 0:
-            self._start = node_data.value if node_data is not None else None
+            self._start = ValuedNodeData.check(node_data)
         if port.index == 1:
-            self._stop = node_data.value if node_data is not None else None
+            self._stop = ValuedNodeData.check(node_data)
         if port.index == 2:
-            self._step = node_data.value if node_data is not None else None
+            self._step = ValuedNodeData.check(node_data)
         self.check_validation()
         if self._start is not None and self._stop is not None and self._step is not None:
             diff = self._stop - self._start
@@ -306,7 +295,7 @@ class NumberGeneratorResolverNode(NodeDataModel):
             if node_data is None:
                 return
             assert isinstance(node_data, RandomNumberGeneratorData)
-            self._generator = node_data.generator
+            self._generator = node_data.value
         if port.index == 1:
             self.compute()
 
