@@ -121,7 +121,7 @@ class BlackWhitelistRule(Rule):
 
         self.whitelist: list[str] | None = whitelist
         self.blacklist: list[str] | None = blacklist
-        if not self.whitelist or self.blacklist:
+        if not (self.whitelist or self.blacklist):
             raise EmptyListsError()
         exprs: list[Expr] = []
         if self.whitelist:
