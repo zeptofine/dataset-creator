@@ -6,17 +6,21 @@ from collections import defaultdict
 from collections.abc import Callable, Generator, Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from types import MappingProxyType
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
-import numpy as np
 import wcmatch.glob as wglob
 from pathvalidate import validate_filepath
 from polars import DataFrame, DataType, Expr, PolarsDataType
 
 from ..configs import Keyworded
-from ..configs.configtypes import InputData, OutputData
 from ..file import File, SafeFormatter
+
+if TYPE_CHECKING:
+    from types import MappingProxyType
+
+    import numpy as np
+
+    from ..configs.configtypes import InputData, OutputData
 
 PartialDataFrame = DataFrame
 FullDataFrame = DataFrame

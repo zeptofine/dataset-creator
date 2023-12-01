@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from string import Formatter
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from pathvalidate import sanitize_filename
-from typing_extensions import SupportsIndex
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping, Sequence
+
+    from typing_extensions import SupportsIndex
 
 
 class InvalidFormatError(Exception):
@@ -41,8 +44,6 @@ class SafeFormatter(Formatter):
 
 
 escaped_split = re.compile(r"(?<!\\),")
-condition_fmt = re.compile(r"^(?P<prompt>[^\?:]+)\?(?P<true>(?:[^:])*):?(?P<false>.*)$")  # present?yes:no
-replacement_fmt = re.compile(r"'(?P<from>[^']+)'='(?P<to>[^']*)'")
 
 
 def condition_format(pth: str, match: re.Match) -> str:
@@ -56,12 +57,18 @@ def condition_format(pth: str, match: re.Match) -> str:
     return match.group("false")
 
 
+def replacement_format(pth: str, match: re.Match) -> str:
+    """
+    Inline replacement condition. 'from'='to'
+    replaces every instance of `from` to `to`.
+    """
+    return pth.replace(match.group("from"), match.group("to"))
+
+
 class MalleablePath(str):
     mpath_format_conditions: ClassVar[dict[re.Pattern, Callable[[str, re.Match], str]]] = {
         re.compile(r"^(?P<prompt>[^\?:]+)\?(?P<true>(?:[^:!])*):?(?P<false>.*)$"): (condition_format),
-        re.compile(r"^'(?P<from>[^']+)'='(?P<to>[^']*)'$"): (  # replaces <from> to <to>
-            lambda pth, m: pth.replace(m.group("from"), m.group("to"))
-        ),
+        re.compile(r"^'(?P<from>[^']+)'='(?P<to>[^']*)'$"): (replacement_format),
     }
 
     def __format__(self, format_spec: str):

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from collections.abc import Collection
+from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import (
     QCheckBox,
     QFrame,
     QGridLayout,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Collection
 
 
 class MiniCheckList(QFrame):

@@ -277,7 +277,7 @@ class DatasetBuilder:
     def get_unfinished_existing(self) -> LazyFrame:
         return self.get_unfinished().filter(pl.col("path").apply(os.path.exists))
 
-    def filter(self, lst: Collection[str]) -> DataFrame:  # noqa: A003
+    def filter(self, lst: Collection[str]) -> DataFrame:
         if len(self.unready_rules):
             warnings.warn(
                 f"{len(self.unready_rules)} filters are not initialized and will not be populated",

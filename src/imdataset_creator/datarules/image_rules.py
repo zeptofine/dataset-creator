@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Callable
 from enum import Enum, StrEnum
 from functools import cache
 from types import MappingProxyType
-from typing import Literal, Self
+from typing import TYPE_CHECKING, Literal, Self
 
 import imagehash
 import polars as pl
@@ -24,6 +23,11 @@ from .base_rules import (
     combine_expr_conds,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    import numpy as np
+
 
 def whash_db4(img) -> imagehash.ImageHash:
     return imagehash.whash(img, mode="db4")
@@ -41,6 +45,12 @@ def get_hwc(pth):
         "width": w,
         "channels": c,
     }
+
+
+def get_hwc_from_np(img: np.ndarray):
+    h, w = img.shape[:2]
+    c = 1 if img.ndim == 2 else img.shape[2]
+    return h, w, c
 
 
 class ImShapeProducer(Producer):

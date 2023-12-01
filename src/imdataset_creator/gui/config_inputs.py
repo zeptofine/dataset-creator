@@ -3,7 +3,7 @@ from __future__ import annotations
 import contextlib
 import functools
 from copy import deepcopy as objcopy
-from typing import Generic, Iterable, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 from PySide6.QtCore import QRect, Qt, Signal, Slot
 from PySide6.QtGui import QAction, QMouseEvent
@@ -25,6 +25,9 @@ from PySide6.QtWidgets import (
 from ..configs.configtypes import ItemConfig, ItemData
 from ..configs.keyworded import Keyworded
 from .settings_inputs import BaseInput, ItemSettings, SettingsBox, SettingsItem, apply_tooltip
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 JSON_SERIALIZABLE = dict | list | tuple | str | int | float | bool | None
 
@@ -317,7 +320,6 @@ class ProceduralConfigList(QGroupBox):  # TODO: Better name lmao
             self.add_box.setEnabled(True)
         elif self.add_box.isVisible():
             self.add_box.setEnabled(False)
-        return
 
     def add_item_to_menu(self, item: ItemDeclaration):
         self.add_menu.addAction(item.title, lambda: self.initialize_item(item))
